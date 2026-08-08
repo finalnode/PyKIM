@@ -21,7 +21,9 @@ for x in range(100, 140):
     paint()
 
 # Walk over the path and play a different tone for each section.
+paint_stop()
 set_x(20)
+animate()
 last_color = ""
 
 for _ in range(119):

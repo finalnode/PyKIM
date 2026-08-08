@@ -1,6 +1,6 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: PyKIM
-Version: 0.1.0
+Version: 0.11.0
 Summary: A small, Pyxel-based Python learning environment
 Author: PyKIM contributors
 License: MIT License
@@ -36,10 +36,11 @@ License-File: LICENSE
 Requires-Dist: pyxel<3,>=2.2
 Provides-Extra: test
 Requires-Dist: pytest>=8; extra == "test"
+Dynamic: license-file
 
 # PyKIM
 
-PyKIM 0.1 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
+PyKIM 0.11 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
 kleine Drohne, bewegt sich pixelweise durch eine 160 × 120 Pixel große Welt,
 liest und verändert Farben und kann einfache Töne spielen. Die gesamte Logik
 funktioniert auch ohne ein geöffnetes Grafikfenster und ist daher gut testbar.
@@ -64,22 +65,36 @@ pytest
 ```python
 from pykim import *
 
+animate()
 set_x(20)
 set_y(20)
 set_color("purple")
+paint_start()
 
 for _ in range(30):
-    paint()
     right()
 
 run()
 ```
 
+`animate()` zeigt Kims Bewegungen beim späteren `run()` Schritt für Schritt.
+Die Standardverzögerung beträgt `0.1` Sekunden pro Pixel und kann angepasst
+werden, zum Beispiel mit `animate(0.25)`. Auch `right(10)` zeigt dabei alle
+zehn Zwischenpositionen. Wird die Zeile entfernt, erscheint Kim wie bisher
+sofort an der Endposition.
+
 `run()` öffnet am Ende das Pyxel-Fenster. Der Ursprung `(0, 0)` liegt links
 oben; `x` wächst nach rechts und `y` nach unten. Kim startet bei `(0, 0)`.
 Bewegungen, die die Welt verlassen würden, lösen eine verständliche Exception
-aus. Kim erscheint als Quadcopter von oben; ihre logische Position ist der
-Mittelpunkt des Sprites.
+aus. Kim erscheint als einzelner Pixel, der durch alle sichtbaren Farben der
+Pyxel-Palette rotiert. Trifft die Cursorfarbe auf dieselbe Farbe im
+Hintergrund, überspringt Kim sie automatisch. Mit `get_color(direction)` oder
+`get_color(x, y)` gelesene Pixel leuchten bei aktivem `animate()` kurz cyan
+auf, ohne dass sich ihre gespeicherte Farbe ändert.
+
+Beim Start kreuzen sich eine bildschirmfüllende x- und y-Achse an Kims
+Startposition. Beide Achsen schrumpfen zu Kims Pixel zusammen. Nach der
+Bewegungs- oder Musiksequenz bleibt Kim einfach als einzelner Pixel stehen.
 
 ## Schüler-API
 
@@ -101,26 +116,34 @@ left(steps=1)
 right(steps=1)
 ```
 
-Farbe auswählen, den aktuellen Pixel färben und Pixel lesen:
+Farbe auswählen, eine Spur beginnen oder beenden und Pixel lesen:
 
 ```python
 set_color("purple")  # oder set_color(2)
-paint()
+paint_start()
+right(20)            # malt jeden besuchten Pixel
+paint_stop()
 get_color()          # aktueller Pixel
 get_color("right")   # unmittelbarer Nachbar
 get_color(100, 50)   # beliebige Position
 ```
 
-Mit `paint_path()` hinterlässt Kim bei jeder Bewegung eine durchgehende Spur.
-Ohne vorherige Farbauswahl wird Weiß verwendet:
+`paint_start()` färbt sofort den aktuellen Pixel und danach jeden Pixel, über
+den Kim sich bewegt. `paint_stop()` beendet die Spur. Ohne vorherige
+Farbauswahl wird Weiß verwendet:
 
 ```python
-paint_path()
+paint_start()
 right(20)
+paint_stop()
 
-paint_path("orange")
+paint_start("orange")
 down(10)
+paint_stop()
 ```
+
+Die bisherigen Namen `paint()` und `paint_path()` funktionieren weiterhin als
+Aliase für `paint_start()`.
 
 `get_color()` gibt immer einen lesbaren, kanonischen Farbnamen zurück. Die 16
 Farben sind: `black`, `navy`, `purple`, `green`, `brown`, `dark_blue`,
@@ -137,6 +160,12 @@ play_tone("F#4", beats=2)
 play_pause()
 play_pause(beats=2)
 ```
+
+> **Hinweis zur Oktavbenennung:** PyKIM verwendet die verbreitete
+> MIDI-Konvention, bei der `C4` der MIDI-Note 60 entspricht. Pyxel benennt
+> seine 60 Tonhöhen dagegen von `C0` bis `B4`. Deshalb entspricht zum Beispiel
+> PyKIMs `C4` klanglich Pyxels `C2`; PyKIM rechnet die Bezeichnungen beim
+> Abspielen automatisch um.
 
 `beats` ist eine positive ganze Zahl und bestimmt die Länge eines Tons oder
 einer Pause. Töne, die vor `run()` angefordert werden, werden gespeichert und

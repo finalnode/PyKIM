@@ -2,6 +2,7 @@ import pytest
 import pykim
 
 from pykim import (
+    animate,
     down,
     get_color,
     get_x,
@@ -9,6 +10,8 @@ from pykim import (
     left,
     paint,
     paint_path,
+    paint_start,
+    paint_stop,
     play_pause,
     play_tone,
     right,
@@ -28,6 +31,27 @@ def test_position_and_movement():
     left(2)
     up()
     assert (get_x(), get_y()) == (9, 22)
+
+
+def test_animate_records_every_movement_step():
+    set_x(10)
+    set_y(20)
+    animate(0.1)
+    right(3)
+
+    assert pykim._animation_delay_frames == 3
+    assert pykim._animation_positions == [
+        (10, 20),
+        (11, 20),
+        (12, 20),
+        (13, 20),
+    ]
+
+
+@pytest.mark.parametrize("bad", [0, -1, "slow", True])
+def test_invalid_animation_delay(bad):
+    with pytest.raises((TypeError, ValueError), match="delay"):
+        animate(bad)
 
 
 @pytest.mark.parametrize("bad", [-1, 160, 1.5, "1", True])
@@ -56,6 +80,28 @@ def test_paint_path_accepts_a_color():
     down(2)
     state = get_world_state()
     assert [state[y][10] for y in range(20, 23)] == [9, 9, 9]
+
+
+def test_paint_start_and_stop():
+    set_x(10)
+    set_y(20)
+    set_color("orange")
+    paint_start()
+    right(2)
+    paint_stop()
+    right(2)
+
+    assert get_world_state()[20][10:15] == (9, 9, 9, 0, 0)
+
+
+def test_paint_starts_continuous_painting():
+    set_x(10)
+    set_y(20)
+    paint()
+    down(2)
+
+    state = get_world_state()
+    assert [state[y][10] for y in range(20, 23)] == [7, 7, 7]
 
 
 @pytest.mark.parametrize("bad", [-1, 1.5, True])
