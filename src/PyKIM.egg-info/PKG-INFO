@@ -1,4 +1,4 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: PyKIM
 Version: 0.1.0
 Summary: A small, Pyxel-based Python learning environment
@@ -36,7 +36,6 @@ License-File: LICENSE
 Requires-Dist: pyxel<3,>=2.2
 Provides-Extra: test
 Requires-Dist: pytest>=8; extra == "test"
-Dynamic: license-file
 
 # PyKIM
 
@@ -79,7 +78,8 @@ run()
 `run()` öffnet am Ende das Pyxel-Fenster. Der Ursprung `(0, 0)` liegt links
 oben; `x` wächst nach rechts und `y` nach unten. Kim startet bei `(0, 0)`.
 Bewegungen, die die Welt verlassen würden, lösen eine verständliche Exception
-aus. Kims logische Position ist der Mittelpunkt ihres 8 × 8 großen Sprites.
+aus. Kim erscheint als Quadcopter von oben; ihre logische Position ist der
+Mittelpunkt des Sprites.
 
 ## Schüler-API
 
@@ -111,6 +111,17 @@ get_color("right")   # unmittelbarer Nachbar
 get_color(100, 50)   # beliebige Position
 ```
 
+Mit `paint_path()` hinterlässt Kim bei jeder Bewegung eine durchgehende Spur.
+Ohne vorherige Farbauswahl wird Weiß verwendet:
+
+```python
+paint_path()
+right(20)
+
+paint_path("orange")
+down(10)
+```
+
 `get_color()` gibt immer einen lesbaren, kanonischen Farbnamen zurück. Die 16
 Farben sind: `black`, `navy`, `purple`, `green`, `brown`, `dark_blue`,
 `light_blue`, `white`, `red`, `orange`, `yellow`, `lime`, `cyan`, `gray`,
@@ -122,11 +133,14 @@ Notennamen. Dieser Bereich entspricht den 60 von Pyxel unterstützten Tonhöhen:
 ```python
 play_tone(60)
 play_tone("C4")
-play_tone("F#4")
+play_tone("F#4", beats=2)
+play_pause()
+play_pause(beats=2)
 ```
 
-Töne, die vor `run()` angefordert werden, werden gespeichert und nach dem
-Öffnen des Fensters nacheinander abgespielt.
+`beats` ist eine positive ganze Zahl und bestimmt die Länge eines Tons oder
+einer Pause. Töne, die vor `run()` angefordert werden, werden gespeichert und
+nach dem Öffnen des Fensters nacheinander abgespielt.
 
 ## Tests und Aufgaben
 

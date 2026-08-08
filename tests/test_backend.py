@@ -60,9 +60,25 @@ def test_run_connects_world_and_audio_to_pyxel(monkeypatch):
 
     assert ("init", 160, 120, "PyKIM") in fake.calls
     assert ("pset", 10, 20, 2) in fake.calls
+    assert ("pset", 10, 20, 9) in fake.calls
+    assert not any(call[0] in ("circ", "line") for call in fake.calls)
     assert ("play", 0, 0) in fake.calls
     assert fake.sounds[0].notes == [24]
     assert fake.sounds[0].speed == 60
+
+
+def test_kim_blinks():
+    fake = FakePyxel()
+    set_x(10)
+    set_y(20)
+
+    pykim._draw_kim(fake)
+    assert fake.calls == [("pset", 10, 20, 9)]
+
+    fake.calls.clear()
+    fake.frame_count = 15
+    pykim._draw_kim(fake)
+    assert fake.calls == []
 
 
 def test_pause_finishes_without_using_a_pyxel_rest():

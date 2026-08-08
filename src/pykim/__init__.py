@@ -305,38 +305,9 @@ def _draw_world(pyxel: object) -> None:
 
 
 def _draw_kim(pyxel: object) -> None:
-    """Draw Kim as an orange and gray quadcopter seen from above."""
-    orange = 9
-    gray = 13
-
-    # Ausleger
-    pyxel.line(_x - 3, _y - 3, _x + 3, _y + 3, orange)
-    pyxel.line(_x + 3, _y - 3, _x - 3, _y + 3, orange)
-
-    # Animierte Rotorblätter
-    blade_positions = ((2, 0), (1, 1), (0, 2), (1, -1))
-    blade_x, blade_y = blade_positions[pyxel.frame_count % len(blade_positions)]
-    rotors = (
-        (_x - 4, _y - 4),
-        (_x + 4, _y - 4),
-        (_x - 4, _y + 4),
-        (_x + 4, _y + 4),
-    )
-
-    for rotor_x, rotor_y in rotors:
-        pyxel.circ(rotor_x, rotor_y, 2, gray)
-        pyxel.line(
-            rotor_x - blade_x,
-            rotor_y - blade_y,
-            rotor_x + blade_x,
-            rotor_y + blade_y,
-            orange,
-        )
-        pyxel.pset(rotor_x, rotor_y, orange)
-
-    # Rumpf und orange Frontmarkierung
-    pyxel.circ(_x, _y, 2, gray)
-    pyxel.pset(_x, _y - 2, orange)
+    """Zeichne Kim als orangefarbenen Pixel, der zweimal pro Sekunde blinkt."""
+    if (pyxel.frame_count // 15) % 2 == 0:
+        pyxel.pset(_x, _y, 9)
 
 
 def run() -> None:

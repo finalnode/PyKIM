@@ -39,8 +39,7 @@ run()
 `run()` öffnet am Ende das Pyxel-Fenster. Der Ursprung `(0, 0)` liegt links
 oben; `x` wächst nach rechts und `y` nach unten. Kim startet bei `(0, 0)`.
 Bewegungen, die die Welt verlassen würden, lösen eine verständliche Exception
-aus. Kim erscheint als Quadcopter von oben; ihre logische Position ist der
-Mittelpunkt des Sprites.
+aus. Kim erscheint als orange blinkender Pixel.
 
 ## Schüler-API
 
