@@ -1,0 +1,125 @@
+import pytest
+import pykim
+
+from pykim import (
+    down,
+    get_color,
+    get_x,
+    get_y,
+    left,
+    paint,
+    paint_path,
+    play_pause,
+    play_tone,
+    right,
+    set_color,
+    set_x,
+    set_y,
+    up,
+)
+from pykim.testing import get_pending_tones, get_world_state, set_pixel_for_test
+
+
+def test_position_and_movement():
+    set_x(10)
+    set_y(20)
+    right()
+    down(3)
+    left(2)
+    up()
+    assert (get_x(), get_y()) == (9, 22)
+
+
+@pytest.mark.parametrize("bad", [-1, 160, 1.5, "1", True])
+def test_invalid_x(bad):
+    with pytest.raises((TypeError, ValueError), match="x|Position"):
+        set_x(bad)
+
+
+def test_movement_cannot_leave_world():
+    with pytest.raises(ValueError, match="außerhalb der PyKIM-Welt"):
+        left()
+
+
+def test_paint_path_uses_default_color_and_paints_every_step():
+    set_x(10)
+    set_y(20)
+    paint_path()
+    right(3)
+    assert get_world_state()[20][10:14] == (7, 7, 7, 7)
+
+
+def test_paint_path_accepts_a_color():
+    set_x(10)
+    set_y(20)
+    paint_path("orange")
+    down(2)
+    state = get_world_state()
+    assert [state[y][10] for y in range(20, 23)] == [9, 9, 9]
+
+
+@pytest.mark.parametrize("bad", [-1, 1.5, True])
+def test_invalid_steps(bad):
+    with pytest.raises((TypeError, ValueError), match="steps"):
+        right(bad)
+
+
+@pytest.mark.parametrize("color", ["purple", 2])
+def test_paint_and_read_canonical_color(color):
+    set_x(10)
+    set_y(20)
+    set_color(color)
+    paint()
+    assert get_color() == "purple"
+    assert get_world_state()[20][10] == 2
+
+
+def test_read_neighbor_and_arbitrary_pixel():
+    set_x(10)
+    set_y(10)
+    set_pixel_for_test(11, 10, "green")
+    set_pixel_for_test(2, 3, "red")
+    assert get_color("right") == "green"
+    assert get_color(2, 3) == "red"
+
+
+@pytest.mark.parametrize("color", ["violet", -1, 16, 2.5, True])
+def test_invalid_color(color):
+    with pytest.raises((TypeError, ValueError), match="Farbe|Farbwert"):
+        set_color(color)
+
+
+def test_invalid_direction_and_signature():
+    with pytest.raises(ValueError, match="Richtung.*unbekannt"):
+        get_color("ahead")
+    with pytest.raises(TypeError, match="erlaubt"):
+        get_color(1, 2, 3)
+
+
+@pytest.mark.parametrize(
+    ("note", "number"), [(60, 60), ("C4", 60), ("F#4", 66), ("Db4", 61)]
+)
+def test_tones(note, number):
+    play_tone(note)
+    assert get_pending_tones() == (number,)
+    assert list(pykim._notes) == [(number, 1)]
+
+
+def test_tone_length_and_pause():
+    play_tone("C4", beats=2)
+    play_pause(beats=3)
+    assert get_pending_tones() == (60, -1)
+
+
+@pytest.mark.parametrize("beats", [0, -1, 1.5, True])
+def test_invalid_beats(beats):
+    with pytest.raises((TypeError, ValueError), match="beats"):
+        play_tone("C4", beats=beats)
+    with pytest.raises((TypeError, ValueError), match="beats"):
+        play_pause(beats)
+
+
+@pytest.mark.parametrize("note", ["H4", "C#", 35, 96, 3.5, True])
+def test_invalid_tones(note):
+    with pytest.raises((TypeError, ValueError), match="Note"):
+        play_tone(note)

@@ -1,0 +1,42 @@
+"""Paint a path, inspect its colors, and react to what Kim sees."""
+
+from pykim import *
+
+
+# Build a path from three colored sections.
+for x in range(20, 60):
+    set_x(x)
+    set_y(60)
+    set_color("green")
+    paint()
+
+for x in range(60, 100):
+    set_x(x)
+    set_color("yellow")
+    paint()
+
+for x in range(100, 140):
+    set_x(x)
+    set_color("red")
+    paint()
+
+# Walk over the path and play a different tone for each section.
+set_x(20)
+last_color = ""
+
+for _ in range(119):
+    color = get_color()
+
+    if color != last_color:
+        if color == "green":
+            play_tone("C4")
+        elif color == "yellow":
+            play_tone("E4")
+        elif color == "red":
+            play_tone("G4")
+
+        last_color = color
+
+    right()
+
+run()
