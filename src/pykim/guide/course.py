@@ -1,0 +1,168 @@
+"""Portable Kursordner für Schule, Zuhause und eingebundene Laufwerke."""
+
+import json
+import os
+from pathlib import Path
+
+COURSE_ENV = "PYKIM_COURSE_DIR"
+CONFIG_DIR_ENV = "PYKIM_CONFIG_DIR"
+
+SECTIONS = {
+    "01_grundlagen": ("quadrat-5",),
+    "02_schleifen": ("treppe-5", "punktlinie-8"),
+    "03_funktionen_und_farben": ("vier-quadrate", "schachbrett-8", "farben-melodie"),
+    "04_toene": ("tonleiter-c-dur", "rhythmus-motiv"),
+    "05_objekte": ("mehrere-pixel", "musik-pixel-klasse"),
+    "06_interaktiv_und_pyxel": ("interaktive-steuerung",),
+}
+
+
+def _config_directory() -> Path:
+    configured = os.environ.get(CONFIG_DIR_ENV)
+    return Path(configured).expanduser() if configured else Path.home() / ".pykim"
+
+
+def _config_file() -> Path:
+    return _config_directory() / "config.json"
+
+
+def _load_config() -> dict[str, object]:
+    try:
+        data = json.loads(_config_file().read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return {}
+
+
+def _save_config(data: dict[str, object]) -> None:
+    config_file = _config_file()
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def get_course_directory() -> Path | None:
+    """Liefere den konfigurierten Kursordner, ohne ihn anzulegen."""
+    environment = os.environ.get(COURSE_ENV)
+    if environment:
+        return Path(environment).expanduser().resolve()
+    try:
+        data = _load_config()
+        value = data.get("course_directory")
+        return Path(value).expanduser().resolve() if value else None
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return None
+
+
+def set_course_directory(path: str | Path) -> Path:
+    """Merke lokal, wo der portable Kursordner liegt."""
+    course = Path(path).expanduser().resolve()
+    data = _load_config()
+    data["course_directory"] = str(course)
+    _save_config(data)
+    return course
+
+
+def get_ide_preference() -> dict[str, str]:
+    """Liefere die lokal gewählte IDE und gegebenenfalls ihren eigenen Pfad."""
+    data = _load_config()
+    ide = data.get("preferred_ide", "system")
+    executable = data.get("custom_ide_path", "")
+    return {
+        "ide": ide if isinstance(ide, str) else "system",
+        "path": executable if isinstance(executable, str) else "",
+    }
+
+
+def set_ide_preference(ide: str, custom_path: str = "") -> dict[str, str]:
+    """Speichere genau eine bevorzugte IDE für spätere Öffnen-Aktionen."""
+    allowed = {"system", "thonny", "vscode", "pycharm", "custom"}
+    if ide not in allowed:
+        raise ValueError(f"Unbekannte IDE-Auswahl: {ide}")
+    path = str(Path(custom_path).expanduser().resolve()) if custom_path.strip() else ""
+    if ide == "custom" and not path:
+        raise ValueError("Für eine eigene IDE muss ein Programmpfad angegeben werden.")
+    if ide == "custom" and not Path(path).exists():
+        raise ValueError("Der angegebene IDE-Pfad wurde nicht gefunden.")
+    data = _load_config()
+    data["preferred_ide"] = ide
+    data["custom_ide_path"] = path
+    _save_config(data)
+    return {"ide": ide, "path": path}
+
+
+def get_student_name(course: str | Path | None = None) -> str:
+    """Lese den im portablen Kursordner hinterlegten Namen."""
+    selected = get_course_directory() if course is None else Path(course).expanduser().resolve()
+    if selected is None:
+        return ""
+    try:
+        data = json.loads((selected / ".pykim-course.json").read_text(encoding="utf-8"))
+        value = data.get("student_name", "") if isinstance(data, dict) else ""
+        return value.strip() if isinstance(value, str) else ""
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return ""
+
+
+def starter_source(exercise_name: str) -> str:
+    """Erzeuge eine bewusst lösungsfreie Schülerdatei."""
+    return (
+        f'"""PyKIM-Aufgabe: {exercise_name}\n\n'
+        "Die Aufgabenstellung und Hilfen findest du im PyKIM-Begleitheft.\n"
+        '"""\n\n'
+        "from pykim import *\n\n"
+        "# Schreibe deine Lösung hier.\n\n\n"
+        f'run(check="{exercise_name}")\n'
+    )
+
+
+def exercise_file(exercise_name: str, course: Path | None = None) -> Path | None:
+    course = get_course_directory() if course is None else course
+    if course is None:
+        return None
+    filename = f"{exercise_name.replace('-', '_')}.py"
+    return next(course.glob(f"*/{filename}"), None)
+
+
+def create_course(path: str | Path, student_name: str = "") -> dict[str, object]:
+    """Lege fehlende Kursdateien an und überschreibe keine Lösungen."""
+    course = Path(path).expanduser().resolve()
+    course.mkdir(parents=True, exist_ok=True)
+    created: list[str] = []
+    existing: list[str] = []
+
+    for section, exercises in SECTIONS.items():
+        section_directory = course / section
+        section_directory.mkdir(exist_ok=True)
+        for exercise in exercises:
+            target = section_directory / f"{exercise.replace('-', '_')}.py"
+            if target.exists():
+                existing.append(str(target.relative_to(course)))
+                continue
+            target.write_text(starter_source(exercise), encoding="utf-8")
+            created.append(str(target.relative_to(course)))
+
+    (course / "eigene_projekte").mkdir(exist_ok=True)
+    metadata = course / ".pykim-course.json"
+    if not metadata.exists():
+        metadata_data = {"format": 1, "student_name": student_name, "course": "PyKIM"}
+        metadata.write_text(
+            json.dumps(metadata_data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        created.append(metadata.name)
+    elif student_name.strip():
+        try:
+            metadata_data = json.loads(metadata.read_text(encoding="utf-8"))
+            if not isinstance(metadata_data, dict):
+                metadata_data = {"format": 1, "course": "PyKIM"}
+        except (OSError, ValueError, TypeError):
+            metadata_data = {"format": 1, "course": "PyKIM"}
+        metadata_data["student_name"] = student_name.strip()
+        metadata.write_text(
+            json.dumps(metadata_data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    set_course_directory(course)
+    return {"path": str(course), "created": created, "existing": existing}

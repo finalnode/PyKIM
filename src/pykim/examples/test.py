@@ -1,3 +1,5 @@
+"""Technischer Gesamttest wichtiger PyKIM-Funktionen."""
+
 import sys
 from pykim import *
 

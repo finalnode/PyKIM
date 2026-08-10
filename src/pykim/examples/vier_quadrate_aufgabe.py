@@ -1,5 +1,6 @@
 """Musterlösung: vier benachbarte Quadrate mit Funktion und Schleife."""
 
+
 from pykim import *
 
 

@@ -1,3 +1,5 @@
+"""Einem vorgegebenen Pfad folgen."""
+
 from pykim import *
 from pykim.testing import set_pixel_for_test
 

@@ -1,4 +1,4 @@
-"""Beispiel fuer eine lokal in Thonny pruefbare Aufgabe."""
+"""Beispiel für eine lokal in Thonny prüfbare Aufgabe."""
 
 import pykim as k
 

@@ -1,3 +1,5 @@
+"""Eine einfache Linie malen."""
+
 from pykim import *
 
 set_x(20)

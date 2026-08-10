@@ -45,7 +45,7 @@ Zeichne ab `(50, 50)` eine violette Treppe mit fünf Stufen.
 **Codeschwelle:** 22 relevante Zeilen = 100 %
 
 Erzeuge neben KIM die Pixel `MIA` und `LEO` und zeichne das in
-`examples/mehrere_pixel.py` beschriebene Muster.
+`src/pykim/examples/mehrere_pixel.py` beschriebene Muster.
 
 - KIM beginnt bei `(20, 20)` und zeichnet `purple`.
 - MIA beginnt bei `(60, 20)` und zeichnet `orange`.
@@ -197,7 +197,7 @@ faire automatische Prüfung.
 
 ## Musterlösungen
 
-Ausführbare Musterlösungen befinden sich im Ordner `examples`:
+Ausführbare Musterlösungen werden im Paketordner `src/pykim/examples` mitgeliefert:
 
 - `quadrat_aufgabe.py`
 - `treppe_aufgabe.py`

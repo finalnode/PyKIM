@@ -1,5 +1,6 @@
 """Musterlösung: acht einzelne Punkte mit einer Schleife zeichnen."""
 
+
 from pykim import *
 
 

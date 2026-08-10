@@ -1,5 +1,6 @@
 """Musterlösung: Farben lesen und als Melodie wiedergeben."""
 
+
 from pykim import *
 
 farben = ["red", "green", "cyan", "yellow"]

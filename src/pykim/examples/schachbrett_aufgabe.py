@@ -1,5 +1,6 @@
 """Musterlösung: Schachbrett mit Funktion, Bedingung und zwei Schleifen."""
 
+
 from pykim import *
 
 

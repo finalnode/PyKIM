@@ -1,5 +1,6 @@
 """Drei Pixel unabhängig in derselben Welt malen lassen."""
 
+
 from pykim import kim, world
 
 

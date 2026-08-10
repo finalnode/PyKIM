@@ -1,5 +1,6 @@
 """Paint a path, inspect its colors, and react to what Kim sees."""
 
+
 from pykim import *
 
 

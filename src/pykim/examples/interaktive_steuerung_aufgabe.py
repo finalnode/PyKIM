@@ -1,5 +1,6 @@
 """Musterlösung: Der Übergang von PyKIM zur Pyxel-Spielschleife."""
 
+
 from pykim import kim, world
 
 kim.set_position(80, 60)

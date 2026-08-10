@@ -1,5 +1,6 @@
 """Let Kim draw a colorful path while moving."""
 
+
 from pykim import *
 
 

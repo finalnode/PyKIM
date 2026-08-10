@@ -1,5 +1,6 @@
 """Musterlösung: Eigene Pixel-Unterklasse mit Farbe und Ton."""
 
+
 from pykim import Pixel, world
 
 

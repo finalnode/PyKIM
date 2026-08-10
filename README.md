@@ -20,6 +20,115 @@ python -m pip install -e '.[test]'
 pytest
 ```
 
+## Lokales Begleitheft und Kursordner
+
+Der optionale NiceGUI-Prototyp bündelt Setup, Aufgabenübersicht, einzelne
+Trainer-Testfälle, Cheatsheet, Dokubuch sowie PyKIM- und Pyxel-Dokumentation:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[guide]'
+pykim-guide
+```
+
+Standardmäßig öffnet sich das Lernstudio als eigenes Desktopfenster. Falls der
+native Fenstermodus auf einem Rechner nicht funktioniert oder das Begleitheft
+bewusst in einem Browser laufen soll, steht derselbe Funktionsumfang so bereit:
+
+```bash
+pykim-guide --browser
+```
+
+Eine isolierte Umgebung verhindert Konflikte mit älteren FastAPI-, Pydantic-
+oder NiceGUI-Versionen anderer Projekte. PyKIM benötigt Python 3.10 oder
+neuer; der Setup-Systemcheck weist auf eine zu alte Python-Version hin.
+
+Das Begleitheft läuft technisch weiterhin ausschließlich lokal. Im Setup kann ein beliebiger
+Kursordner gewählt werden, auch auf einem als Laufwerk eingebundenen
+WebDAV-Speicher. Technisch ist WebDAV für Dateien zuständig; CalDAV ist das
+darauf aufbauende Kalenderprotokoll und eignet sich nicht selbst als
+Dateisystem.
+
+Die Suite bindet ausschließlich an `127.0.0.1`. Andere Geräte im Schul- oder
+Heimnetz können ihre lokalen Start-, Installations- und Updateaktionen daher
+nicht aufrufen.
+
+### Verschlüsselte Moodle-Dateiabgaben
+
+Moodle wird ohne Plugin ausschließlich als authentifizierter Datei-Transport
+verwendet. Die Lehrkraft erzeugt einmalig ein öffentliches Kurszertifikat und
+einen passwortgeschützten privaten Schlüssel:
+
+```bash
+pykim-teacher keygen \
+  --teacher "Frau Beispiel" \
+  --school "OSZ KIM" \
+  --course "Informatik 11A" \
+  --output ./kurs-schluessel
+```
+
+Die `.pykim-cert`-Datei wird im Lernraum bereitgestellt. Der private
+`.pykim-private-key` verbleibt ausschließlich bei der Lehrkraft und sollte
+zusätzlich gesichert werden. Schüler importieren das Zertifikat auf der
+Abgabeseite des Lernstudios. Der verschlüsselte Export erscheint im Unterordner
+`abgaben` des Kursordners und kann als normale Datei in Moodle hochgeladen
+werden.
+
+Ein heruntergeladener Moodle-Abgabeordner wird lokal ausgewertet:
+
+```bash
+pykim-teacher report ./moodle-download \
+  --key ./kurs-schluessel/informatik-11a.pykim-private-key \
+  --output ./bericht
+```
+
+Das Werkzeug fragt das Schlüsselpasswort verdeckt ab und erzeugt einen HTML-
+Bericht sowie eine CSV-Leistungsübersicht. Es berechnet alle Codefingerprints
+erneut. Original-, formatierter und AST-Strukturhash dienen nur als
+Ähnlichkeitshinweise und niemals als automatischer Plagiatsnachweis.
+
+Das Setup legt eine gegliederte Aufgabenstruktur an und überschreibt niemals
+vorhandene Lösungen. Trainerläufe und Dokubuch-Einträge werden portabel unter
+`.pykim/progress.json` im Kursordner gespeichert. Wer zwischen Schule und
+Zuhause wechselt, bindet denselben Ordner ein und wählt ihn einmal im Setup.
+Alternativ kann der Pfad gesetzt werden:
+
+```bash
+export PYKIM_COURSE_DIR="/Pfad/zum/eingebundenen/PyKIM-Kurs"
+```
+
+Bei gleichzeitigem Bearbeiten auf mehreren Geräten können
+Synchronisationskonflikte entstehen. Der Prototyp ist für das nacheinander
+Weiterarbeiten auf Schule- und Heimgerät ausgelegt.
+
+### Suite-Werkzeuge
+
+Der Tab **Setup** erkennt Python, PyKIM, Pyxel, Thonny und Visual Studio Code
+und verweist bei fehlenden IDEs auf die offiziellen Installationsseiten. Im
+Tab **Werkzeuge** kann der Kursordner mit der erkannten IDE geöffnet werden.
+
+Die Suite kann außerdem die Versionsnummer des GitHub-main-Branches prüfen.
+Eine Installation der Entwicklungsversion erfolgt nur nach einer expliziten
+Bestätigung und verändert keine Dateien im Kursordner.
+
+Für Pyxel-Projekte startet die Suite den offiziellen Ressourceneditor mit:
+
+```bash
+pyxel edit mein_spiel.pyxres
+```
+
+Eine `.pyxres`-Datei enthält Sprites, Tilemaps, Sounds und Musik. Sie liegt
+standardmäßig unter `eigene_projekte/` im Kursordner.
+
+Der Tab **Python im Browser** enthält eine erste Pyodide-Spielwiese. Sie lädt
+Python als WebAssembly im Browser und führt normalen Python-Code ohne lokale
+Datei aus. Dafür ist beim ersten Laden eine Internetverbindung erforderlich.
+Pyxel selbst wird dort nicht mit `micropip` installiert; ein späteres
+browserfähiges PyKIM benötigt ein eigenes Canvas-Backend beziehungsweise die
+offizielle Pyxel-WASM-Laufzeit.
+
 ## Erstes Programm
 
 ```python
@@ -164,7 +273,7 @@ leo.hide()  # Spur behalten, Figur verstecken
 world.run()
 ```
 
-Ein vollständiges Beispiel steht in `examples/mehrere_pixel.py`.
+Ein vollständiges Beispiel steht in `src/pykim/examples/mehrere_pixel.py`.
 
 Jeder Pixel kann unabhängig versteckt und wieder gezeigt werden:
 
@@ -190,7 +299,7 @@ with world.parallel():
 Die Figuren dürfen unterschiedlich viele Schritte ausführen. Eine früher
 fertige Figur wartet an ihrem Ziel, während die anderen weiterlaufen.
 
-Das Beispiel `examples/mehrere_pixel.py` wird mit
+Das Beispiel `src/pykim/examples/mehrere_pixel.py` wird mit
 `world.run(check="mehrere-pixel")` geprüft. Der Trainer vergleicht die Namen
 und Endpositionen aller Figuren, jeden farbigen Weltpixel, LEOs Sichtbarkeit
 und die Verwendung eines `world.parallel()`-Blocks.
@@ -305,7 +414,8 @@ Zusätzliche, nicht zur Anfänger-API gehörende Hilfen liegen in
 from pykim.testing import reset_world, set_pixel_for_test, get_world_state
 ```
 
-Weitere vollständige Programme stehen im Ordner `examples`.
+Weitere vollständige Programme stehen im Paketordner `src/pykim/examples`
+und in der Beispielsektion des Lernstudios.
 Alle automatisch prüfbaren Aufgabenstellungen stehen gesammelt in
 [`AUFGABEN.md`](AUFGABEN.md).
 
@@ -328,7 +438,7 @@ run(check="quadrat-5")
 Die Prüfung bewertet die fertige Zeichnung und nicht die verwendete
 Befehlsfolge. Das Quadrat darf daher in unterschiedlichen Richtungen und auch
 mithilfe einer Schleife gezeichnet werden. Ein vollständiges Beispiel liegt in
-`examples/quadrat_aufgabe.py`.
+`src/pykim/examples/quadrat_aufgabe.py`.
 
 Eine zweite Aufgabe fordert eine Treppe aus fünf jeweils 5 Pixel breiten und
 hohen Stufen. Dabei wird auch geprüft, ob die wiederholten Bewegungen mit einer
@@ -345,7 +455,7 @@ run(check="treppe-5")
 
 `run(check=...)` prüft zuerst die Zeichnung und erkennt dabei auch die
 verwendete Schleife. Anschließend öffnet es wie gewohnt das Pyxel-Fenster. Das
-vollständige Beispiel steht in `examples/treppe_aufgabe.py`.
+vollständige Beispiel steht in `src/pykim/examples/treppe_aufgabe.py`.
 
 #### Neue Trainer-Aufgaben ergänzen
 

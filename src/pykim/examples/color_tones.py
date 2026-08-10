@@ -1,3 +1,5 @@
+"""Farben mit Tönen verbinden."""
+
 from pykim import *
 from pykim.testing import set_pixel_for_test
 
@@ -9,4 +11,3 @@ if get_color() == "red":
     play_tone("C4")
 
 run()
-

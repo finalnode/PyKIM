@@ -20,6 +20,16 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+guide = [
+  "nicegui[native]>=3,<4",
+  "cryptography>=39,<47",
+  "tomli>=2; python_version < '3.11'",
+]
+submission = ["cryptography>=39,<47"]
+
+[project.scripts]
+pykim-guide = "pykim.guide.app:main"
+pykim-teacher = "pykim.submission.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

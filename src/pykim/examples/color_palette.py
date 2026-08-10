@@ -1,5 +1,6 @@
 """Paint one stripe in each of Pyxel's 16 colors."""
 
+
 from pykim import *
 
 
