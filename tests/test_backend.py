@@ -28,6 +28,14 @@ class FakeSound:
 
 
 class FakePyxel:
+    KEY_LEFT = 1
+    KEY_RIGHT = 2
+    KEY_UP = 3
+    KEY_DOWN = 4
+    KEY_SPACE = 5
+    KEY_RETURN = 6
+    KEY_ESCAPE = 7
+
     def __init__(self):
         self.sounds = [FakeSound()]
         self.calls = []
@@ -40,6 +48,18 @@ class FakePyxel:
         for _ in range(47):
             update()
         draw()
+
+    def btn(self, key):
+        self.calls.append(("btn", key))
+        return key == self.KEY_RIGHT
+
+    def btnp(self, key):
+        self.calls.append(("btnp", key))
+        return key == self.KEY_SPACE
+
+    def btnr(self, key):
+        self.calls.append(("btnr", key))
+        return False
 
     def play_pos(self, channel):
         return None
@@ -58,6 +78,58 @@ class FakePyxel:
 
     def line(self, *args):
         self.calls.append(("line", *args))
+
+    def rect(self, *args):
+        self.calls.append(("rect", *args))
+
+    def text(self, *args):
+        self.calls.append(("text", *args))
+
+
+def test_interactive_run_uses_update_draw_and_world_api(monkeypatch):
+    fake = FakePyxel()
+    monkeypatch.setitem(sys.modules, "pyxel", fake)
+    frames = []
+
+    def update():
+        frames.append(pykim.world.frame_count)
+        if pykim.world.btn("right"):
+            pykim.kim.right()
+
+    def draw():
+        pykim.world.cls("navy")
+        pykim.world.rect(1, 2, 3, 4, "purple")
+        pykim.world.text(5, 6, "Punkte", "white")
+        pykim.kim.draw()
+
+    pykim.world.run(update, draw)
+
+    assert len(frames) == 47
+    assert pykim.kim.get_x() == 47
+    assert ("btn", fake.KEY_RIGHT) in fake.calls
+    assert ("cls", 1) in fake.calls
+    assert ("rect", 1, 2, 3, 4, 2) in fake.calls
+    assert ("text", 5, 6, "Punkte", 7) in fake.calls
+
+
+def test_interactive_run_automatically_updates_pixel_subclasses(monkeypatch):
+    fake = FakePyxel()
+    monkeypatch.setitem(sys.modules, "pyxel", fake)
+
+    class Walker(pykim.Pixel):
+        def update(self):
+            self.right()
+
+    mia = pykim.world.spawn(Walker, "MIA", 10, 10)
+    pykim.world.run(lambda: None)
+
+    assert mia.get_x() == 57
+
+
+def test_world_btn_is_false_before_run_and_validates_runtime_keys():
+    assert not pykim.world.btn("right")
+    with pytest.raises(TypeError, match="Tastenname"):
+        pykim.world.btn(1)
 
 def test_run_connects_world_and_audio_to_pyxel(monkeypatch):
     fake = FakePyxel()

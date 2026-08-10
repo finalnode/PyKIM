@@ -2,11 +2,14 @@
 
 import inspect
 from contextlib import contextmanager
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import TypeVar
 
 import pykim as api
 
 from .pixel import Pixel
+
+PixelType = TypeVar("PixelType", bound=Pixel)
 
 
 class World:
@@ -15,6 +18,7 @@ class World:
     def __init__(self) -> None:
         self.extra_pixels: list[Pixel] = []
         self._parallel_events: dict[Pixel, list[dict[str, object]]] | None = None
+        self._backend: object | None = None
 
     @property
     def cells(self) -> list[list[int]]:
@@ -25,12 +29,103 @@ class World:
         return (api.kim, *self.extra_pixels)
 
     def new_pixel(self, name: str, x: int = 0, y: int = 0) -> Pixel:
+        return self.spawn(Pixel, name, x, y)
+
+    def spawn(
+        self,
+        pixel_class: type[PixelType],
+        name: str,
+        x: int = 0,
+        y: int = 0,
+        **attributes: object,
+    ) -> PixelType:
+        """Erzeuge eine Instanz einer eigenen Pixel-Unterklasse."""
+        if not isinstance(pixel_class, type) or not issubclass(pixel_class, Pixel):
+            raise TypeError("pixel_class muss eine Unterklasse von Pixel sein.")
         if name == "KIM" or any(pixel.name == name for pixel in self.extra_pixels):
             raise ValueError(f"Der Pixelname {name!r} wird bereits verwendet.")
-        pixel = Pixel(self, name, x, y)
+        pixel = pixel_class(self, name, x, y, **attributes)
         self.extra_pixels.append(pixel)
         api._register_animation_pixel(pixel, x, y)
         return pixel
+
+    @property
+    def width(self) -> int:
+        return api.WIDTH
+
+    @property
+    def height(self) -> int:
+        return api.HEIGHT
+
+    @property
+    def frame_count(self) -> int:
+        return 0 if self._backend is None else self._backend.frame_count
+
+    def cls(self, color: str | int = "black") -> None:
+        """Leere die Anzeige; außerhalb von draw() auch die logische Welt."""
+        color_index = api._color(color)
+        if self._backend is not None:
+            self._backend.cls(color_index)
+        else:
+            for row in self.cells:
+                row[:] = [color_index] * api.WIDTH
+
+    clear = cls
+
+    def pset(self, x: int, y: int, color: str | int) -> None:
+        x, y = api._position(x, y)
+        color_index = api._color(color)
+        if self._backend is not None:
+            self._backend.pset(x, y, color_index)
+        else:
+            self.cells[y][x] = color_index
+
+    def rect(
+        self, x: int, y: int, width: int, height: int, color: str | int
+    ) -> None:
+        """Zeichne ein gefülltes Rechteck wie pyxel.rect()."""
+        x, y = api._position(x, y)
+        width = api._positive_size(width, "width")
+        height = api._positive_size(height, "height")
+        api._position(x + width - 1, y + height - 1)
+        color_index = api._color(color)
+        if self._backend is not None:
+            self._backend.rect(x, y, width, height, color_index)
+        else:
+            for row in self.cells[y:y + height]:
+                row[x:x + width] = [color_index] * width
+
+    def text(self, x: int, y: int, value: object, color: str | int = "white") -> None:
+        """Zeichne Text im interaktiven draw()-Modus."""
+        x, y = api._position(x, y)
+        if self._backend is None:
+            raise RuntimeError("world.text() kann nur innerhalb von draw() verwendet werden.")
+        self._backend.text(x, y, str(value), api._color(color))
+
+    def btn(self, key: str) -> bool:
+        return self._key_query("btn", key)
+
+    def btnp(self, key: str) -> bool:
+        return self._key_query("btnp", key)
+
+    def btnr(self, key: str) -> bool:
+        return self._key_query("btnr", key)
+
+    def _key_query(self, method: str, key: str) -> bool:
+        if not isinstance(key, str):
+            raise TypeError("key muss ein Tastenname sein.")
+        names = {
+            "left": "KEY_LEFT", "right": "KEY_RIGHT", "up": "KEY_UP",
+            "down": "KEY_DOWN", "space": "KEY_SPACE", "enter": "KEY_RETURN",
+            "escape": "KEY_ESCAPE",
+        }
+        normalized = key.lower()
+        constant = names.get(normalized, f"KEY_{normalized.upper()}")
+        if self._backend is None:
+            return False
+        if not hasattr(self._backend, constant):
+            raise ValueError(f"Die Taste {key!r} ist unbekannt.")
+        return bool(getattr(self._backend, method)(getattr(self._backend, constant)))
 
     def animate(self, delay: int | float = 0.1) -> None:
         api.animate(delay)
@@ -102,7 +197,13 @@ class World:
         finally:
             self._flush_parallel()
 
-    def run(self, *, check: str | None = None) -> None:
+    def run(
+        self,
+        update: Callable[[], None] | None = None,
+        draw: Callable[[], None] | None = None,
+        *,
+        check: str | None = None,
+    ) -> None:
         source = None
         if check is not None:
             caller = inspect.currentframe()
@@ -111,4 +212,4 @@ class World:
                 source = inspect.getsource(caller) if caller is not None else ""
             except (OSError, TypeError):
                 source = ""
-        api.run(check=check, _source=source)
+        api.run(update, draw, check=check, _source=source)

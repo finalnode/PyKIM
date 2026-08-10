@@ -71,6 +71,40 @@ def test_pixel_names_are_unique():
         pykim.world.new_pixel("MIA")
 
 
+def test_spawn_creates_a_custom_pixel_subclass_with_attributes():
+    class MusikPixel(pykim.Pixel):
+        def __init__(self, pixel_world, name, x=0, y=0, *, note="C4"):
+            super().__init__(pixel_world, name, x, y)
+            self.note = note
+
+        def finish(self):
+            self.play_tone(self.note)
+
+    mia = pykim.world.spawn(MusikPixel, "MIA", 10, 20, note="E4")
+    mia.finish()
+
+    assert isinstance(mia, MusikPixel)
+    assert mia.note == "E4"
+    assert get_pending_tones() == (64,)
+
+
+def test_spawn_rejects_a_class_that_is_not_a_pixel():
+    with pytest.raises(TypeError, match="Unterklasse von Pixel"):
+        pykim.world.spawn(object, "DING")
+
+
+def test_world_drawing_helpers_work_without_a_running_window():
+    pykim.world.pset(2, 3, "purple")
+    pykim.world.rect(4, 5, 2, 3, "orange")
+
+    state = get_world_state()
+    assert state[3][2] == 2
+    assert [state[y][4:6] for y in range(5, 8)] == [(9, 9)] * 3
+
+    pykim.world.cls("black")
+    assert not any(any(row) for row in get_world_state())
+
+
 def test_animate_records_every_movement_step():
     set_x(10)
     set_y(20)

@@ -1,6 +1,6 @@
 # PyKIM
 
-PyKIM 0.1.1 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
+PyKIM 0.2.0 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
 kleine Drohne, bewegt sich pixelweise durch eine 160 × 120 Pixel große Welt,
 liest und verändert Farben und kann einfache Töne spielen. Die gesamte Logik
 funktioniert auch ohne ein geöffnetes Grafikfenster und ist daher gut testbar.
@@ -216,6 +216,86 @@ play_pause(beats=2)
 einer Pause. Töne, die vor `run()` angefordert werden, werden gespeichert und
 nach dem Öffnen des Fensters nacheinander abgespielt.
 
+### Interaktiver Modus und Übergang zu Pyxel
+
+Neben fertigen Befehlsfolgen unterstützt PyKIM eine Spielschleife. `update()`
+enthält Eingaben und Zustandsänderungen, `draw()` baut das aktuelle Bild auf:
+
+```python
+from pykim import kim, world
+
+def update():
+    if world.btn("right") and kim.get_x() < world.width - 1:
+        kim.right()
+
+def draw():
+    world.cls("black")
+    world.text(5, 5, "Pfeiltaste rechts", "white")
+    kim.draw()
+
+world.run(update, draw)
+```
+
+Eingaben stehen als `world.btn(key)` für gehaltene, `world.btnp(key)` für neu
+gedrückte und `world.btnr(key)` für losgelassene Tasten bereit. Vordefinierte
+Namen sind `left`, `right`, `up`, `down`, `space`, `enter` und `escape`;
+Buchstaben wie `a` funktionieren ebenfalls.
+
+Die Pyxel-nahen Weltoperationen lauten:
+
+```python
+world.cls("black")
+world.pset(10, 20, "purple")
+world.rect(10, 20, 30, 15, "orange")
+world.text(5, 5, "Punkte: 3", "white")
+
+world.width
+world.height
+world.frame_count
+```
+
+Im späteren Pyxel-Programm werden daraus hauptsächlich andere Namen:
+
+```text
+world.btn("right")  -> pyxel.btn(pyxel.KEY_RIGHT)
+world.cls("black")  -> pyxel.cls(0)
+world.pset(...)      -> pyxel.pset(...)
+world.run(...)       -> pyxel.run(...)
+```
+
+Wird nur `update` übergeben, leert PyKIM die Anzeige und zeichnet alle
+sichtbaren Pixel automatisch. Mit einer eigenen `draw()`-Funktion lernen
+Schüler bewusst die für Pyxel zentrale Trennung von Logik und Darstellung.
+
+### Eigene Pixel-Klassen
+
+`world.spawn()` erzeugt Instanzen eigener `Pixel`-Unterklassen. Ihre
+`update()`-Methoden werden im interaktiven Modus automatisch einmal pro Frame
+aufgerufen:
+
+```python
+from pykim import Pixel, world
+
+class MusikPixel(Pixel):
+    def __init__(self, pixel_world, name, x, y, *, note):
+        super().__init__(pixel_world, name, x, y)
+        self.note = note
+
+    def update(self):
+        if self.world.btnp("space"):
+            self.play_tone(self.note)
+
+    def draw(self):
+        self.world.pset(self.get_x(), self.get_y(), "purple")
+
+mia = world.spawn(MusikPixel, "MIA", 40, 60, note="C4")
+leo = world.spawn(MusikPixel, "LEO", 80, 60, note="E4")
+world.run(lambda: None)
+```
+
+Damit können Unterrichtsreihen von Objektbenutzung über eigene Attribute und
+Methoden zu Vererbung, Überschreiben und polymorphem Verhalten führen.
+
 ## Tests und Aufgaben
 
 Zusätzliche, nicht zur Anfänger-API gehörende Hilfen liegen in
@@ -226,6 +306,8 @@ from pykim.testing import reset_world, set_pixel_for_test, get_world_state
 ```
 
 Weitere vollständige Programme stehen im Ordner `examples`.
+Alle automatisch prüfbaren Aufgabenstellungen stehen gesammelt in
+[`AUFGABEN.md`](AUFGABEN.md).
 
 ### Lokale Aufgabenprüfung in Thonny
 
@@ -274,28 +356,40 @@ pykim/trainer/
 ├── models.py             # Ergebnisse und Aufgabenmodell
 ├── feedback.py           # deutsche Konsolenausgabe
 ├── optimization.py       # optionale Bewertung von Codequalität
-├── source_analysis.py    # Analyse des Schülercodes
+├── builder.py            # einheitliche Autoren-API und Codeanalyse
 ├── runner.py             # Einstieg für run(check=...)
 └── exercises/
-    ├── __init__.py       # Aufgaben-Registry
+    ├── __init__.py       # automatische Aufgaben-Registry
+    ├── checkerboard.py
+    ├── color_melody.py
+    ├── dotted_line.py
+    ├── four_squares.py
     ├── multiple_pixels.py
+    ├── custom_pixel.py
+    ├── interactive.py
+    ├── rhythm.py
+    ├── scale.py
     ├── square.py
     └── stairs.py
 ```
 
-Gemeinsame Weltabfragen liegen bei den übrigen Testhilfen in `pykim.testing`.
-Eine neue Aufgabe definiert in `exercises/` eine Prüffunktion und exportiert
-sie als `EXERCISE = Exercise(name, title, checker)`. Danach wird sie in
-`exercises/__init__.py` zur Registry hinzugefügt. Der PyKIM-Kern und
-`run(check=...)` müssen dafür nicht verändert werden.
+Neue Aufgaben werden mit `ExerciseBuilder` deklarativ beschrieben. Technische
+Weltabfragen, Farbindizes und AST-Analysen gehören nicht in die Aufgabendatei.
+Eine vollständige Anleitung mit kopierbaren Vorlagen steht in
+[`TRAINER_AUTOREN.md`](TRAINER_AUTOREN.md). Jede Datei mit einem erzeugten
+`EXERCISE` wird automatisch registriert. Der PyKIM-Kern und `run(check=...)`
+müssen dafür nicht verändert werden.
 
-Ausgewählte Aufgaben können zusätzlich zur fachlichen Prüfung eine
-Optimierungsbewertung ausgeben. Bei `treppe-5` werden die verwendete Schleife
-und die Anzahl der im Quelltext wiederholten Bewegungsbefehle bewertet:
+Alle mitgelieferten Aufgaben geben zusätzlich zur fachlichen Prüfung eine
+prozentuale Bewertung der Codelänge aus. Die jeweilige Schwelle entspricht der
+mitgelieferten kompakten Musterlösung; Leerzeilen und reine Kommentarzeilen
+werden nicht gezählt:
 
 ```text
-Optimierung: 10/10
+Optimierung: 100 %
 ✓ Dein Code ist für diese Aufgabe optimal aufgebaut.
 ```
 
-Bei einer längeren Lösung erscheinen stattdessen konkrete Tipps zum Kürzen.
+Bei einer längeren Lösung erscheinen stattdessen die tatsächliche und die
+optimale Zeilenzahl als konkreter Tipp. Geforderte Kontrollstrukturen wie
+Schleifen oder Funktionen werden unabhängig davon fachlich geprüft.

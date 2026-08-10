@@ -160,3 +160,20 @@ class Pixel:
             )
         x, y = api._position(x, y)
         return api.COLORS[self.world.cells[y][x]]
+
+    def play_tone(self, note: str | int, beats: int = 1) -> None:
+        api.play_tone(note, beats)
+
+    def play_pause(self, beats: int = 1) -> None:
+        api.play_pause(beats)
+
+    def update(self) -> None:
+        """Optionaler Frame-Hook für eigene Pixel-Unterklassen."""
+
+    def draw(self) -> None:
+        """Zeichne diese Figur im interaktiven Modus."""
+        backend = self.world._backend
+        if backend is None or not self.visible:
+            return
+        index = self.world.pixels.index(self)
+        api._draw_actor(backend, self.get_x(), self.get_y(), index * 3)

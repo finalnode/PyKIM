@@ -32,7 +32,13 @@ def get_pending_tones() -> tuple[int, ...]:
     return tuple(note for note, _ in pykim._notes)
 
 
+def get_pending_audio_events() -> tuple[tuple[int, int], ...]:
+    """Gib Tonhöhe und Länge aller noch abzuspielenden Ereignisse zurück."""
+    return tuple(pykim._notes)
+
+
 __all__ = [
-    "HEIGHT", "WIDTH", "get_painted_pixels", "get_pending_tones",
+    "HEIGHT", "WIDTH", "get_painted_pixels", "get_pending_audio_events",
+    "get_pending_tones",
     "get_world_state", "reset_world", "set_pixel_for_test",
 ]

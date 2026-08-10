@@ -18,7 +18,10 @@ def print_report(report: CheckReport) -> None:
 
     if report.optimization is not None:
         optimization = report.optimization
-        print(f"\nOptimierung: {optimization.score}/{optimization.maximum}")
+        if optimization.maximum == 100:
+            print(f"\nOptimierung: {optimization.score} %")
+        else:
+            print(f"\nOptimierung: {optimization.score}/{optimization.maximum}")
         if optimization.score == optimization.maximum:
             print("✓ Dein Code ist für diese Aufgabe optimal aufgebaut.")
         else:

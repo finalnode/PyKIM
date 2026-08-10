@@ -3,7 +3,7 @@
 import re
 from collections import deque
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 WIDTH = 160
 HEIGHT = 120
@@ -74,6 +74,13 @@ def _integer(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         kind = type(value).__name__
         raise TypeError(f"{name} muss eine ganze Zahl sein, nicht {kind}.")
+    return value
+
+
+def _positive_size(value: object, name: str) -> int:
+    value = _integer(value, name)
+    if value < 1:
+        raise ValueError(f"{name} muss mindestens 1 sein.")
     return value
 
 
@@ -574,7 +581,13 @@ def _draw_start_sequences(pyxel: object, frame: int, duration: int = 45) -> None
         _draw_axes(pyxel, x, y, scale, color)
 
 
-def run(*, check: str | None = None, _source: str | None = None) -> None:
+def run(
+    update: object = None,
+    draw: object = None,
+    *,
+    check: str | None = None,
+    _source: str | None = None,
+) -> None:
     """Prüfe optional eine Aufgabe und öffne anschließend das Pyxel-Fenster."""
     if check is not None:
         import inspect
@@ -599,7 +612,36 @@ def run(*, check: str | None = None, _source: str | None = None) -> None:
             "Pyxel wird benötigt, um das PyKIM-Fenster zu öffnen."
         ) from None
 
+    if update is not None and not callable(update):
+        raise TypeError("update muss eine Funktion sein.")
+    if draw is not None and not callable(draw):
+        raise TypeError("draw muss eine Funktion sein.")
+
     pyxel.init(WIDTH, HEIGHT, title="PyKIM")
+
+    if update is not None or draw is not None:
+        world._backend = pyxel
+
+        def interactive_update() -> None:
+            _play_next_note(pyxel)
+            for pixel in world.pixels:
+                pixel.update()
+            if update is not None:
+                update()
+
+        def interactive_draw() -> None:
+            if draw is not None:
+                draw()
+            else:
+                world.cls()
+                for pixel in world.pixels:
+                    pixel.draw()
+
+        try:
+            pyxel.run(interactive_update, interactive_draw)
+        finally:
+            world._backend = None
+        return
 
     intro_frame = 0
 
@@ -653,6 +695,7 @@ def _reset() -> None:
     _animation_ticks = 0
     if "world" in globals():
         world.extra_pixels.clear()
+        world._backend = None
         kim.visible = True
 
 
