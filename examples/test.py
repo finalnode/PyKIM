@@ -14,7 +14,7 @@ set_y(10)
 print("Gesetzt:", get_x(), get_y())
 
 # Jede Bewegung später mit 0,2 Sekunden pro Pixelschritt wiedergeben.
-animate(0.2)
+animate()
 
 # Ab jetzt hinterlässt Kim bei jeder Bewegung eine violette Spur.
 set_color("purple")

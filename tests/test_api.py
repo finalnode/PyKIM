@@ -16,8 +16,10 @@ from pykim import (
     play_tone,
     right,
     set_color,
+    set_position,
     set_x,
     set_y,
+    speed,
     up,
 )
 from pykim.testing import get_pending_tones, get_world_state, set_pixel_for_test
@@ -31,6 +33,42 @@ def test_position_and_movement():
     left(2)
     up()
     assert (get_x(), get_y()) == (9, 22)
+
+
+def test_set_position_changes_both_coordinates():
+    set_position(12, 34)
+    assert (get_x(), get_y()) == (12, 34)
+
+
+def test_kim_object_and_procedural_api_share_the_same_state():
+    pykim.kim.set_position(10, 20)
+    right(3)
+    pykim.kim.down(2)
+
+    assert (get_x(), get_y()) == (13, 22)
+    assert (pykim.kim.get_x(), pykim.kim.get_y()) == (13, 22)
+
+
+def test_two_pixels_move_and_paint_independently():
+    pykim.kim.set_position(10, 10)
+    pykim.kim.paint_path("purple")
+    pykim.kim.right(2)
+    mia = pykim.world.new_pixel("MIA", 10, 20)
+    mia.paint_path("orange")
+    mia.down(2)
+
+    state = get_world_state()
+    assert state[10][10:13] == (2, 2, 2)
+    assert [state[y][10] for y in range(20, 23)] == [9, 9, 9]
+    assert (pykim.kim.get_x(), pykim.kim.get_y()) == (12, 10)
+    assert (mia.get_x(), mia.get_y()) == (10, 22)
+    assert pykim.world.pixels == (pykim.kim, mia)
+
+
+def test_pixel_names_are_unique():
+    pykim.world.new_pixel("MIA")
+    with pytest.raises(ValueError, match="bereits verwendet"):
+        pykim.world.new_pixel("MIA")
 
 
 def test_animate_records_every_movement_step():
@@ -52,6 +90,31 @@ def test_animate_records_every_movement_step():
 def test_invalid_animation_delay(bad):
     with pytest.raises((TypeError, ValueError), match="delay"):
         animate(bad)
+
+
+@pytest.mark.parametrize(
+    ("value", "frames"), [(1, 100), (10, 10), (50, 2), (99, 1)]
+)
+def test_speed_sets_animation_delay(value, frames):
+    speed(value)
+    assert pykim._animation_delay_frames == frames
+    assert pykim._animation_positions == [(0, 0)]
+
+
+def test_speed_100_disables_animation():
+    animate()
+    right(2)
+
+    speed(100)
+
+    assert pykim._animation_delay_frames is None
+    assert pykim._animation_positions == []
+
+
+@pytest.mark.parametrize("bad", [0, 101, -1, 1.5, "50", True])
+def test_invalid_speed(bad):
+    with pytest.raises((TypeError, ValueError), match="speed"):
+        speed(bad)
 
 
 @pytest.mark.parametrize("bad", [-1, 160, 1.5, "1", True])
@@ -94,14 +157,14 @@ def test_paint_start_and_stop():
     assert get_world_state()[20][10:15] == (9, 9, 9, 0, 0)
 
 
-def test_paint_starts_continuous_painting():
+def test_paint_colors_only_the_current_pixel():
     set_x(10)
     set_y(20)
     paint()
     down(2)
 
     state = get_world_state()
-    assert [state[y][10] for y in range(20, 23)] == [7, 7, 7]
+    assert [state[y][10] for y in range(20, 23)] == [7, 0, 0]
 
 
 @pytest.mark.parametrize("bad", [-1, 1.5, True])

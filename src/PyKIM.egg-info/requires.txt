@@ -1,4 +1,0 @@
-pyxel<3,>=2.2
-
-[test]
-pytest>=8

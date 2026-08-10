@@ -11,11 +11,21 @@ def reset_world() -> None:
 
 def set_pixel_for_test(x: int, y: int, color: str | int) -> None:
     x, y = pykim._position(x, y)
-    pykim._pixels[y][x] = pykim._color(color)
+    pykim.world.cells[y][x] = pykim._color(color)
 
 
 def get_world_state() -> tuple[tuple[int, ...], ...]:
-    return tuple(map(tuple, pykim._pixels))
+    return tuple(map(tuple, pykim.world.cells))
+
+
+def get_painted_pixels() -> set[tuple[int, int]]:
+    """Gib die Koordinaten aller nicht schwarzen Pixel zurück."""
+    return {
+        (x, y)
+        for y, row in enumerate(pykim.world.cells)
+        for x, color in enumerate(row)
+        if color != 0
+    }
 
 
 def get_pending_tones() -> tuple[int, ...]:
@@ -23,6 +33,6 @@ def get_pending_tones() -> tuple[int, ...]:
 
 
 __all__ = [
-    "HEIGHT", "WIDTH", "get_pending_tones", "get_world_state", "reset_world",
-    "set_pixel_for_test",
+    "HEIGHT", "WIDTH", "get_painted_pixels", "get_pending_tones",
+    "get_world_state", "reset_world", "set_pixel_for_test",
 ]

@@ -1,6 +1,7 @@
 import sys
 
 import pykim
+import pytest
 from pykim import (
     animate,
     get_color,
@@ -98,6 +99,122 @@ def test_kim_skips_the_background_color():
     assert fake.calls == [("pset", 10, 20, 2)]
 
 
+def test_draws_multiple_pixels_in_the_same_world():
+    fake = FakePyxel()
+    set_x(10)
+    set_y(20)
+    mia = pykim.world.new_pixel("MIA", 30, 40)
+
+    pykim._draw_pixels(fake)
+
+    assert ("pset", 10, 20, 1) in fake.calls
+    assert ("pset", 30, 40, 4) in fake.calls
+    assert pykim.world.pixels == (pykim.kim, mia)
+
+
+def test_animates_an_additional_pixel_step_by_step():
+    fake = FakePyxel()
+    pykim.speed(99)
+    mia = pykim.world.new_pixel("MIA", 30, 40)
+    mia.paint_path("orange")
+    mia.right(2)
+
+    pykim._draw_pixels(fake)
+    assert ("pset", 30, 40, 4) in fake.calls
+    assert ("pset", 32, 40, 4) not in fake.calls
+
+    for _ in range(3):
+        pykim._advance_animation()
+    fake.calls.clear()
+    pykim._draw_world(fake)
+    pykim._draw_pixels(fake)
+
+    assert ("pset", 32, 40, 9) in fake.calls
+    assert ("pset", 32, 40, 4) in fake.calls
+
+
+def test_hidden_pixels_are_not_drawn_and_can_be_shown_again():
+    fake = FakePyxel()
+    mia = pykim.world.new_pixel("MIA", 30, 40)
+    mia.hide()
+    pykim.hide()
+
+    pykim._draw_pixels(fake)
+    assert fake.calls == []
+
+    mia.show()
+    pykim.show()
+    pykim._draw_pixels(fake)
+    assert ("pset", 0, 0, 1) in fake.calls
+    assert ("pset", 30, 40, 4) in fake.calls
+
+
+def test_hide_takes_effect_at_its_place_in_the_animation():
+    fake = FakePyxel()
+    pykim.speed(99)
+    leo = pykim.world.new_pixel("LEO", 30, 40)
+    leo.paint_path("cyan")
+    leo.up(2)
+    leo.hide()
+
+    for _ in range(3):
+        pykim._advance_animation()
+    pykim._draw_pixels(fake)
+    assert ("pset", 30, 38, 4) in fake.calls
+
+    pykim._advance_animation()
+    fake.calls.clear()
+    pykim._draw_pixels(fake)
+    assert not any(call[1:3] == (30, 38) for call in fake.calls)
+
+
+def test_parallel_moves_two_pixels_in_the_same_animation_frames():
+    fake = FakePyxel()
+    set_x(10)
+    set_y(10)
+    mia = pykim.world.new_pixel("MIA", 20, 20)
+    pykim.speed(99)
+    pykim.kim.paint_path("purple")
+    mia.paint_path("orange")
+
+    with pykim.world.parallel():
+        pykim.kim.right(2)
+        mia.down(2)
+
+    # Zwei paint_start-Ereignisse liegen vor dem Parallelblock. Nach einem
+    # weiteren Frame haben sich beide Figuren genau einen Schritt bewegt.
+    for _ in range(3):
+        pykim._advance_animation()
+    pykim._draw_pixels(fake)
+
+    assert ("pset", 11, 10, 1) in fake.calls
+    assert ("pset", 20, 21, 4) in fake.calls
+
+
+def test_parallel_keeps_shorter_pixel_at_its_destination():
+    set_x(10)
+    set_y(10)
+    mia = pykim.world.new_pixel("MIA", 20, 20)
+    pykim.speed(99)
+
+    with pykim.world.parallel():
+        pykim.kim.right(3)
+        mia.down(1)
+
+    for _ in range(3):
+        pykim._advance_animation()
+
+    assert pykim._animation_position(pykim.kim) == (13, 10)
+    assert pykim._animation_position(mia) == (20, 21)
+
+
+def test_parallel_blocks_cannot_be_nested():
+    with pytest.raises(RuntimeError, match="nicht verschachtelt"):
+        with pykim.world.parallel():
+            with pykim.world.parallel():
+                pass
+
+
 def test_color_sensor_lights_up_during_animation():
     fake = FakePyxel()
     set_x(10)
@@ -134,7 +251,7 @@ def test_animation_draws_the_path_step_by_step():
     set_y(20)
     animate(0.01)
     set_color("purple")
-    paint()
+    pykim.paint_start()
     right(2)
 
     pykim._draw_world(fake)
@@ -166,6 +283,33 @@ def test_maximum_axes_shrink_to_a_pixel():
     fake.calls.clear()
     pykim._draw_axes(fake, 20, 30, 0, 10)
     assert fake.calls == [("pset", 20, 30, 10)]
+
+
+def test_start_sequence_draws_axes_for_every_visible_pixel():
+    fake = FakePyxel()
+    set_x(10)
+    set_y(20)
+    pykim.world.new_pixel("MIA", 30, 40)
+
+    pykim._draw_start_sequences(fake, frame=0)
+
+    assert fake.calls == [
+        ("cls", 0),
+        ("line", 0, 20, 159, 20, 1),
+        ("line", 10, 0, 10, 119, 1),
+        ("line", 0, 40, 159, 40, 4),
+        ("line", 30, 0, 30, 119, 4),
+    ]
+
+
+def test_start_sequence_omits_a_pixel_hidden_before_animation():
+    fake = FakePyxel()
+    mia = pykim.world.new_pixel("MIA", 30, 40)
+    mia.hide()
+
+    pykim._draw_start_sequences(fake, frame=0)
+
+    assert not any(call[0] == "line" and 40 in call for call in fake.calls)
 
 
 def test_pause_finishes_without_using_a_pyxel_rest():

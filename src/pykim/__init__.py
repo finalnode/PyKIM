@@ -3,7 +3,7 @@
 import re
 from collections import deque
 
-__version__ = "0.11.0"
+__version__ = "0.1.1"
 
 WIDTH = 160
 HEIGHT = 120
@@ -59,7 +59,9 @@ _pause_frames = 0
 # sie mit der gewählten Verzögerung nacheinander wiedergegeben.
 _animation_delay_frames: int | None = None
 _animation_positions: list[tuple[int, int]] = []
-_animation_paints: list[tuple[int, int, int] | None] = []
+_animation_actor_positions: list[dict[object, tuple[int, int]]] = []
+_animation_actor_visibility: list[dict[object, bool]] = []
+_animation_paints: list[list[tuple[int, int, int]]] = []
 _animation_sensors: list[tuple[int, int] | None] = []
 _animation_pixels: list[list[int]] = []
 _animation_index = 0
@@ -113,21 +115,79 @@ def set_y(y: int) -> None:
     _record_position(_x, _y)
 
 
+def set_position(x: int, y: int) -> None:
+    """Setze Kims x- und y-Koordinate gemeinsam."""
+    global _x, _y
+    _x, _y = _position(x, y)
+    _record_position(_x, _y)
+
+
 def _record_position(x: int, y: int, color: int | None = None) -> None:
     """Merke eine Position und optional einen zeitgleichen Farbauftrag."""
     if _animation_delay_frames is not None:
-        _animation_positions.append((x, y))
         paint_event = None if color is None else (x, y, color)
-        _animation_paints.append(paint_event)
+        if world._capture_parallel(kim, position=(x, y), paint=paint_event):
+            return
+        _animation_positions.append((x, y))
+        _animation_paints.append([] if paint_event is None else [paint_event])
         _animation_sensors.append(None)
+        positions = _animation_actor_positions[-1].copy()
+        positions[kim] = (x, y)
+        _animation_actor_positions.append(positions)
+        _animation_actor_visibility.append(_animation_actor_visibility[-1].copy())
+
+
+def _record_pixel_position(
+    pixel: object, x: int, y: int, color: int | None = None
+) -> None:
+    """Merke eine Position eines zusätzlichen Pixels in der Timeline."""
+    if _animation_delay_frames is None:
+        return
+    paint_event = None if color is None else (x, y, color)
+    if world._capture_parallel(pixel, position=(x, y), paint=paint_event):
+        return
+    _animation_positions.append((x, y))
+    _animation_paints.append([] if paint_event is None else [paint_event])
+    _animation_sensors.append(None)
+    positions = _animation_actor_positions[-1].copy()
+    positions[pixel] = (x, y)
+    _animation_actor_positions.append(positions)
+    _animation_actor_visibility.append(_animation_actor_visibility[-1].copy())
+
+
+def _register_animation_pixel(pixel: object, x: int, y: int) -> None:
+    """Mache ein neu erzeugtes Pixel in allen Animationsframes sichtbar."""
+    for positions in _animation_actor_positions:
+        positions[pixel] = (x, y)
+    for visibility in _animation_actor_visibility:
+        visibility[pixel] = True
+
+
+def _record_pixel_visibility(pixel: object, visible: bool) -> None:
+    """Merke hide() oder show() als eigenes Animationsereignis."""
+    if _animation_delay_frames is None:
+        return
+    if world._capture_parallel(pixel, visible=visible):
+        return
+    _animation_positions.append((pixel.get_x(), pixel.get_y()))
+    _animation_paints.append([])
+    _animation_sensors.append(None)
+    _animation_actor_positions.append(_animation_actor_positions[-1].copy())
+    visibility = _animation_actor_visibility[-1].copy()
+    visibility[pixel] = visible
+    _animation_actor_visibility.append(visibility)
 
 
 def _record_sensor(x: int, y: int) -> None:
     """Merke einen gelesenen Pixel als kurzen Sensor-Moment."""
     if _animation_delay_frames is not None:
+        if world._capture_parallel(kim, sensor=(x, y)):
+            return
         _animation_positions.append((_x, _y))
-        _animation_paints.append(None)
+        _animation_paints.append([])
         _animation_sensors.append((x, y))
+        _animation_actor_positions.append(_animation_actor_positions[-1].copy())
+        _animation_actor_visibility.append(_animation_actor_visibility[-1].copy())
 
 
 def _move(dx: int, dy: int, steps: int) -> None:
@@ -178,22 +238,49 @@ def right(steps: int = 1) -> None:
 
 def animate(delay: int | float = 0.1) -> None:
     """Zeige Bewegungen bei run() schrittweise mit delay Sekunden pro Pixel."""
-    global _animation_delay_frames, _animation_positions
-    global _animation_paints, _animation_sensors, _animation_pixels
-    global _animation_index, _animation_ticks
-
     if isinstance(delay, bool) or not isinstance(delay, (int, float)):
         raise TypeError("delay muss eine Zahl sein.")
     if delay <= 0:
         raise ValueError("delay muss größer als 0 sein.")
 
-    _animation_delay_frames = max(1, round(delay * 30))
-    _animation_positions = [(_x, _y)]
-    _animation_paints = [None]
-    _animation_sensors = [None]
-    _animation_pixels = [row[:] for row in _pixels]
+    _configure_animation(max(1, round(delay * 30)))
+
+
+def _configure_animation(delay_frames: int | None) -> None:
+    """Aktiviere eine Frame-Verzögerung oder schalte die Animation aus."""
+    global _animation_delay_frames, _animation_positions
+    global _animation_paints, _animation_sensors, _animation_pixels
+    global _animation_actor_positions
+    global _animation_actor_visibility
+    global _animation_index, _animation_ticks
+
+    _animation_delay_frames = delay_frames
+    _animation_positions = [] if delay_frames is None else [(_x, _y)]
+    _animation_actor_positions = (
+        []
+        if delay_frames is None
+        else [{pixel: (pixel.get_x(), pixel.get_y()) for pixel in world.pixels}]
+    )
+    _animation_actor_visibility = (
+        []
+        if delay_frames is None
+        else [{pixel: pixel.visible for pixel in world.pixels}]
+    )
+    _animation_paints = [] if delay_frames is None else [[]]
+    _animation_sensors = [] if delay_frames is None else [None]
+    _animation_pixels = [] if delay_frames is None else [row[:] for row in _pixels]
     _animation_index = 0
     _animation_ticks = 0
+
+
+def speed(value: int) -> None:
+    """Setze die Geschwindigkeit von 1 (langsam) bis 100 (sofort)."""
+    value = _integer(value, "speed")
+    if not 1 <= value <= 100:
+        raise ValueError("speed muss zwischen 1 und 100 liegen.")
+
+    delay_frames = None if value == 100 else max(1, round(100 / value))
+    _configure_animation(delay_frames)
 
 
 # Farben und Pixelwelt
@@ -247,8 +334,8 @@ def paint_stop() -> None:
 
 
 def paint() -> None:
-    """Aktiviere das Malen; bevorzugt wird der klare Name paint_start()."""
-    paint_start()
+    """Färbe genau den Pixel an Kims aktueller Position."""
+    _pixels[_y][_x] = _paint_color()
 
 
 def paint_path(color: str | int | None = None) -> None:
@@ -374,10 +461,17 @@ def _draw_world(pyxel: object) -> None:
                 pyxel.pset(x, y, color)
 
 
-def _animation_position() -> tuple[int, int]:
-    if _animation_delay_frames is not None and _animation_positions:
-        return _animation_positions[_animation_index]
-    return _x, _y
+def _animation_position(pixel: object | None = None) -> tuple[int, int]:
+    pixel = kim if pixel is None else pixel
+    if _animation_delay_frames is not None and _animation_actor_positions:
+        return _animation_actor_positions[_animation_index][pixel]
+    return pixel.get_x(), pixel.get_y()
+
+
+def _animation_visible(pixel: object) -> bool:
+    if _animation_delay_frames is not None and _animation_actor_visibility:
+        return _animation_actor_visibility[_animation_index][pixel]
+    return pixel.visible
 
 
 def _advance_animation() -> None:
@@ -393,20 +487,33 @@ def _advance_animation() -> None:
     if _animation_ticks >= _animation_delay_frames:
         _animation_index += 1
         _animation_ticks = 0
-        paint_event = _animation_paints[_animation_index]
-        if paint_event is not None:
+        for paint_event in _animation_paints[_animation_index]:
             x, y, color = paint_event
             _animation_pixels[y][x] = color
 
 
-def _draw_kim(pyxel: object) -> None:
-    """Zeichne Kim farbrotierend und mit Kontrast zum Untergrund."""
-    x, y = _animation_position()
+def _draw_actor(pyxel: object, x: int, y: int, offset: int = 0) -> None:
+    """Zeichne eine Figur farbrotierend und mit Kontrast zum Untergrund."""
     color = (pyxel.frame_count // 5) % 15 + 1
+    color = (color - 1 + offset) % 15 + 1
     pixels = _animation_pixels if _animation_delay_frames is not None else _pixels
     if color == pixels[y][x]:
         color = color % 15 + 1
     pyxel.pset(x, y, color)
+
+
+def _draw_kim(pyxel: object) -> None:
+    """Zeichne den Standard-Pixel KIM."""
+    if _animation_visible(kim):
+        _draw_actor(pyxel, *_animation_position(kim))
+
+
+def _draw_pixels(pyxel: object) -> None:
+    """Zeichne KIM und alle zusätzlich erzeugten Pixel."""
+    _draw_kim(pyxel)
+    for index, pixel in enumerate(world.extra_pixels, start=1):
+        if _animation_visible(pixel):
+            _draw_actor(pyxel, *_animation_position(pixel), index * 3)
 
 
 def _draw_sensor(pyxel: object) -> None:
@@ -444,8 +551,47 @@ def _draw_start_sequence(
     _draw_axes(pyxel, x, y, scale, color)
 
 
-def run() -> None:
-    """Öffne das Pyxel-Fenster und starte Bild- und Audioausgabe."""
+def _draw_start_sequences(pyxel: object, frame: int, duration: int = 45) -> None:
+    """Zeige die schrumpfenden Startachsen aller sichtbaren Pixel zugleich."""
+    pyxel.cls(0)
+    scale = max(0.0, 1 - frame / duration)
+    for index, pixel in enumerate(world.pixels):
+        visible = (
+            _animation_actor_visibility[0].get(pixel, pixel.visible)
+            if _animation_actor_visibility
+            else pixel.visible
+        )
+        if not visible:
+            continue
+        x, y = (
+            _animation_actor_positions[0].get(
+                pixel, (pixel.get_x(), pixel.get_y())
+            )
+            if _animation_actor_positions
+            else (pixel.get_x(), pixel.get_y())
+        )
+        color = ((pyxel.frame_count // 5) + index * 3) % 15 + 1
+        _draw_axes(pyxel, x, y, scale, color)
+
+
+def run(*, check: str | None = None, _source: str | None = None) -> None:
+    """Prüfe optional eine Aufgabe und öffne anschließend das Pyxel-Fenster."""
+    if check is not None:
+        import inspect
+
+        from pykim.trainer.runner import check_exercise
+
+        if _source is None:
+            caller = inspect.currentframe()
+            caller = caller.f_back if caller is not None else None
+            try:
+                source = inspect.getsource(caller) if caller is not None else ""
+            except (OSError, TypeError):
+                source = ""
+        else:
+            source = _source
+        check_exercise(check, source)
+
     try:
         import pyxel
     except ImportError:
@@ -459,17 +605,12 @@ def run() -> None:
 
     def draw() -> None:
         if intro_frame <= 45:
-            start_x, start_y = (
-                _animation_positions[0]
-                if _animation_positions
-                else (_x, _y)
-            )
-            _draw_start_sequence(pyxel, start_x, start_y, intro_frame)
+            _draw_start_sequences(pyxel, intro_frame)
             return
 
         _draw_world(pyxel)
         _draw_sensor(pyxel)
-        _draw_kim(pyxel)
+        _draw_pixels(pyxel)
 
     def update() -> None:
         nonlocal intro_frame
@@ -491,6 +632,8 @@ def _reset() -> None:
     global _x, _y, _selected_color, _painting_path, _pixels, _pause_frames
     global _animation_delay_frames, _animation_positions
     global _animation_paints, _animation_sensors, _animation_pixels
+    global _animation_actor_positions
+    global _animation_actor_visibility
     global _animation_index, _animation_ticks
     _x = 0
     _y = 0
@@ -501,11 +644,33 @@ def _reset() -> None:
     _pause_frames = 0
     _animation_delay_frames = None
     _animation_positions = []
+    _animation_actor_positions = []
+    _animation_actor_visibility = []
     _animation_paints = []
     _animation_sensors = []
     _animation_pixels = []
     _animation_index = 0
     _animation_ticks = 0
+    if "world" in globals():
+        world.extra_pixels.clear()
+        kim.visible = True
+
+
+def hide() -> None:
+    """Verstecke KIM, ohne seine Spur oder Position zu verändern."""
+    kim.hide()
+
+
+def show() -> None:
+    """Zeige KIM wieder an."""
+    kim.show()
+
+
+from .pixel import Pixel
+from .world import World
+
+world = World()
+kim = Pixel(world, "KIM", default=True)
 
 
 __all__ = [
@@ -514,17 +679,25 @@ __all__ = [
     "get_color",
     "get_x",
     "get_y",
+    "hide",
     "left",
     "paint",
     "paint_path",
     "paint_start",
     "paint_stop",
+    "Pixel",
     "play_pause",
     "play_tone",
     "right",
     "run",
     "set_color",
+    "set_position",
     "set_x",
     "set_y",
+    "show",
+    "speed",
     "up",
+    "World",
+    "kim",
+    "world",
 ]
