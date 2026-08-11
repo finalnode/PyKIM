@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "PyKIM contributors" }]
-dependencies = ["pyxel>=2.2,<3"]
+dependencies = ["pyxel>=2.2,<3", "PyYAML>=6,<7"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Education",
@@ -52,6 +52,7 @@ pykim = [
   "guide/Skripte/README.md",
   "guide/Aufgaben/imperativ/*.md",
   "guide/Aufgaben/oop/*.md",
+  "guide/Trainer/*.yml",
 ]
 
 [tool.pytest.ini_options]

@@ -1,0 +1,40 @@
+format: 1
+id: treppe-5
+title: Treppe mit 5 Stufen
+tests:
+- type: position
+  position:
+  - 75
+  - 75
+  success: KIM steht am unteren Ende der Treppe.
+  failure: KIM steht noch nicht am unteren Ende der Treppe.
+  hint: Jede Stufe führt KIM 5 Pixel nach rechts und 5 Pixel nach unten.
+- type: pixels
+  exact: false
+  stairs:
+    start:
+    - 50
+    - 50
+    steps: 5
+    size: 5
+  success: Alle 5 Stufen sind vollständig gezeichnet.
+  failure: Mindestens eine der 5 Stufen ist noch unvollständig.
+  hint: Wiederhole eine waagerechte und eine senkrechte Bewegung fünfmal.
+- type: no-extra-pixels
+  stairs:
+    start:
+    - 50
+    - 50
+    steps: 5
+    size: 5
+  hint: Pro Wiederholung werden nur zwei Bewegungen benötigt.
+- type: pixel-count
+  count: 51
+  success: Die Treppe besitzt genau die richtige Länge.
+  hint: Beginne die Farbspur am Startpunkt und lasse sie bis zum Ende an.
+- type: loop
+  success: Du verwendest eine Schleife und vermeidest Wiederholungen.
+  failure: Die Zeichnung stimmt vielleicht, aber dein Code lässt sich noch kürzen.
+  hint: Schreibe die zwei Bewegungen in eine for-Schleife mit range(5).
+optimization:
+  optimal_lines: 8

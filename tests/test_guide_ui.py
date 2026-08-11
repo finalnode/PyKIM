@@ -33,4 +33,4 @@ async def test_student_can_open_overview_tasks_and_script(user):
     await user.should_see("IDE, Dateien und Updates")
     user.find("Trainer-Autorenwerkzeuge").click()
     await user.should_see("Aufgabenprüfung")
-    await user.should_see("Neue Trainerdatei entwerfen")
+    await user.should_see("Neue Trainingsdefinition entwerfen")

@@ -3,6 +3,8 @@
 import re
 from dataclasses import dataclass
 
+import yaml
+
 from .models import Exercise
 
 RULE_LABELS = {
@@ -28,15 +30,15 @@ RULE_LABELS = {
 }
 
 RULE_TEMPLATES = {
-    "pixels": '.expect_pixels({(20, 20): "purple"})',
-    "position": ".expect_position((20, 20))",
-    "loop": ".require_loop()",
-    "nested-loop": ".require_nested_loop()",
-    "condition": ".require_condition()",
-    "function": ".require_function()",
-    "audio": '.expect_audio([("C4", 1), ("E4", 1)])',
-    "parallel": ".require_parallel()",
-    "class": '.require_class("MeinPixel", base="Pixel")',
+    "pixels": {"type": "pixels", "cells": [[20, 20, "purple"]]},
+    "position": {"type": "position", "position": [20, 20]},
+    "loop": {"type": "loop"},
+    "nested-loop": {"type": "nested-loop"},
+    "condition": {"type": "condition"},
+    "function": {"type": "function"},
+    "audio": {"type": "audio", "events": [["C4", 1], ["E4", 1]]},
+    "parallel": {"type": "parallel"},
+    "class": {"type": "class", "name": "MeinPixel", "base": "Pixel"},
 }
 
 
@@ -86,7 +88,7 @@ def generate_exercise_source(
     *,
     optimal_lines: int | None = None,
 ) -> str:
-    """Erzeuge einen direkt speicherbaren Builder-Entwurf aus UI-Bausteinen."""
+    """Erzeuge eine sichere YAML-Trainingsdefinition aus UI-Bausteinen."""
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name):
         raise ValueError("Die Kennung muss aus Kleinbuchstaben, Zahlen und Bindestrichen bestehen.")
     if not title.strip():
@@ -96,21 +98,19 @@ def generate_exercise_source(
     unknown = set(rules) - set(RULE_TEMPLATES)
     if unknown:
         raise ValueError(f"Unbekannte Prüfbausteine: {', '.join(sorted(unknown))}")
-    lines = [
-        '"""Aufgabe: ' + title.strip() + '."""',
-        "",
-        "from pykim.trainer import ExerciseBuilder",
-        "",
-        "EXERCISE = (",
-        f'    ExerciseBuilder("{name}", {title.strip()!r})',
-    ]
-    lines.extend(f"    {RULE_TEMPLATES[rule]}" for rule in rules)
+    definition = {
+        "format": 1,
+        "exercises": [{
+            "id": name,
+            "title": title.strip(),
+            "tests": [dict(RULE_TEMPLATES[rule]) for rule in rules],
+        }],
+    }
     if optimal_lines is not None:
         if optimal_lines < 1:
             raise ValueError("Die optimale Zeilenzahl muss mindestens 1 sein.")
-        lines.append(f"    .optimize_lines(optimal={optimal_lines})")
-    lines.extend(("    .build()", ")", ""))
-    return "\n".join(lines)
+        definition["exercises"][0]["optimization"] = {"optimal_lines": optimal_lines}
+    return yaml.safe_dump(definition, allow_unicode=True, sort_keys=False)
 
 
 __all__ = [

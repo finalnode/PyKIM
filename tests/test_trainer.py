@@ -11,8 +11,7 @@ from pykim.trainer.exercises import exercise_names, get_exercise
 
 
 def test_builtin_exercises_work_without_searchable_package_directory(monkeypatch):
-    """Ein eingefrorenes PyInstaller-Paket kann nicht mit pkgutil gesucht werden."""
-    monkeypatch.setattr(exercise_registry, "iter_modules", lambda _path: ())
+    """Die Registry benötigt keine dynamisch importierten Python-Trainer."""
 
     exercises = exercise_registry._discover_exercises()
 
@@ -585,7 +584,7 @@ def test_definition_hash_changes_with_visible_feedback():
     assert first.definition_hash != second.definition_hash
 
 
-def test_authoring_generator_creates_complete_parseable_builder_source():
+def test_authoring_generator_creates_complete_yaml_definition():
     source = generate_exercise_source(
         "neue-aufgabe",
         "Neue Aufgabe",
@@ -593,11 +592,37 @@ def test_authoring_generator_creates_complete_parseable_builder_source():
         optimal_lines=8,
     )
 
-    compile(source, "neue_aufgabe.py", "exec")
-    assert 'ExerciseBuilder("neue-aufgabe", \'Neue Aufgabe\')' in source
-    assert '.expect_pixels({(20, 20): "purple"})' in source
-    assert ".require_loop()" in source
-    assert ".optimize_lines(optimal=8)" in source
+    import yaml
+    from pykim.trainer.definitions import exercise_from_data
+
+    payload = yaml.safe_load(source)
+    exercise = exercise_from_data(payload["exercises"][0])
+    assert exercise.name == "neue-aufgabe"
+    assert [rule.kind for rule in exercise.rules] == ["pixels", "loop"]
+    assert payload["exercises"][0]["optimization"]["optimal_lines"] == 8
+
+
+def test_yaml_trainer_rejects_unknown_executable_rule():
+    from pykim.trainer.definitions import exercise_from_data
+
+    with pytest.raises(ValueError, match="Unbekannter sicherer Prüftyp"):
+        exercise_from_data({
+            "id": "unsicher",
+            "title": "Unsicher",
+            "tests": [{"type": "python", "code": "__import__('os').system('echo no')"}],
+        })
+
+
+def test_yaml_trainer_rejects_unknown_top_level_fields():
+    from pykim.trainer.definitions import exercise_from_data
+
+    with pytest.raises(ValueError, match="Unbekannte Aufgabenfelder"):
+        exercise_from_data({
+            "id": "unsicher",
+            "title": "Unsicher",
+            "tests": [{"type": "loop"}],
+            "python": "print('wird niemals ausgeführt')",
+        })
 
 
 @pytest.mark.parametrize(

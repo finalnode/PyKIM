@@ -1,12 +1,14 @@
 """Sicherer Arbeitsbereich für gemeinsam versionierte Trainer- und Markdownentwürfe."""
 
-import ast
 import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from pykim.trainer.exercises import get_exercise
+from pykim.trainer.definitions import exercise_from_data
 
 from .library import task_document
 
@@ -52,23 +54,15 @@ def validate_author_draft(draft: AuthorDraft) -> tuple[str, ...]:
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", draft.name):
         issues.append("Die Kennung muss ein kebab-case-Name sein.")
     try:
-        tree = ast.parse(draft.trainer_source)
-    except SyntaxError as error:
-        issues.append(f"Trainer-Python enthält einen Syntaxfehler in Zeile {error.lineno}.")
-        tree = None
-    if tree is not None:
-        builders = [
-            node for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "ExerciseBuilder"
-        ]
-        if not builders:
-            issues.append("Im Trainercode fehlt ExerciseBuilder(...).")
-        elif not builders[0].args or not isinstance(builders[0].args[0], ast.Constant) or builders[0].args[0].value != draft.name:
-            issues.append("Die ExerciseBuilder-Kennung stimmt nicht mit dem Entwurfsnamen überein.")
-        if not any(isinstance(node, ast.Name) and node.id == "EXERCISE" for node in ast.walk(tree)):
-            issues.append("Die Trainerdatei muss EXERCISE exportieren.")
+        payload = yaml.safe_load(draft.trainer_source)
+        definitions = payload.get("exercises") if isinstance(payload, dict) else None
+        if payload.get("format") != 1 or not isinstance(definitions, list) or len(definitions) != 1:
+            raise ValueError("Ein Entwurf benötigt format: 1 und genau eine Aufgabe.")
+        exercise = exercise_from_data(definitions[0])
+        if exercise.name != draft.name:
+            issues.append("Die YAML-Kennung stimmt nicht mit dem Entwurfsnamen überein.")
+    except (AttributeError, TypeError, ValueError, yaml.YAMLError) as error:
+        issues.append(f"Trainer-YAML ist ungültig: {error}")
     lines = draft.assignment_markdown.splitlines()
     if not any(line.startswith("# ") for line in lines):
         issues.append("Im Markdown fehlt die Überschrift der Aufgabe.")
@@ -83,22 +77,23 @@ def load_published_draft(name: str) -> AuthorDraft:
     get_exercise(name)  # verständliche Fehlermeldung für unbekannte Kennungen
     import pykim.trainer.exercises as exercise_package
 
-    source_path = next(
-        (
-            path
-            for path in Path(exercise_package.__file__).parent.glob("*.py")
-            if f'ExerciseBuilder("{name}"' in path.read_text(encoding="utf-8")
-        ),
-        None,
+    source_path = Path(exercise_package.__file__).resolve().parents[2] / "guide" / "Trainer" / "definitions.yml"
+    payload = yaml.safe_load(source_path.read_text(encoding="utf-8"))
+    definition = next(
+        (item for item in payload["exercises"] if item.get("id") == name), None
     )
-    if source_path is None:
-        raise ValueError(f"Die Trainerquelle für {name!r} wurde nicht gefunden.")
+    if definition is None:
+        raise ValueError(f"Die Trainingsdefinition für {name!r} wurde nicht gefunden.")
     document = task_document(name)
     if document is None:
         raise ValueError(f"Für {name!r} fehlt das Aufgaben-Markdown.")
     return AuthorDraft(
         name,
-        source_path.read_text(encoding="utf-8"),
+        yaml.safe_dump(
+            {"format": 1, "exercises": [definition]},
+            allow_unicode=True,
+            sort_keys=False,
+        ),
         document.content,
     )
 
@@ -116,7 +111,7 @@ def save_author_draft(
     if paradigm not in {"imperativ", "oop"}:
         raise ValueError("Der Lernweg muss imperativ oder oop sein.")
     root = Path(course).expanduser().resolve() / ".pykim" / "author_drafts"
-    trainer_path = root / "trainer" / f"{draft.name.replace('-', '_')}.py"
+    trainer_path = root / "trainer" / f"{draft.name}.yml"
     markdown_path = root / "Aufgaben" / paradigm / f"{draft.name}.md"
     if not overwrite and (trainer_path.exists() or markdown_path.exists()):
         raise FileExistsError(

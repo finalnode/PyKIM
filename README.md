@@ -606,29 +606,22 @@ pykim/trainer/
 ├── models.py             # Ergebnisse und Aufgabenmodell
 ├── feedback.py           # deutsche Konsolenausgabe
 ├── optimization.py       # optionale Bewertung von Codequalität
-├── builder.py            # einheitliche Autoren-API und Codeanalyse
+├── builder.py            # interne Prüfbausteine und Codeanalyse
+├── definitions.py        # sicherer YAML-Lader und Schema-Prüfung
 ├── runner.py             # Einstieg für run(check=...)
 └── exercises/
-    ├── __init__.py       # automatische Aufgaben-Registry
-    ├── checkerboard.py
-    ├── color_melody.py
-    ├── dotted_line.py
-    ├── four_squares.py
-    ├── multiple_pixels.py
-    ├── custom_pixel.py
-    ├── interactive.py
-    ├── rhythm.py
-    ├── scale.py
-    ├── square.py
-    └── stairs.py
+    └── __init__.py       # validierte Aufgaben-Registry
 ```
 
-Neue Aufgaben werden mit `ExerciseBuilder` deklarativ beschrieben. Technische
+Die aktualisierbaren Trainingsdaten liegen zusammen mit Skript und Aufgaben in
+`pykim/guide/Trainer/definitions.yml`.
+
+Neue Aufgaben werden in YAML deklarativ beschrieben. Technische
 Weltabfragen, Farbindizes und AST-Analysen gehören nicht in die Aufgabendatei.
 Eine vollständige Anleitung mit kopierbaren Vorlagen steht in
-[`TRAINER_AUTOREN.md`](TRAINER_AUTOREN.md). Jede Datei mit einem erzeugten
-`EXERCISE` wird automatisch registriert. Der PyKIM-Kern und `run(check=...)`
-müssen dafür nicht verändert werden.
+[`TRAINER_AUTOREN.md`](TRAINER_AUTOREN.md). Die Registry lädt und validiert die
+YAML-Definitionen beim Start. Der PyKIM-Kern und `run(check=...)` müssen dafür
+nicht verändert werden.
 
 Alle mitgelieferten Aufgaben geben zusätzlich zur fachlichen Prüfung eine
 prozentuale Bewertung der Codelänge aus. Die jeweilige Schwelle entspricht der

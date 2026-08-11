@@ -69,9 +69,9 @@ def render_authoring_view(ui) -> None:
         ui.separator()
         section_heading(
             ui,
-            "Neue Trainerdatei entwerfen",
-            "Der Entwurf ist normaler ExerciseBuilder-Code. Fachwerte wie Positionen "
-            "und Farben können anschließend direkt im erzeugten Code angepasst werden.",
+            "Neue Trainingsdefinition entwerfen",
+            "Der Entwurf ist sicheres YAML. Positionen, Farben, Feedback und erlaubte "
+            "Prüfbausteine können ohne eigenen Python-Trainer angepasst werden.",
             level=3,
         )
         published = ui.select(
@@ -104,7 +104,7 @@ def render_authoring_view(ui) -> None:
         ).classes("w-full")
         optimal = ui.number("Optimale relevante Codezeilen (optional)", min=1)
         trainer_output = ui.codemirror(
-            value="", language="Python", line_wrapping=False,
+            value="", language="YAML", line_wrapping=False,
         ).classes("w-full").style("height: 24rem")
         markdown_output = ui.textarea("Vollständiges Aufgaben-Markdown").props(
             "outlined autogrow"
@@ -171,7 +171,7 @@ def render_authoring_view(ui) -> None:
             ui.run_javascript(
                 f"navigator.clipboard.writeText({json.dumps(trainer_output.value)})"
             )
-            ui.notify("Trainerdatei kopiert.", type="positive")
+            ui.notify("Trainings-YAML kopiert.", type="positive")
 
         def load_published() -> None:
             if not published.value:

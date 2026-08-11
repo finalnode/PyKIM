@@ -1,0 +1,33 @@
+format: 1
+id: rhythmus-motiv
+title: Rhythmisches Tonmotiv
+tests:
+- type: audio
+  events:
+  - - C4
+    - 1
+  - - E4
+    - 1
+  - - G4
+    - 2
+  - - null
+    - 1
+  - - C4
+    - 1
+  - - E4
+    - 1
+  - - G4
+    - 2
+  - - null
+    - 1
+  success: Das Motiv wird zweimal mit den richtigen Ton- und Pausenlängen gespielt.
+  failure: Das Motiv oder seine Wiederholung stimmt noch nicht vollständig.
+  hint: Spiele C4 (1), E4 (1), G4 (2), Pause (1) zweimal.
+- type: function
+  success: Das Motiv ist in einer eigenen Funktion gekapselt.
+  hint: Definiere beispielsweise def spiele_motiv():.
+- type: loop
+  success: Eine Schleife übernimmt die Wiederholung.
+  hint: Rufe die Motivfunktion in einer for-Schleife zweimal auf.
+optimization:
+  optimal_lines: 10

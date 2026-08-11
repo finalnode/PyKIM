@@ -1,0 +1,11 @@
+format: 1
+id: quadrat-5
+title: Quadrat mit Kantenlänge 5
+tests:
+- type: square
+  start:
+  - 50
+  - 50
+  side: 5
+optimization:
+  optimal_lines: 10

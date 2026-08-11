@@ -1,0 +1,60 @@
+format: 1
+id: pykim-standardkurs
+title: PyKIM-Standardkurs
+minimum_app_version: 0.2.0
+chapters:
+  imperativ:
+  - Skripte/imperativ/01_erste_befehle.md
+  - Skripte/imperativ/01a_variablen.md
+  - Skripte/imperativ/01b_datentypen_und_operatoren.md
+  - Skripte/imperativ/02_schleifen.md
+  - Skripte/imperativ/02a_listen.md
+  - Skripte/imperativ/03_bedingungen.md
+  - Skripte/imperativ/04_funktionen.md
+  - Skripte/imperativ/04a_funktionen_mit_parametern.md
+  - Skripte/imperativ/04b_while_schleifen.md
+  - Skripte/imperativ/04c_strings.md
+  - Skripte/imperativ/04d_zweidimensionale_listen.md
+  - Skripte/imperativ/04e_rekursion.md
+  - Skripte/imperativ/04f_dictionaries.md
+  - Skripte/imperativ/04g_fehler_und_debugging.md
+  - Skripte/imperativ/05_interaktiv.md
+  - Skripte/imperativ/05a_welt_anzeigen_und_pyxel.md
+  - Skripte/imperativ/06_spielprojekt.md
+  oop:
+  - Skripte/oop/01_objekte.md
+  - Skripte/oop/02_eigene_klassen.md
+exercises:
+- id: quadrat-5
+  assignment: Aufgaben/imperativ/quadrat-5.md
+  trainer: Trainer/quadrat-5.yml
+- id: treppe-5
+  assignment: Aufgaben/imperativ/treppe-5.md
+  trainer: Trainer/treppe-5.yml
+- id: punktlinie-8
+  assignment: Aufgaben/imperativ/punktlinie-8.md
+  trainer: Trainer/punktlinie-8.yml
+- id: vier-quadrate
+  assignment: Aufgaben/imperativ/vier-quadrate.md
+  trainer: Trainer/vier-quadrate.yml
+- id: schachbrett-8
+  assignment: Aufgaben/imperativ/schachbrett-8.md
+  trainer: Trainer/schachbrett-8.yml
+- id: tonleiter-c-dur
+  assignment: Aufgaben/imperativ/tonleiter-c-dur.md
+  trainer: Trainer/tonleiter-c-dur.yml
+- id: rhythmus-motiv
+  assignment: Aufgaben/imperativ/rhythmus-motiv.md
+  trainer: Trainer/rhythmus-motiv.yml
+- id: farben-melodie
+  assignment: Aufgaben/imperativ/farben-melodie.md
+  trainer: Trainer/farben-melodie.yml
+- id: interaktive-steuerung
+  assignment: Aufgaben/imperativ/interaktive-steuerung.md
+  trainer: Trainer/interaktive-steuerung.yml
+- id: musik-pixel-klasse
+  assignment: Aufgaben/oop/musik-pixel-klasse.md
+  trainer: Trainer/musik-pixel-klasse.yml
+- id: mehrere-pixel
+  assignment: Aufgaben/oop/mehrere-pixel.md
+  trainer: Trainer/mehrere-pixel.yml

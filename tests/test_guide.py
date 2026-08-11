@@ -167,8 +167,8 @@ def test_bundled_content_manifest_matches_all_markdown_files():
         path.relative_to(PACKAGED_CONTENT_ROOT).as_posix(): hashlib.sha256(
             path.read_bytes()
         ).hexdigest()
-        for folder in ("Skripte", "Aufgaben")
-        for path in (PACKAGED_CONTENT_ROOT / folder).rglob("*.md")
+        for folder, pattern in (("Skripte", "*.md"), ("Aufgaben", "*.md"), ("Trainer", "*.yml"))
+        for path in (PACKAGED_CONTENT_ROOT / folder).rglob(pattern)
     }
 
     assert expected == actual
@@ -328,7 +328,7 @@ def test_author_workspace_loads_a_published_pair():
     draft = load_published_draft("quadrat-5")
 
     assert draft.name == "quadrat-5"
-    assert 'ExerciseBuilder("quadrat-5"' in draft.trainer_source
+    assert "id: quadrat-5" in draft.trainer_source
     assert draft.assignment_markdown.startswith("# Quadrat")
     assert validate_author_draft(draft) == ()
 

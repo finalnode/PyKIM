@@ -3,7 +3,7 @@
   "content_version": "2026.08.1",
   "minimum_app_version": "0.2.0",
   "package_url": "https://github.com/finalnode/PyKIM/releases/download/content-2026.08.1/pykim-content-2026.08.1.zip",
-  "package_sha256": "c757a79cb13b1af4f24367d841b0b9d629068009aabddaac25b394241b1a04ac",
+  "package_sha256": "ccf50edabbaee7ca62ca1aa4799c59bac51d1b71120b2a521023389e4ae6fa3f",
   "files": {
     "Aufgaben/imperativ/farben-melodie.md": "0e214aa145f37995e9844890169d9d7f33afecbb4b9ee6b53c042b5da92a9ef3",
     "Aufgaben/imperativ/interaktive-steuerung.md": "05ec898b687c3048812abeb4d24d5c7994ea99b26ad474458b9090bad337f3b3",
@@ -35,6 +35,7 @@
     "Skripte/imperativ/05a_welt_anzeigen_und_pyxel.md": "a697ef28c62c0366e5c4500d9fae9fea5031856a434ab9cd9842b176e0d13e71",
     "Skripte/imperativ/06_spielprojekt.md": "bc1609b960f920e8a876862a4e4cbe00d81db29b81c27300a72a8aca7c83ce8d",
     "Skripte/oop/01_objekte.md": "8f1c556fba99c20a5f15ff41d3a1eccb17fd82be20d8e252edbe08e854309f82",
-    "Skripte/oop/02_eigene_klassen.md": "5b57b6768e10bdf3fa7829a1e986a8b30d1420c93409972cc453e8b019a72ada"
+    "Skripte/oop/02_eigene_klassen.md": "5b57b6768e10bdf3fa7829a1e986a8b30d1420c93409972cc453e8b019a72ada",
+    "Trainer/definitions.yml": "75959956f0b742eadd80a2ec3fc8b0a4ef22ceb72055c36a9406db273355269c"
   }
 }

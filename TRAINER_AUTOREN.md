@@ -1,206 +1,184 @@
 # Aufgaben für den PyKIM-Trainer schreiben
 
-Trainerdateien beschreiben nur, **was** eine richtige Lösung ausmacht. Der
-`ExerciseBuilder` übernimmt Weltzugriff, Farbumwandlung, Audiovergleich,
-Quellcodeanalyse und den Aufbau der deutschen Rückmeldung.
+Trainingsdaten sind gewöhnliches YAML. Eine Aufgabe enthält keine ausführbaren
+Funktionen und keinen Python-Import. Die Suite übersetzt ausschließlich bekannte
+Prüftypen in ihre fest eingebaute Prüfmaschine.
 
-## Autorenwerkzeuge in der Suite
+Alle mitgelieferten Definitionen stehen momentan in
+`src/pykim/guide/Trainer/definitions.yml`:
 
-Unter **Werkzeuge → Trainer-Autorenwerkzeuge** zeigt die Suite für jede
-registrierte Aufgabe:
-
-- die verwendeten Prüfbausteine,
-- Erfolgs-, Fehler- und Tipptexte aus Sicht der Lernenden,
-- redaktionelle Warnungen,
-- einen stabilen Definitions-Hash.
-
-Darunter erzeugt ein kleiner Bausteineditor aus Kennung, Titel, Prüfungen und
-optionaler Codeschwelle eine vollständige Trainerdatei und das zugehörige
-Aufgaben-Markdown. Vorhandene Aufgaben können als Ausgangspunkt geladen werden.
-Beide Texte bleiben bewusst normaler, editierbarer Quelltext: Positionen,
-Farben und besondere Fachwerte lassen sich direkt und nachvollziehbar anpassen.
-
-Die Suite validiert Python-Syntax, Kennung, `EXERCISE`, Markdown-Titel,
-Schwierigkeitsgrad und Anforderungen fortlaufend. Beim Speichern entstehen
-immer beide Dateien unter `.pykim/author_drafts/` im Kursordner. Vorhandene
-Entwürfe werden nur nach bewusst gesetztem Haken überschrieben. Installierte
-Paketdateien bleiben dadurch unverändert.
-
-Der Definitions-Hash ändert sich, sobald sich Titel, Reihenfolge, Art oder
-Feedback der Prüfungen ändern. Er identifiziert damit eine konkrete
-Testdefinition, ersetzt aber keine Versionsverwaltung.
-
-## Kleinste Aufgabe
-
-```python
-from pykim.trainer import ExerciseBuilder
-
-EXERCISE = (
-    ExerciseBuilder("roter-punkt", "Ein roter Punkt")
-    .expect_pixels({(20, 20): "red"})
-    .expect_position((20, 20))
-    .build()
-)
+```yaml
+format: 1
+exercises:
+  - id: roter-punkt
+    title: Ein roter Punkt
+    tests:
+      - type: pixels
+        cells:
+          - [20, 20, red]
+        success: Der rote Punkt liegt richtig.
+        failure: Der rote Punkt fehlt oder liegt falsch.
+        hint: Gehe zuerst zu (20, 20) und male dort rot.
+      - type: position
+        position: [20, 20]
+    optimization:
+      optimal_lines: 5
 ```
 
-Farben werden immer mit Namen angegeben. Interne Pyxel-Indizes wie `8` oder
-`12` gehören nicht in Trainerdateien.
+`id` ist die stabile Kennung, die auch bei `run(check="roter-punkt")`
+verwendet wird. `title` erscheint in den Testergebnissen. Jeder Eintrag unter
+`tests` benötigt einen bekannten `type`.
 
-## Eigene Rückmeldungen
+## Rückmeldungen
 
-Jede Regel besitzt brauchbare Standardtexte. Für eine konkrete Aufgabe können
-`success`, `failure` und `hint` überschrieben werden:
+Jeder Test kann drei Texte überschreiben:
 
-```python
-.require_loop(
-    success="Du verwendest eine Schleife für alle acht Punkte.",
-    failure="Die Wiederholungen sind noch einzeln notiert.",
-    hint="Setze paint() und right(2) in eine for-Schleife.",
-)
+```yaml
+- type: loop
+  success: Du verwendest eine Schleife für alle acht Punkte.
+  failure: Die Wiederholungen sind noch einzeln notiert.
+  hint: Setze paint() und right(2) in eine for-Schleife.
 ```
 
-## Welt und Figuren prüfen
+Fehlen Texte, verwendet der Trainer verständliche Standardmeldungen. Für
+veröffentlichte Aufgaben sollte insbesondere ein konkreter Tipp vorhanden sein.
 
-```python
-.expect_pixels({
-    (20, 20): "purple",
-    (21, 20): "orange",
-})
-.expect_position((30, 20))                 # standardmäßig KIM
-.expect_positions({"KIM": (30, 20), "MIA": (40, 20)})
-.expect_pixel_names(("KIM", "MIA"))
-.expect_visibility("MIA", False)
+## Zeichnungen prüfen
+
+Einzelne farbige Pixel:
+
+```yaml
+- type: pixels
+  cells:
+    - [20, 20, purple]
+    - [21, 20, orange]
 ```
 
-`expect_pixels()` prüft standardmäßig das exakte Bild einschließlich Farben
-und zusätzlicher Pixel. Eine reine Koordinatenmenge ignoriert die Farben:
+Nur Positionen, ohne Farbprüfung:
 
-```python
-.expect_pixels({(20, 20), (21, 20)}, exact=False)
-.expect_no_extra_pixels({(20, 20), (21, 20)})
-.expect_pixel_count(2, success="Genau zwei Pixel sind angemalt.")
+```yaml
+- type: pixels
+  exact: false
+  cells:
+    - [20, 20]
+    - [21, 20]
 ```
 
-Für ein geschlossenes Quadrat gibt es eine fertige Geometrieprüfung:
+Gerade Linien einschließlich Start- und Endpunkt:
 
-```python
-.expect_square(start=(50, 50), side=5)
+```yaml
+- type: pixels
+  paths:
+    - {start: [20, 20], end: [30, 20], color: purple}
+    - {start: [30, 20], end: [30, 30], color: orange}
 ```
 
-## Töne und Pausen prüfen
+Für häufige Unterrichtsmuster existieren kompakte Vorlagen:
 
-Audioereignisse bestehen aus `(Note, beats)`. `None` steht lesbar für eine
+```yaml
+- type: pixels
+  checkerboard:
+    start: [20, 20]
+    size: [8, 8]
+    colors: [purple, orange]
+
+- type: pixels
+  stairs: {start: [50, 50], steps: 5, size: 5}
+
+- type: square
+  start: [50, 50]
+  side: 5
+```
+
+Zusätzliche Pixel und die Gesamtzahl lassen sich getrennt bewerten:
+
+```yaml
+- type: no-extra-pixels
+  stairs: {start: [50, 50], steps: 5, size: 5}
+- type: pixel-count
+  count: 51
+  success: Die Treppe besitzt genau die richtige Länge.
+```
+
+## Figuren und Weltzustand
+
+```yaml
+- type: position
+  pixel: KIM
+  position: [30, 20]
+- type: positions
+  positions: {KIM: [30, 20], MIA: [40, 20]}
+- type: pixel-names
+  names: [KIM, MIA]
+- type: visibility
+  pixel: MIA
+  visible: false
+```
+
+## Töne und Pausen
+
+Audioereignisse werden als `[Note, beats]` angegeben. `null` steht für eine
 Pause:
 
-```python
-.expect_audio([
-    ("C4", 1),
-    ("E4", 1),
-    ("G4", 2),
-    (None, 1),
-])
+```yaml
+- type: audio
+  events:
+    - [C4, 1]
+    - [E4, 1]
+    - [G4, 2]
+    - [null, 1]
 ```
 
-MIDI-Zahlen sind möglich, Notennamen sind in Aufgaben aber meist verständlicher.
+## Kontrollstrukturen und Aufrufe
 
-## Kontrollstrukturen prüfen
-
-```python
-.require_loop()
-.require_nested_loop()
-.require_condition()
-.require_condition(calls=("get_color",))
-.require_function()
-.require_function("update")
-.require_calls("cls", "run")
-.require_parallel()
+```yaml
+- type: loop
+- type: nested-loop
+- type: condition
+  calls: [get_color]
+- type: function
+  name: update
+- type: calls
+  names: [cls, run]
+- type: parallel
 ```
 
-## Eigene Klassen prüfen
+## Klassen prüfen
 
-```python
-.require_class("MusikPixel", base="Pixel")
-.require_super_init("MusikPixel")
-.require_methods("MusikPixel", "update", "draw")
-.require_calls("spawn")
+```yaml
+- type: class
+  name: MusikPixel
+  base: Pixel
+- type: super-init
+  class: MusikPixel
+- type: methods
+  class: MusikPixel
+  names: [update, draw]
 ```
 
-## Optimierung ergänzen
+## Codeumfang bewerten
 
-### Codeschwelle in Prozent
-
-Wenn eine Aufgabe optimal in beispielsweise zehn relevanten Codezeilen lösbar
-ist, wird die Schwelle direkt angegeben:
-
-```python
-.optimize_lines(optimal=10)
+```yaml
+optimization:
+  optimal_lines: 10
 ```
 
-Gezählt werden alle nichtleeren Zeilen außer reinen Kommentarzeilen. Leerzeilen
-und Kommentare verschlechtern die Bewertung also nicht. Die Punktzahl lautet:
+Gezählt werden nichtleere Codezeilen ohne reine Kommentare. Zehn oder weniger
+relevante Zeilen ergeben 100 %, 15 Zeilen 67 % und 20 Zeilen 50 %. Die
+fachlichen Tests entscheiden unabhängig davon, ob die Lösung korrekt ist.
 
-```text
-min(100, optimal / tatsächlich × 100)
-```
+## Sicherheit und Erweiterungen
 
-Eine Lösung mit 10 Zeilen erhält `100 %`, eine mit 15 Zeilen `67 %` und eine
-mit 20 Zeilen `50 %`. Kürzere korrekte Lösungen bleiben bei `100 %`. Die
-fachlichen Prüfungen entscheiden weiterhin unabhängig davon, ob die Aufgabe
-korrekt gelöst wurde.
+Die YAML-Datei wird mit `yaml.safe_load()` gelesen. Unbekannte Felder und
+Prüftypen werden abgelehnt. Ein Inhaltspaket kann daher keine eigenen
+Python-Befehle einschleusen.
 
-Beispiel:
+Wenn ein neuer fachlicher Prüftyp benötigt wird, wird er einmal in der
+Suite-Engine implementiert und getestet. Danach können beliebig viele Aufgaben
+diesen Typ in YAML verwenden. Beliebiger Python-Code, Lambdas oder dynamische
+Imports gehören nicht in Trainingsdaten.
 
-```python
-EXERCISE = (
-    ExerciseBuilder("tonleiter", "Tonleiter")
-    .expect_audio(NOTES)
-    .require_loop()
-    .optimize_lines(optimal=5)
-    .build()
-)
-```
-
-### Eigene Optimierungsfunktion
-
-Eine vorhandene Optimierungsfunktion kann separat angehängt werden:
-
-```python
-from pykim.trainer.optimization import evaluate_checkerboard
-
-EXERCISE = (
-    ExerciseBuilder("schachbrett-8", "Schachbrett")
-    .expect_pixels(EXPECTED)
-    .require_nested_loop()
-    .optimize_with(evaluate_checkerboard)
-    .build()
-)
-```
-
-## Ungewöhnliche Sonderprüfung
-
-Wenn keine fertige Regel passt, bleibt ein ausdrücklich beschrifteter Ausweg:
-
-```python
-.add_check(
-    lambda source: meine_pruefung(),
-    success="Das besondere Ziel ist erreicht.",
-    failure="Das besondere Ziel fehlt noch.",
-    hint="Prüfe ...",
-)
-```
-
-Für dynamische Meldungen existiert zusätzlich `add_result()`. Neue allgemein
-nützliche Prüfungen sollten jedoch bevorzugt einmal im Builder ergänzt werden,
-statt technische Logik in mehreren Aufgaben zu duplizieren.
-
-## Aufgabe verfügbar machen
-
-Die Datei muss lediglich in `src/pykim/trainer/exercises/` liegen und eine
-Variable namens `EXERCISE` exportieren. Die Registry entdeckt sie beim Start
-automatisch; eine Importliste muss nicht gepflegt werden. Die Registry prüft
-Kennung, Titel, Prüfbausteine und Definitions-Hash beim Laden.
-
-Die Aufgabenstellung liegt als gleichnamige Markdown-Datei unter
-`src/pykim/guide/Aufgaben/imperativ/` oder `Aufgaben/oop/`. Diese Datei ist die
-einzige Quelle für den Aufgabentext und den Schwierigkeitsgrad; eine gemeinsame
-`AUFGABEN.md` muss nicht zusätzlich gepflegt werden.
+Die Aufgabenstellung bleibt als gleichnamige Markdown-Datei unter
+`src/pykim/guide/Aufgaben/imperativ/` oder `Aufgaben/oop/`. Das Autorenwerkzeug
+der Suite erzeugt und validiert YAML und Markdown gemeinsam und speichert
+Entwürfe unter `.pykim/author_drafts/` im Kursordner.

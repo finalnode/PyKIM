@@ -16,9 +16,12 @@ def main(arguments: list[str] | None = None) -> int:
     project = Path(__file__).resolve().parents[1]
     guide = project / "src" / "pykim" / "guide"
     paths = sorted(
-        path
-        for folder in (guide / "Skripte", guide / "Aufgaben")
-        for path in folder.rglob("*.md")
+        [
+            path
+            for folder in (guide / "Skripte", guide / "Aufgaben")
+            for path in folder.rglob("*.md")
+        ]
+        + list((guide / "Trainer").rglob("*.yml"))
     )
     files = {
         path.relative_to(guide).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
