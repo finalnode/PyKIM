@@ -8,6 +8,7 @@ for x, farbe in enumerate(farben, start=20):
     set_position(x, 20)
     set_color(farbe)
     paint()
+    paint_stop()
 
 set_position(20, 20)
 for _ in range(4):

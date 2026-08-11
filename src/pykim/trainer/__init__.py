@@ -1,6 +1,15 @@
 """Deutschsprachige Aufgabenprüfung für den Einsatz mit Thonny."""
 
-from .models import CheckReport, CheckResult, OptimizationResult
+from .models import CheckReport, CheckResult, OptimizationResult, RuleDefinition
 from .builder import ExerciseBuilder
+from .authoring import audit_exercise, generate_exercise_source
 
-__all__ = ["CheckReport", "CheckResult", "ExerciseBuilder", "OptimizationResult"]
+__all__ = [
+    "CheckReport",
+    "CheckResult",
+    "ExerciseBuilder",
+    "OptimizationResult",
+    "RuleDefinition",
+    "audit_exercise",
+    "generate_exercise_source",
+]

@@ -8,6 +8,7 @@ def zeichne_feld(x, y, color):
     set_position(x, y)
     set_color(color)
     paint()
+    paint_stop()
 
 
 speed(100)

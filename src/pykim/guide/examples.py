@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
+from .interpreter import python_command
+
 
 @dataclass(frozen=True)
 class ExampleProgram:
@@ -32,7 +34,7 @@ CATEGORIES = {
     "musik_pixel_aufgabe": "Musterlösungen",
     "pachelbel_canon": "Musik",
     "paint_line": "Zeichnen",
-    "paint_path": "Zeichnen",
+    "paint_trace": "Zeichnen",
     "punktlinie_aufgabe": "Musterlösungen",
     "quadrat_aufgabe": "Musterlösungen",
     "rhythmus_aufgabe": "Musterlösungen",
@@ -76,7 +78,7 @@ def launch_example(name: str) -> Path:
     environment = os.environ.copy()
     environment["PYKIM_PROGRESS_MODE"] = "disabled"
     subprocess.Popen(
-        [sys.executable, str(example.path)],
+        [*python_command(), str(example.path)],
         cwd=example.path.parent,
         env=environment,
     )
@@ -87,9 +89,17 @@ def copy_example_to_course(name: str, course: str | Path) -> tuple[Path, bool]:
     """Lege eine bearbeitbare Kopie an, ohne vorhandene Schülerarbeit zu ersetzen."""
     example = _example(name)
     root = Path(course).expanduser().resolve()
-    target = root / "eigene_projekte" / "beispiele" / f"{name}.py"
-    target.parent.mkdir(parents=True, exist_ok=True)
+    from .projects import create_project, project_slug, projects_directory
+
+    directory = projects_directory(root) / "beispiele" / project_slug(example.title)
+    target = directory / "main.py"
     if target.exists():
         return target, False
-    target.write_text(example.source, encoding="utf-8")
-    return target, True
+    project = create_project(
+        root,
+        example.title,
+        "pykim",
+        source=example.source,
+        parent="Beispiele",
+    )
+    return project.entrypoint, True

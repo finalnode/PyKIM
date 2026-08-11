@@ -15,15 +15,11 @@ class MusikPixel(Pixel):
             self.play_tone(self.note)
 
     def draw(self):
-        self.world.pset(self.get_x(), self.get_y(), self.color)
+        self.world.pset(self.x, self.y, self.color)
 
 
 mia = world.spawn(MusikPixel, "MIA", 50, 60, color="purple", note="C4")
 leo = world.spawn(MusikPixel, "LEO", 80, 60, color="orange", note="E4")
-
-
-def update():
-    pass
 
 
 def draw():
@@ -33,4 +29,4 @@ def draw():
     leo.draw()
 
 
-world.run(update, draw, check="musik-pixel-klasse")
+world.run(draw=draw, check="musik-pixel-klasse")

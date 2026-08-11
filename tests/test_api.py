@@ -22,7 +22,12 @@ from pykim import (
     speed,
     up,
 )
-from pykim.testing import get_pending_tones, get_world_state, set_pixel_for_test
+from pykim.testing import (
+    get_pending_audio_events,
+    get_pending_tones,
+    get_world_state,
+    set_pixel_for_test,
+)
 
 
 def test_position_and_movement():
@@ -33,6 +38,26 @@ def test_position_and_movement():
     left(2)
     up()
     assert (get_x(), get_y()) == (9, 22)
+
+
+def test_pixel_position_properties_replace_getters_in_oop_code():
+    mia = pykim.world.new_pixel("MIA", 10, 20)
+
+    assert mia.x == 10
+    assert mia.y == 20
+    assert mia.position == (10, 20)
+    mia.x = 30
+    mia.y = 40
+    assert mia.position == (30, 40)
+    mia.position = (50, 60)
+    assert (mia.x, mia.y) == (50, 60)
+
+
+def test_pixel_position_property_rejects_invalid_shape():
+    mia = pykim.world.new_pixel("MIA")
+
+    with pytest.raises(TypeError, match="Tupel"):
+        mia.position = [10, 20]
 
 
 def test_set_position_changes_both_coordinates():
@@ -191,14 +216,46 @@ def test_paint_start_and_stop():
     assert get_world_state()[20][10:15] == (9, 9, 9, 0, 0)
 
 
-def test_paint_colors_only_the_current_pixel():
+def test_paint_colors_current_pixel_and_following_path():
     set_x(10)
     set_y(20)
     paint()
     down(2)
 
     state = get_world_state()
-    assert [state[y][10] for y in range(20, 23)] == [7, 0, 0]
+    assert [state[y][10] for y in range(20, 23)] == [7, 7, 7]
+
+
+def test_paint_accepts_a_color_and_starts_a_path():
+    set_x(10)
+    set_y(20)
+    paint("orange")
+    right()
+
+    state = get_world_state()
+    assert state[20][10] == 9
+    assert state[20][11] == 9
+
+
+def test_paint_followed_by_stop_colors_only_current_pixel():
+    set_position(10, 20)
+    paint("orange")
+    paint_stop()
+    right()
+
+    state = get_world_state()
+    assert state[20][10] == 9
+    assert state[20][11] == 0
+
+
+def test_world_and_pixels_can_both_trigger_shared_audio():
+    mia = pykim.world.new_pixel("MIA")
+
+    pykim.world.play_tone("C4")
+    mia.play_tone("E4", beats=2)
+    pykim.world.play_pause()
+
+    assert get_pending_audio_events() == ((60, 1), (64, 2), (-1, 1))
 
 
 @pytest.mark.parametrize("bad", [-1, 1.5, True])

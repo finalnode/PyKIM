@@ -5,6 +5,16 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class RuleDefinition:
+    """Menschenlesbare Beschreibung eines Trainer-Prüfbausteins."""
+
+    kind: str
+    success: str
+    failure: str
+    hint: str = ""
+
+
+@dataclass(frozen=True)
 class CheckResult:
     """Ergebnis einer einzelnen, für Lernende sichtbaren Prüfung."""
 
@@ -51,3 +61,5 @@ class Exercise:
     name: str
     title: str
     checker: Callable[[str], CheckReport]
+    rules: tuple[RuleDefinition, ...] = ()
+    definition_hash: str = ""

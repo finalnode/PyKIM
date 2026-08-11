@@ -1,0 +1,113 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+
+project = Path(SPEC).resolve().parents[2]
+
+datas = []
+binaries = []
+hiddenimports = []
+
+datas += collect_data_files("nicegui")
+datas += collect_data_files("webview")
+pyxel_datas, pyxel_binaries, pyxel_hidden = collect_all("pyxel")
+datas += pyxel_datas
+binaries += pyxel_binaries
+hiddenimports += pyxel_hidden
+hiddenimports += collect_submodules("pykim.trainer.exercises")
+
+datas += collect_data_files("pykim", include_py_files=False)
+datas += collect_data_files("pykim.examples", include_py_files=True)
+hiddenimports += ["pykim.examples"]
+hiddenimports += [
+    "engineio.async_drivers.aiohttp",
+    "engineio.async_drivers.asgi",
+    "uvicorn.logging",
+    "uvicorn.loops.auto",
+    "uvicorn.protocols.http.auto",
+    "uvicorn.protocols.websockets.auto",
+    "uvicorn.lifespan.on",
+    "webview.platforms.cocoa",
+    "nicegui.native.native_mode",
+    "nicegui.elements.codemirror",
+]
+
+wheelhouse = project / "dist" / "wheelhouse"
+if wheelhouse.is_dir():
+    datas.append((str(wheelhouse), "wheels"))
+
+analysis = Analysis(
+    [str(project / "packaging" / "macos_entry.py")],
+    pathex=[str(project / "src")],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=sorted(set(hiddenimports)),
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=["tkinter.test", "unittest.test"],
+    noarchive=False,
+)
+
+pyz = PYZ(analysis.pure, analysis.zipped_data)
+
+executable = EXE(
+    pyz,
+    analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="PyKIM Suite",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+python_runner = EXE(
+    pyz,
+    analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="PyKIM Python",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+collection = COLLECT(
+    executable,
+    python_runner,
+    analysis.binaries,
+    analysis.zipfiles,
+    analysis.datas,
+    strip=False,
+    upx=False,
+    name="PyKIM Suite",
+)
+
+app = BUNDLE(
+    collection,
+    name="PyKIM Suite.app",
+    icon=str(project / "packaging" / "macos" / "assets" / "app-icon.icns"),
+    bundle_identifier="de.osz-kim.pykim-suite",
+    version="0.2.0",
+    info_plist={
+        "CFBundleDisplayName": "PyKIM Suite",
+        "CFBundleName": "PyKIM Suite",
+        "CFBundleShortVersionString": "0.2.0",
+        "NSHighResolutionCapable": True,
+        "LSMinimumSystemVersion": "10.15",
+    },
+)

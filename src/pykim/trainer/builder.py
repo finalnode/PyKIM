@@ -1,13 +1,21 @@
 """Lesbare, deklarative Autoren-API für PyKIM-Aufgaben."""
 
 import ast
+import hashlib
+import json
 from collections.abc import Callable, Iterable, Mapping
 from typing import TypeAlias
 
 import pykim
 from pykim.testing import get_pending_audio_events
 
-from .models import CheckReport, CheckResult, Exercise, OptimizationResult
+from .models import (
+    CheckReport,
+    CheckResult,
+    Exercise,
+    OptimizationResult,
+    RuleDefinition,
+)
 
 Position: TypeAlias = tuple[int, int]
 Color: TypeAlias = str | int
@@ -54,6 +62,7 @@ class ExerciseBuilder:
         self.name = name
         self.title = title
         self._results: list[ResultFactory] = []
+        self._rules: list[RuleDefinition] = []
         self._optimization: Optimization | None = None
 
     def add_check(
@@ -63,6 +72,7 @@ class ExerciseBuilder:
         success: str,
         failure: str,
         hint: str = "",
+        rule: str = "custom",
     ) -> "ExerciseBuilder":
         """Ergänze bei Sonderfällen eine eigene, klar beschriftete Prüfung."""
         self._results.append(
@@ -70,11 +80,28 @@ class ExerciseBuilder:
                 bool(predicate(source)), success, failure, hint
             )
         )
+        self._rules.append(RuleDefinition(rule, success, failure, hint))
         return self
 
-    def add_result(self, factory: ResultFactory) -> "ExerciseBuilder":
+    def add_result(
+        self,
+        factory: ResultFactory,
+        *,
+        rule: str = "dynamic",
+        success: str = "Dynamische Prüfung bestanden.",
+        failure: str = "Dynamische Prüfung fehlgeschlagen.",
+        hint: str = "",
+    ) -> "ExerciseBuilder":
         """Ergänze eine Prüfung mit dynamischen Rückmeldungen."""
         self._results.append(factory)
+        self._rules.append(RuleDefinition(rule, success, failure, hint))
+        return self
+
+    def _tag_last(self, kind: str) -> "ExerciseBuilder":
+        current = self._rules[-1]
+        self._rules[-1] = RuleDefinition(
+            kind, current.success, current.failure, current.hint
+        )
         return self
 
     def expect_pixels(
@@ -101,7 +128,7 @@ class ExerciseBuilder:
                 else positions <= set(_painted_cells())
             )
         return self.add_check(
-            predicate, success=success, failure=failure, hint=hint
+            predicate, success=success, failure=failure, hint=hint, rule="pixels"
         )
 
     def expect_square(
@@ -135,7 +162,7 @@ class ExerciseBuilder:
             success=f"KIM hat bei {start} gezeichnet und ist dorthin zurückgekehrt.",
             failure=f"Start oder Ende des Quadrats liegt nicht bei {start}.",
             hint=f"Setze KIM zuerst mit set_position{start} an den Startpunkt.",
-        )
+        )._tag_last("square-start")
 
         def size_result(index: int, label: str) -> ResultFactory:
             def result(_source: str) -> CheckResult:
@@ -148,20 +175,32 @@ class ExerciseBuilder:
                 )
             return result
 
-        self.add_result(size_result(2, "breit"))
-        self.add_result(size_result(3, "hoch"))
+        self.add_result(
+            size_result(2, "breit"),
+            rule="square-width",
+            success=f"Das Quadrat ist {side} Pixel breit.",
+            failure="Die Breite des Quadrats stimmt noch nicht.",
+            hint=f"Die waagerechten Seiten sollen genau {side} Schritte lang sein.",
+        )
+        self.add_result(
+            size_result(3, "hoch"),
+            rule="square-height",
+            success=f"Das Quadrat ist {side} Pixel hoch.",
+            failure="Die Höhe des Quadrats stimmt noch nicht.",
+            hint=f"Die senkrechten Seiten sollen genau {side} Schritte lang sein.",
+        )
         self.add_check(
             lambda _source: bool(geometry()[0]) and geometry()[1] <= geometry()[0],
             success="Alle vier Seiten sind vollständig.",
             failure="Mindestens eine Seite ist noch nicht vollständig.",
             hint="Beginne die Farbspur vor der ersten Bewegung und zeichne vier Seiten.",
-        )
+        )._tag_last("square-outline")
         self.add_check(
             lambda _source: bool(geometry()[0]) and geometry()[0] <= geometry()[1],
             success="Es wurden keine zusätzlichen Pixel angemalt.",
             failure="Es wurden Pixel innerhalb oder außerhalb des Quadratrands angemalt.",
             hint="Beende die Farbspur, bevor du nach dem Quadrat weitergehst.",
-        )
+        )._tag_last("square-no-extras")
         return self
 
     def expect_no_extra_pixels(
@@ -175,7 +214,7 @@ class ExerciseBuilder:
         allowed = set(allowed)
         return self.add_check(
             lambda _source: bool(_painted_cells()) and set(_painted_cells()) <= allowed,
-            success=success, failure=failure, hint=hint,
+            success=success, failure=failure, hint=hint, rule="no-extra-pixels",
         )
 
     def expect_pixel_count(
@@ -190,7 +229,13 @@ class ExerciseBuilder:
             actual = len(_painted_cells())
             message = failure or f"Erwartet sind {count} Pixel; angemalt wurden {actual}."
             return CheckResult(actual == count, success, message, hint)
-        return self.add_result(result)
+        return self.add_result(
+            result,
+            rule="pixel-count",
+            success=success,
+            failure=failure or f"Die Anzahl soll genau {count} sein.",
+            hint=hint,
+        )
 
     def expect_position(
         self,
@@ -208,7 +253,7 @@ class ExerciseBuilder:
             predicate,
             success=success or f"{pixel} steht an der richtigen Endposition.",
             failure=failure or f"{pixel} steht noch nicht bei {position}.",
-            hint=hint,
+            hint=hint, rule="position",
         )
 
     def expect_positions(
@@ -225,7 +270,10 @@ class ExerciseBuilder:
                 and (actor.get_x(), actor.get_y()) == position
                 for name, position in expected.items()
             )
-        return self.add_check(predicate, success=success, failure=failure, hint=hint)
+        return self.add_check(
+            predicate, success=success, failure=failure, hint=hint,
+            rule="positions",
+        )
 
     def expect_pixel_names(
         self,
@@ -238,7 +286,7 @@ class ExerciseBuilder:
         expected = set(names)
         return self.add_check(
             lambda _source: {pixel.name for pixel in pykim.world.pixels} == expected,
-            success=success, failure=failure, hint=hint,
+            success=success, failure=failure, hint=hint, rule="pixel-names",
         )
 
     def expect_visibility(
@@ -258,7 +306,7 @@ class ExerciseBuilder:
             predicate,
             success=success or f"{pixel} ist wie gefordert {state}.",
             failure=failure or f"{pixel} ist noch nicht {state}.",
-            hint=hint,
+            hint=hint, rule="visibility",
         )
 
     def expect_audio(
@@ -275,7 +323,7 @@ class ExerciseBuilder:
         )
         return self.add_check(
             lambda _source: get_pending_audio_events() == expected,
-            success=success, failure=failure, hint=hint,
+            success=success, failure=failure, hint=hint, rule="audio",
         )
 
     def _require_source(
@@ -285,18 +333,19 @@ class ExerciseBuilder:
         success: str,
         failure: str,
         hint: str,
+        rule: str = "source",
     ) -> "ExerciseBuilder":
         def check_source(source: str) -> bool:
             tree = _tree(source)
             return tree is not None and predicate(tree, source)
         return self.add_check(
-            check_source, success=success, failure=failure, hint=hint
+            check_source, success=success, failure=failure, hint=hint, rule=rule
         )
 
     def require_loop(self, *, success: str = "Du verwendest eine Schleife.", failure: str = "Es wurde noch keine Schleife erkannt.", hint: str = "Nutze for und range(), um Wiederholungen zu formulieren.") -> "ExerciseBuilder":
         return self._require_source(
             lambda tree, _source: any(isinstance(node, (ast.For, ast.While)) for node in ast.walk(tree)),
-            success=success, failure=failure, hint=hint,
+            success=success, failure=failure, hint=hint, rule="loop",
         )
 
     def require_nested_loop(self, *, success: str = "Du verwendest verschachtelte Schleifen.", failure: str = "Es wurden noch keine verschachtelten Schleifen erkannt.", hint: str = "Setze eine Schleife für die Spalten in eine Schleife für die Zeilen.") -> "ExerciseBuilder":
@@ -306,7 +355,7 @@ class ExerciseBuilder:
                 isinstance(node, loops)
                 and any(isinstance(child, loops) for child in ast.walk(node) if child is not node)
                 for node in ast.walk(tree)
-            ), success=success, failure=failure, hint=hint,
+            ), success=success, failure=failure, hint=hint, rule="nested-loop",
         )
 
     def require_condition(self, *, calls: Iterable[str] = (), success: str = "Du verwendest eine Bedingung.", failure: str = "Es wurde noch keine if-Bedingung erkannt.", hint: str = "Verwende if und bei Bedarf elif oder else.") -> "ExerciseBuilder":
@@ -319,7 +368,7 @@ class ExerciseBuilder:
                     if isinstance(node, ast.Call) and (name := _call_name(node)) is not None
                 }
             ),
-            success=success, failure=failure, hint=hint,
+            success=success, failure=failure, hint=hint, rule="condition",
         )
 
     def require_function(self, name: str | None = None, *, success: str = "Du verwendest eine eigene Funktion.", failure: str = "Es wurde noch keine passende Funktion erkannt.", hint: str = "Definiere die wiederholte Teilaufgabe mit def.") -> "ExerciseBuilder":
@@ -328,7 +377,7 @@ class ExerciseBuilder:
                 isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                 and (name is None or node.name == name)
                 for node in ast.walk(tree)
-            ), success=success, failure=failure, hint=hint,
+            ), success=success, failure=failure, hint=hint, rule="function",
         )
 
     def require_calls(self, *names: str, success: str | None = None, failure: str | None = None, hint: str = "Prüfe, ob alle geforderten Funktionen aufgerufen werden.") -> "ExerciseBuilder":
@@ -340,7 +389,7 @@ class ExerciseBuilder:
             },
             success=success or f"Du verwendest {', '.join(names)}.",
             failure=failure or f"Mindestens ein Aufruf fehlt: {', '.join(names)}.",
-            hint=hint,
+            hint=hint, rule="calls",
         )
 
     def require_parallel(self, *, success: str = "Du verwendest world.parallel().", failure: str = "Es wurde noch kein world.parallel()-Block erkannt.", hint: str = "Nutze with world.parallel(): für gleichzeitige Bewegungen.") -> "ExerciseBuilder":
@@ -354,7 +403,10 @@ class ExerciseBuilder:
                 )
                 for node in ast.walk(tree)
             )
-        return self._require_source(predicate, success=success, failure=failure, hint=hint)
+        return self._require_source(
+            predicate, success=success, failure=failure, hint=hint,
+            rule="parallel",
+        )
 
     def require_class(self, name: str, *, base: str | None = None, success: str | None = None, failure: str | None = None, hint: str = "Prüfe Klassenname und Basisklasse.") -> "ExerciseBuilder":
         def predicate(tree: ast.AST, _source: str) -> bool:
@@ -368,7 +420,7 @@ class ExerciseBuilder:
             predicate,
             success=success or f"Die Klasse {name} ist richtig definiert.",
             failure=failure or f"Die Klasse {name} fehlt oder erbt nicht korrekt.",
-            hint=hint,
+            hint=hint, rule="class",
         )
 
     def require_methods(self, class_name: str, *methods: str, success: str | None = None, failure: str | None = None, hint: str = "Definiere die Methoden innerhalb der Klasse.") -> "ExerciseBuilder":
@@ -383,7 +435,7 @@ class ExerciseBuilder:
             predicate,
             success=success or f"{class_name} besitzt alle geforderten Methoden.",
             failure=failure or f"In {class_name} fehlen Methoden: {', '.join(methods)}.",
-            hint=hint,
+            hint=hint, rule="methods",
         )
 
     def require_super_init(self, class_name: str, *, success: str = "Der Konstruktor der Basisklasse wird aufgerufen.", failure: str = "Ein Aufruf von super().__init__() fehlt noch.", hint: str = "Rufe in __init__ zuerst super().__init__(...) auf.") -> "ExerciseBuilder":
@@ -399,7 +451,10 @@ class ExerciseBuilder:
                 and _call_name(node.func.value) == "super"
                 for node in ast.walk(target)
             )
-        return self._require_source(predicate, success=success, failure=failure, hint=hint)
+        return self._require_source(
+            predicate, success=success, failure=failure, hint=hint,
+            rule="super-init",
+        )
 
     def optimize_with(self, evaluator: Optimization) -> "ExerciseBuilder":
         self._optimization = evaluator
@@ -437,6 +492,7 @@ class ExerciseBuilder:
 
     def build(self) -> Exercise:
         factories = tuple(self._results)
+        rules = tuple(self._rules)
         evaluator = self._optimization
         title = self.title
 
@@ -448,7 +504,22 @@ class ExerciseBuilder:
                 optimization,
             )
 
-        return Exercise(self.name, self.title, checker)
+        definition = {
+            "name": self.name,
+            "title": self.title,
+            "rules": [rule.__dict__ for rule in rules],
+            "optimization": evaluator is not None,
+        }
+        definition_hash = hashlib.sha256(
+            json.dumps(definition, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        return Exercise(
+            self.name,
+            self.title,
+            checker,
+            rules=rules,
+            definition_hash=definition_hash,
+        )
 
 
 def _callable_name(node: ast.expr) -> str | None:

@@ -20,7 +20,7 @@ animate()
 
 # Ab jetzt hinterlässt Kim bei jeder Bewegung eine violette Spur.
 set_color("purple")
-paint_start()
+paint()
 
 # Ein Quadrat mit einer Seitenlänge von fünf Pixeln abfahren.
 up(5)

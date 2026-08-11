@@ -8,15 +8,15 @@ from pykim import kim, world
 world.speed(30)
 
 # KIM ist bereits vorhanden und zeichnet einen violetten Winkel.
-kim.set_position(20, 20)
-kim.paint_path("purple")
+kim.position = (20, 20)
+kim.paint("purple")
 
 # Weitere Pixel werden von der Welt erzeugt und haben einen eigenen Zustand.
 mia = world.new_pixel("MIA", x=60, y=20)
-mia.paint_path("orange")
+mia.paint("orange")
 
 leo = world.new_pixel("LEO", x=40, y=60)
-leo.paint_path("cyan")
+leo.paint("cyan")
 
 # Phase 1: Alle drei bewegen sich gleichzeitig aufeinander zu.
 with world.parallel():

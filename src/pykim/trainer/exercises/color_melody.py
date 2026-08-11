@@ -29,6 +29,6 @@ EXERCISE = (
         failure="Farbabfrage und if-Bedingung sind noch nicht vollständig erkennbar.",
         hint="Speichere get_color() und vergleiche die Farbe mit if/elif.",
     )
-    .optimize_lines(optimal=20)
+    .optimize_lines(optimal=21)
     .build()
 )

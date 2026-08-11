@@ -45,7 +45,7 @@ _ACCIDENTALS = {"": 0, "#": 1, "b": -1}
 _x = 0
 _y = 0
 # Die mit set_color() gewählte Farbe. None bedeutet, dass noch keine Farbe
-# gewählt wurde; paint_start() verwendet dann DEFAULT_COLOR.
+# gewählt wurde; paint() verwendet dann DEFAULT_COLOR.
 _selected_color: int | None = None
 _painting_path = False
 _pixels = [[0] * WIDTH for _ in range(HEIGHT)]
@@ -310,7 +310,7 @@ def _color(value: str | int) -> int:
 
 
 def set_color(color: str | int) -> None:
-    """Wähle die Farbe für paint_start()."""
+    """Wähle die Farbe für den nächsten Aufruf von paint()."""
     global _selected_color
     _selected_color = _color(color)
 
@@ -320,8 +320,8 @@ def _paint_color() -> int:
     return DEFAULT_COLOR if _selected_color is None else _selected_color
 
 
-def paint_start(color: str | int | None = None) -> None:
-    """Male ab jetzt den aktuellen Pixel und jede folgende Bewegung."""
+def paint(color: str | int | None = None) -> None:
+    """Färbe den aktuellen Pixel und male bei folgenden Bewegungen weiter."""
     global _painting_path, _selected_color
 
     if color is not None:
@@ -340,14 +340,14 @@ def paint_stop() -> None:
     _painting_path = False
 
 
-def paint() -> None:
-    """Färbe genau den Pixel an Kims aktueller Position."""
-    _pixels[_y][_x] = _paint_color()
+def paint_start(color: str | int | None = None) -> None:
+    """Kompatibler Alias für paint()."""
+    paint(color)
 
 
 def paint_path(color: str | int | None = None) -> None:
-    """Kompatibler Alias für paint_start()."""
-    paint_start(color)
+    """Kompatibler Alias für paint()."""
+    paint(color)
 
 
 def get_color(*args: object) -> str:
@@ -605,6 +605,13 @@ def run(
             source = _source
         check_exercise(check, source)
 
+    # Dokumentations- und CI-Prüfungen führen vollständige Schülerprogramme
+    # absichtlich ohne Fenster aus. Die gesamte Weltlogik ist zu diesem
+    # Zeitpunkt bereits gelaufen und kann trotzdem geprüft werden.
+    import os
+    if os.environ.get("PYKIM_HEADLESS") == "1":
+        return
+
     try:
         import pyxel
     except ImportError:
@@ -725,8 +732,6 @@ __all__ = [
     "hide",
     "left",
     "paint",
-    "paint_path",
-    "paint_start",
     "paint_stop",
     "Pixel",
     "play_pause",

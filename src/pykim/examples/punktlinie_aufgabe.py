@@ -10,6 +10,7 @@ set_color("purple")
 
 for _ in range(8):
     paint()
+    paint_stop()
     right(2)
 
 run(check="punktlinie-8")

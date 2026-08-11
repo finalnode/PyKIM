@@ -2,18 +2,19 @@
 
 import json
 import os
+import shutil
 from pathlib import Path
 
 COURSE_ENV = "PYKIM_COURSE_DIR"
 CONFIG_DIR_ENV = "PYKIM_CONFIG_DIR"
 
 SECTIONS = {
-    "01_grundlagen": ("quadrat-5",),
-    "02_schleifen": ("treppe-5", "punktlinie-8"),
-    "03_funktionen_und_farben": ("vier-quadrate", "schachbrett-8", "farben-melodie"),
-    "04_toene": ("tonleiter-c-dur", "rhythmus-motiv"),
-    "05_objekte": ("mehrere-pixel", "musik-pixel-klasse"),
-    "06_interaktiv_und_pyxel": ("interaktive-steuerung",),
+    "Aufgaben/imperativ": (
+        "quadrat-5", "treppe-5", "punktlinie-8", "vier-quadrate",
+        "schachbrett-8", "tonleiter-c-dur", "rhythmus-motiv",
+        "farben-melodie", "interaktive-steuerung",
+    ),
+    "Aufgaben/oop": ("mehrere-pixel", "musik-pixel-klasse"),
 }
 
 
@@ -93,6 +94,23 @@ def set_ide_preference(ide: str, custom_path: str = "") -> dict[str, str]:
     return {"ide": ide, "path": path}
 
 
+def get_runtime_preference() -> str:
+    """Liefere den lokal gewählten Schüler-Interpreter."""
+    value = _load_config().get("student_python", "")
+    return value if isinstance(value, str) else ""
+
+
+def set_runtime_preference(executable: str | Path) -> str:
+    """Speichere einen vorhandenen Python-Interpreter für Schülerprogramme."""
+    path = Path(executable).expanduser().resolve()
+    if not path.is_file():
+        raise ValueError("Der ausgewählte Python-Interpreter wurde nicht gefunden.")
+    data = _load_config()
+    data["student_python"] = str(path)
+    _save_config(data)
+    return str(path)
+
+
 def get_student_name(course: str | Path | None = None) -> str:
     """Lese den im portablen Kursordner hinterlegten Namen."""
     selected = get_course_directory() if course is None else Path(course).expanduser().resolve()
@@ -123,7 +141,24 @@ def exercise_file(exercise_name: str, course: Path | None = None) -> Path | None
     if course is None:
         return None
     filename = f"{exercise_name.replace('-', '_')}.py"
-    return next(course.glob(f"*/{filename}"), None)
+    return next(course.rglob(filename), None)
+
+
+def reset_exercise_file(exercise_name: str, course: str | Path) -> Path:
+    """Sichere eine Schülerdatei und setze sie auf den Starter zurück."""
+    root = Path(course).expanduser().resolve()
+    target = exercise_file(exercise_name, root)
+    if target is None or not target.is_file():
+        raise FileNotFoundError(f"Die Aufgabe {exercise_name} wurde nicht gefunden.")
+    backup_directory = root / ".pykim" / "backups"
+    backup_directory.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime
+    import shutil
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    shutil.copy2(target, backup_directory / f"{target.stem}-{stamp}.py")
+    target.write_text(starter_source(exercise_name), encoding="utf-8")
+    return target
 
 
 def create_course(path: str | Path, student_name: str = "") -> dict[str, object]:
@@ -135,16 +170,28 @@ def create_course(path: str | Path, student_name: str = "") -> dict[str, object]
 
     for section, exercises in SECTIONS.items():
         section_directory = course / section
-        section_directory.mkdir(exist_ok=True)
+        section_directory.mkdir(parents=True, exist_ok=True)
         for exercise in exercises:
             target = section_directory / f"{exercise.replace('-', '_')}.py"
             if target.exists():
                 existing.append(str(target.relative_to(course)))
                 continue
-            target.write_text(starter_source(exercise), encoding="utf-8")
+            legacy = next(
+                (candidate for candidate in course.rglob(target.name) if candidate != target),
+                None,
+            )
+            if legacy is not None:
+                # Alte nummerierte Kursordner bleiben unangetastet; die Lösung
+                # wird in die neue Paradigmenstruktur übernommen.
+                shutil.copy2(legacy, target)
+            else:
+                target.write_text(starter_source(exercise), encoding="utf-8")
             created.append(str(target.relative_to(course)))
 
+    # Der alte Ordner bleibt für bereits angelegte Kopien erhalten. Neue
+    # Projekte werden strukturiert unter ``Projekte`` gespeichert.
     (course / "eigene_projekte").mkdir(exist_ok=True)
+    (course / "Projekte").mkdir(exist_ok=True)
     metadata = course / ".pykim-course.json"
     if not metadata.exists():
         metadata_data = {"format": 1, "student_name": student_name, "course": "PyKIM"}

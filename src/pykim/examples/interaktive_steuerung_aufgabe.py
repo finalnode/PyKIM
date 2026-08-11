@@ -3,17 +3,17 @@
 
 from pykim import kim, world
 
-kim.set_position(80, 60)
+kim.position = (80, 60)
 
 
 def update():
-    if world.btn("left") and kim.get_x() > 0:
+    if world.btn("left") and kim.x > 0:
         kim.left()
-    if world.btn("right") and kim.get_x() < world.width - 1:
+    if world.btn("right") and kim.x < world.width - 1:
         kim.right()
-    if world.btn("up") and kim.get_y() > 0:
+    if world.btn("up") and kim.y > 0:
         kim.up()
-    if world.btn("down") and kim.get_y() < world.height - 1:
+    if world.btn("down") and kim.y < world.height - 1:
         kim.down()
 
 

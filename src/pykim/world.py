@@ -133,6 +133,14 @@ class World:
     def speed(self, value: int) -> None:
         api.speed(value)
 
+    def play_tone(self, note: str | int, beats: int = 1) -> None:
+        """Spiele einen Ton über das gemeinsame Audiosystem."""
+        api.play_tone(note, beats)
+
+    def play_pause(self, beats: int = 1) -> None:
+        """Füge dem gemeinsamen Audiosystem eine Pause hinzu."""
+        api.play_pause(beats)
+
     def _capture_parallel(
         self,
         pixel: Pixel,

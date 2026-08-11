@@ -33,8 +33,34 @@ class Pixel:
     def get_x(self) -> int:
         return api.get_x() if self._default else self._x
 
+    @property
+    def x(self) -> int:
+        return self.get_x()
+
+    @x.setter
+    def x(self, value: int) -> None:
+        self.set_x(value)
+
     def get_y(self) -> int:
         return api.get_y() if self._default else self._y
+
+    @property
+    def y(self) -> int:
+        return self.get_y()
+
+    @y.setter
+    def y(self, value: int) -> None:
+        self.set_y(value)
+
+    @property
+    def position(self) -> tuple[int, int]:
+        return self.get_x(), self.get_y()
+
+    @position.setter
+    def position(self, value: tuple[int, int]) -> None:
+        if not isinstance(value, tuple) or len(value) != 2:
+            raise TypeError("position muss ein Tupel aus x und y sein.")
+        self.set_position(*value)
 
     def set_position(self, x: int, y: int) -> None:
         if self._default:
@@ -100,26 +126,26 @@ class Pixel:
         else:
             self._selected_color = api._color(color)
 
-    def paint(self) -> None:
+    def paint(self, color: str | int | None = None) -> None:
+        """Färbe die aktuelle Position und aktiviere die Farbspur."""
         if self._default:
-            api.paint()
-        else:
-            self.world.cells[self._y][self._x] = self._paint_color()
-
-    def paint_start(self, color: str | int | None = None) -> None:
-        if self._default:
-            api.paint_start(color)
+            api.paint(color)
             return
         if color is not None:
             self._selected_color = api._color(color)
         elif self._selected_color is None:
             self._selected_color = api.DEFAULT_COLOR
-        self.paint()
+        self.world.cells[self._y][self._x] = self._paint_color()
         api._record_pixel_position(self, self._x, self._y, self._paint_color())
         self._painting_path = True
 
+    def paint_start(self, color: str | int | None = None) -> None:
+        """Kompatibler Alias für paint()."""
+        self.paint(color)
+
     def paint_path(self, color: str | int | None = None) -> None:
-        self.paint_start(color)
+        """Kompatibler Alias für paint()."""
+        self.paint(color)
 
     def paint_stop(self) -> None:
         if self._default:

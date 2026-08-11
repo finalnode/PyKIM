@@ -16,5 +16,6 @@ for y in range(20, 100):
             set_color("peach")
 
         paint()
+        paint_stop()
 
 run()

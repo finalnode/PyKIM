@@ -28,6 +28,6 @@ EXERCISE = (
         success="Das Zeichnen eines Feldes ist in einer Funktion gekapselt.",
         hint="Definiere eine Funktion mit x, y und color als Parametern.",
     )
-    .optimize_lines(optimal=15)
+    .optimize_lines(optimal=16)
     .build()
 )

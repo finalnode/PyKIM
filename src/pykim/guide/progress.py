@@ -131,3 +131,28 @@ def remove_packaged_example_attempts(course: Path | None = None) -> int:
         data["attempts"] = retained
         _save(data, course)
     return removed
+
+
+def clear_exercise_progress(exercise: str, course: Path | None = None) -> int:
+    """Entferne nur die Versuche einer Aufgabe und sichere den vorherigen Stand."""
+    target = progress_file(course)
+    if target is None or not target.exists():
+        return 0
+    data = load_progress(course)
+    attempts = data.get("attempts", [])
+    if not isinstance(attempts, list):
+        return 0
+    retained = [
+        attempt
+        for attempt in attempts
+        if not isinstance(attempt, dict) or attempt.get("exercise") != exercise
+    ]
+    removed = len(attempts) - len(retained)
+    if removed:
+        backup_directory = target.parent / "backups"
+        backup_directory.mkdir(exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        shutil.copy2(target, backup_directory / f"progress-{exercise}-{stamp}.json")
+        data["attempts"] = retained
+        _save(data, course)
+    return removed

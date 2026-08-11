@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from pykim.trainer.exercises import exercise_names, get_exercise
+from pykim.trainer.exercises import get_exercise
 from pykim.trainer.assignments import get_assignment
 from pykim.submission.export import (
     course_certificate_info,
@@ -11,33 +11,60 @@ from pykim.submission.export import (
     install_course_certificate,
 )
 
-from .content import CHEATSHEET, PYODIDE_PLAYGROUND, PYXEL_REFERENCE, SCRIPT
+from .content import CHEATSHEET, PYODIDE_PLAYGROUND, PYXEL_REFERENCE
+from .author_view import render_authoring_view
+from .library import (
+    PACKAGED_CONTENT_ROOT,
+    PARADIGMS,
+    render_task_markdown,
+    task_documents,
+)
+from .learning_view import (
+    friendly_python_error,
+    render_overview,
+    render_test_results as render_exercise_test_results,
+)
 from .course import (
     create_course,
     exercise_file,
     get_course_directory,
     get_ide_preference,
+    get_runtime_preference,
     get_student_name,
+    reset_exercise_file,
     set_ide_preference,
+    set_runtime_preference,
 )
-from .examples import copy_example_to_course, example_programs, launch_example
-from .progress import load_progress, save_journal_entry
+from .runtime import (
+    bundled_wheelhouse,
+    discover_runtimes,
+    is_managed_runtime,
+    provision_managed_runtime,
+    repair_runtime,
+    runtime_diagnostics,
+)
+from .examples_view import render_examples_view
+from .pyxel_examples_view import render_pyxel_examples_view
+from .projects_view import render_projects_view
+from .execution import execution_manager, script_example_manager
+from .progress import clear_exercise_progress, load_progress, save_journal_entry
+from .script_view import render_script_reader
+from .script_api import register_script_api
+from .theme import configure_theme
+from .updates import check_updates, install_content_update
+from .navigation import create_navigation
 from .system import (
-    github_version,
     detected_ides,
-    execute_student_program,
     install_or_repair_pyxel,
-    launch_pyxel_editor,
-    launch_pyxel_example,
     open_path,
     open_in_preferred_ide,
-    pyxel_examples,
     read_student_source,
     run_student_program,
     save_student_source,
+    source_hash,
+    SourceConflictError,
     system_status,
     system_user_name,
-    update_from_github,
 )
 
 IDE_LABELS = {
@@ -56,61 +83,6 @@ def _preferred_ide_label() -> str:
     return IDE_LABELS.get(preference["ide"], "IDE")
 
 
-def _latest_attempts(progress: dict[str, object]) -> dict[str, dict[str, object]]:
-    latest: dict[str, dict[str, object]] = {}
-    attempts = progress.get("attempts", [])
-    if isinstance(attempts, list):
-        for attempt in attempts:
-            if isinstance(attempt, dict) and isinstance(attempt.get("exercise"), str):
-                latest[attempt["exercise"]] = attempt
-    return latest
-
-
-def _render_test_results(ui, exercise_name: str) -> None:
-    attempt = _latest_attempts(load_progress()).get(exercise_name)
-    if attempt is None:
-        with ui.card().classes("w-full bg-grey-1 shadow-none border"):
-            ui.label("Automatische Tests").classes("font-bold")
-            ui.label(
-                "Noch kein Testlauf vorhanden. Starte dein Programm, "
-                "um die einzelnen Prüffälle auszuführen."
-            ).classes("text-grey-7")
-        return
-
-    tests = attempt.get("tests", [])
-    passed_tests = int(attempt.get("passed", 0))
-    total_tests = int(attempt.get("total", len(tests)))
-    with ui.row().classes("w-full items-center gap-3 mt-3"):
-        ui.label("Automatische Tests").classes("text-lg font-bold")
-        ui.badge(
-            f"{passed_tests} / {total_tests} bestanden",
-            color="positive" if passed_tests == total_tests else "negative",
-        )
-    with ui.expansion("Testdetails anzeigen", icon="fact_check").classes(
-        "w-full border rounded"
-    ):
-        for index, test in enumerate(tests, start=1):
-            passed = bool(test["passed"])
-            style = "pykim-test-passed" if passed else "pykim-test-failed"
-            with ui.card().classes(f"w-full pykim-test-result {style}"):
-                with ui.row().classes("w-full items-center"):
-                    ui.icon(
-                        "check_circle" if passed else "cancel",
-                        color="positive" if passed else "negative",
-                    )
-                    ui.label(f"Testfall {index}").classes("font-bold")
-                    ui.space()
-                    ui.badge(
-                        "BESTANDEN" if passed else "FEHLGESCHLAGEN",
-                        color="positive" if passed else "negative",
-                    )
-                ui.label(test["message"]).classes("text-base")
-                if test.get("hint"):
-                    ui.label(f"Tipp: {test['hint']}").classes(
-                        "w-full pykim-test-hint"
-                    )
-
-
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     """Lese die bewusst kleine Kommandozeile des Begleithefts."""
     parser = argparse.ArgumentParser(description="PyKIM-Lernstudio starten")
@@ -127,6 +99,7 @@ def main(
     show: bool = True,
     native: bool | None = None,
     arguments: list[str] | None = None,
+    run_server: bool = True,
 ) -> None:
     desktop = not parse_arguments(arguments).browser if native is None else native
     try:
@@ -137,155 +110,44 @@ def main(
             "pip install 'pykim[guide]'."
         ) from None
 
+    register_script_api(nicegui_app)
+
     @ui.page("/")
     def index() -> None:
         ide_open_buttons = []
+        dirty_exercises: set[str] = set()
         # Farben des OSZ KIM: kräftiges Orange, technisches Grau und Weiß.
-        ui.colors(primary="#f36b2b", secondary="#9b9da0", accent="#5f6164")
-        ui.add_head_html(r"""
-            <style>
-                pre.pykim-copy-ready {
-                    position: relative;
-                    padding: 1rem 7rem 1rem 1.1rem !important;
-                    background: #f5f5f4 !important;
-                    border: 1px solid #d7d8d9;
-                    border-left: 4px solid #f36b2b;
-                    border-radius: .45rem;
-                    box-shadow: 0 1px 2px rgba(40, 40, 40, .06);
-                }
-                pre.pykim-copy-ready code {
-                    background: transparent !important;
-                }
-                .pykim-copy-button {
-                    position: absolute; top: .55rem; right: .55rem; z-index: 2;
-                    border: 0; border-radius: .4rem; padding: .35rem .65rem;
-                    background: #686a6d; color: white; cursor: pointer;
-                    font: 500 .8rem system-ui, sans-serif;
-                }
-                .pykim-copy-button:hover { background: #f36b2b; }
-                .pykim-playground textarea {
-                    width: 100%; min-height: 15rem; padding: 1rem;
-                    border: 1px solid #cfd0d1; border-left: 4px solid #f36b2b;
-                    border-radius: .45rem; background: #f5f5f4;
-                    font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
-                }
-                .pykim-run-button, .pykim-clear-button {
-                    border: 0; border-radius: .4rem; padding: .55rem .9rem;
-                    color: white; cursor: pointer; margin-right: .4rem;
-                }
-                .pykim-run-button { background: #f36b2b; }
-                .pykim-clear-button { background: #686a6d; }
-                .pykim-test-result {
-                    border: 1px solid #d7d8d9;
-                    border-left-width: 5px;
-                    border-radius: .45rem;
-                    box-shadow: none;
-                }
-                .pykim-test-passed {
-                    border-left-color: #2e7d32;
-                    background: #f2f8f3;
-                }
-                .pykim-test-failed {
-                    border-left-color: #d14b34;
-                    background: #fff5f2;
-                }
-                .pykim-test-hint {
-                    background: #fff4eb;
-                    border-left: 3px solid #f36b2b;
-                    border-radius: .3rem;
-                    padding: .55rem .75rem;
-                }
-            </style>
-            <script type="module">
-                import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.mjs";
-                let runtime = null;
-                const ready = loadPyodide().then(value => {
-                    runtime = value;
-                    const status = document.getElementById('pyodide-status');
-                    if (status) status.innerHTML = '<strong>Python ist bereit.</strong>';
-                    return value;
-                }).catch(error => {
-                    const status = document.getElementById('pyodide-status');
-                    if (status) status.textContent = `Pyodide konnte nicht geladen werden: ${error}`;
-                    throw error;
-                });
-                window.runPyKIMPython = async () => {
-                    const output = document.getElementById('pyodide-output');
-                    const code = document.getElementById('pyodide-code').value;
-                    output.textContent = 'Wird ausgeführt …';
-                    try {
-                        const pyodide = await ready;
-                        let text = '';
-                        pyodide.setStdout({batched: value => text += `${value}\n`});
-                        pyodide.setStderr({batched: value => text += `${value}\n`});
-                        const result = await pyodide.runPythonAsync(code);
-                        if (result !== undefined) text += String(result);
-                        output.textContent = text || 'Programm ohne Ausgabe beendet.';
-                    } catch (error) {
-                        output.textContent = String(error);
-                    }
-                };
-            </script>
-            <script>
-                (() => {
-                    const addCopyButtons = root => {
-                        root.querySelectorAll('pre:not(.pykim-copy-ready)').forEach(pre => {
-                            pre.classList.add('pykim-copy-ready');
-                            const button = document.createElement('button');
-                            button.className = 'pykim-copy-button';
-                            button.type = 'button';
-                            button.textContent = 'Kopieren';
-                            button.addEventListener('click', async () => {
-                                const code = pre.querySelector('code');
-                                const text = (code || pre).innerText;
-                                if (navigator.clipboard?.writeText) {
-                                    await navigator.clipboard.writeText(text);
-                                } else {
-                                    const area = document.createElement('textarea');
-                                    area.value = text;
-                                    area.style.position = 'fixed';
-                                    area.style.opacity = '0';
-                                    document.body.appendChild(area);
-                                    area.select();
-                                    document.execCommand('copy');
-                                    area.remove();
-                                }
-                                button.textContent = 'Kopiert ✓';
-                                setTimeout(() => button.textContent = 'Kopieren', 1500);
-                            });
-                            pre.appendChild(button);
-                        });
-                    };
-                    document.addEventListener('DOMContentLoaded', () => {
-                        addCopyButtons(document);
-                        new MutationObserver(() => addCopyButtons(document)).observe(
-                            document.body, {childList: true, subtree: true}
-                        );
-                    });
-                })();
-            </script>
-        """)
-        with ui.header().classes("items-center"):
-            ui.label("PyKIM-Begleitheft").classes("text-xl font-bold")
-            ui.space()
-            configured = get_course_directory()
-            current_student = get_student_name(configured) or system_user_name()
-            ui.label(f"Hallo, {current_student}").classes("text-sm")
-            ui.label("Kein Kursordner" if configured is None else str(configured)).classes("text-sm")
+        configure_theme(ui)
+        ui.link("Zum Hauptinhalt springen", "#pykim-main").classes("pykim-skip-link")
+        with ui.header().classes("pykim-header"):
+            with ui.row().classes("pykim-header-top w-full items-center no-wrap"):
+                ui.label("PyKIM-Begleitheft").classes("text-xl font-bold")
+                ui.space()
+                configured = get_course_directory()
+                current_student = get_student_name(configured) or system_user_name()
+                ui.label(f"Hallo, {current_student}").classes("text-sm")
+                update_badge = ui.badge("Updates werden geprüft …", color="grey")
+                ui.label(
+                    "Kein Kursordner" if configured is None else str(configured)
+                ).classes("pykim-course-path text-sm")
 
-        with ui.tabs().classes("w-full") as tabs:
-            setup_tab = ui.tab("Setup", icon="settings")
-            tools_tab = ui.tab("Werkzeuge", icon="construction")
-            overview_tab = ui.tab("Übersicht", icon="dashboard")
-            tasks_tab = ui.tab("Aufgaben", icon="checklist")
-            examples_tab = ui.tab("Beispiele", icon="lightbulb")
-            submission_tab = ui.tab("Abgabe", icon="upload_file")
-            sheet_tab = ui.tab("Cheatsheet", icon="bolt")
-            script_tab = ui.tab("Skript", icon="menu_book")
-            pyxel_tab = ui.tab("Pyxel", icon="sports_esports")
-            browser_tab = ui.tab("Python im Browser", icon="code")
+            tabs, (
+                setup_tab,
+                tools_tab,
+                overview_tab,
+                tasks_tab,
+                examples_tab,
+                projects_tab,
+                submission_tab,
+                sheet_tab,
+                script_tab,
+                pyxel_tab,
+                browser_tab,
+            ) = create_navigation(ui)
 
-        with ui.tab_panels(tabs, value=overview_tab).classes("w-full max-w-6xl mx-auto"):
+        with ui.tab_panels(tabs, value=overview_tab).classes(
+            "w-full max-w-6xl mx-auto"
+        ).props("id=pykim-main role=main"):
             with ui.tab_panel(setup_tab):
                 ui.label("Kursordner einrichten").classes("text-2xl font-bold")
                 ui.markdown(
@@ -439,6 +301,203 @@ def main(
                 ide_choice.on_value_change(lambda _: save_ide())
                 custom_ide_path.on_value_change(lambda _: save_ide())
 
+                ui.separator()
+                ui.label("Python-Laufzeit für Aufgaben").classes("text-xl font-bold")
+                ui.label(
+                    "Die Suite und die Entwicklungsumgebung verwenden für Schülerprogramme "
+                    "denselben geprüften Interpreter."
+                ).classes("text-sm text-grey-7")
+                offline_wheels = bundled_wheelhouse()
+                ui.label(
+                    "Offline-Pakete gefunden: Die Einrichtung benötigt kein Internet."
+                    if offline_wheels
+                    else "Noch kein Offline-Paket eingebunden: Für die Einrichtung kann Internetzugang erforderlich sein."
+                ).classes("text-sm text-positive" if offline_wheels else "text-sm text-orange")
+                runtimes = discover_runtimes(path.value or None)
+                runtime_options = {
+                    item.executable: (
+                        f"Python {item.version or '?'} · {item.source} · "
+                        + (
+                            "bereit"
+                            if item.supported and item.pykim and item.pyxel
+                            else " · ".join(
+                                problem for problem, applies in (
+                                    ("Python-Version ungeeignet", not item.supported),
+                                    ("PyKIM fehlt", not item.pykim),
+                                    ("Pyxel fehlt", not item.pyxel),
+                                ) if applies
+                            )
+                        )
+                    )
+                    for item in runtimes
+                }
+                ready_runtime_paths = {
+                    item.executable for item in runtimes
+                    if item.supported and item.pykim and item.pyxel
+                }
+                configured_runtime = get_runtime_preference()
+                runtime_value = (
+                    configured_runtime
+                    if configured_runtime in runtime_options
+                    else next(iter(ready_runtime_paths), None)
+                )
+                runtime_choice = ui.select(
+                    runtime_options,
+                    value=runtime_value,
+                    label="Interpreter",
+                ).classes("w-full")
+
+                def save_runtime() -> None:
+                    if not runtime_choice.value:
+                        return
+                    if runtime_choice.value not in ready_runtime_paths:
+                        runtime_setup_confirmation.open()
+                        return
+                    try:
+                        set_runtime_preference(runtime_choice.value)
+                        ui.notify("Python-Laufzeit gespeichert.", type="positive")
+                    except ValueError as error:
+                        ui.notify(str(error), type="negative")
+
+                runtime_choice.on_value_change(lambda _: save_runtime())
+                if not ready_runtime_paths:
+                    ui.label(
+                        "Noch keine vollständige Laufzeit mit PyKIM und Pyxel gefunden."
+                    ).classes("text-orange")
+                incomplete = [
+                    item for item in runtimes
+                    if not (item.supported and item.pykim and item.pyxel)
+                ]
+                for item in incomplete:
+                    missing = []
+                    if not item.supported:
+                        missing.append("Python-Version ungeeignet")
+                    if not item.pykim:
+                        missing.append("PyKIM fehlt")
+                    if not item.pyxel:
+                        missing.append("Pyxel fehlt")
+                    ui.label(
+                        f"{item.source}: {item.executable} – {', '.join(missing)}"
+                    ).classes("text-xs text-grey-7")
+
+                async def provision_selected_runtime() -> None:
+                    selected = runtime_choice.value
+                    if not selected:
+                        return
+                    runtime_setup_confirmation.close()
+                    runtime_setup_button.disable()
+                    runtime_activity.set_visibility(True)
+                    try:
+                        ready = await nicegui_run.io_bound(
+                            provision_managed_runtime,
+                            path.value,
+                            selected,
+                        )
+                        ui.notify(
+                            f"Python {ready.version}: PyKIM-Laufzeit ist bereit.",
+                            type="positive",
+                        )
+                        runtime_choice.options[ready.executable] = (
+                            f"Python {ready.version} · PyKIM-Kursumgebung · bereit"
+                        )
+                        runtime_choice.set_value(ready.executable)
+                        runtime_choice.update()
+                        runtime_repair_button.enable()
+                    except Exception as error:
+                        ui.notify(f"Einrichtung fehlgeschlagen: {error}", type="negative")
+                        runtime_choice.set_value(runtime_value)
+                    finally:
+                        runtime_activity.set_visibility(False)
+                        runtime_setup_button.enable()
+
+                with ui.dialog() as runtime_setup_confirmation, ui.card():
+                    ui.label("PyKIM-Laufzeit einrichten?").classes("text-xl font-bold")
+                    ui.label(
+                        "Die Suite erstellt außerhalb des Kursordners eine isolierte "
+                        "Python-Umgebung und installiert dort PyKIM und Pyxel."
+                    )
+                    ui.label(
+                        "Aufgaben, Projekte und Lernstand werden nicht verändert."
+                    ).classes("text-sm text-grey-7")
+                    with ui.row().classes("justify-end w-full"):
+                        ui.button(
+                            "Abbrechen",
+                            on_click=lambda: (
+                                runtime_setup_confirmation.close(),
+                                runtime_choice.set_value(runtime_value),
+                            ),
+                        ).props("flat")
+                        runtime_setup_button = ui.button(
+                            "Umgebung einrichten",
+                            on_click=provision_selected_runtime,
+                            icon="build",
+                        )
+
+                async def repair_selected_runtime() -> None:
+                    runtime_repair_confirmation.close()
+                    runtime_repair_button.disable()
+                    runtime_activity.set_visibility(True)
+                    try:
+                        ready = await nicegui_run.io_bound(repair_runtime, path.value)
+                        ui.notify(
+                            f"Python {ready.version}: Laufzeit wurde erfolgreich repariert.",
+                            type="positive",
+                        )
+                    except Exception as error:
+                        ui.notify(f"Reparatur fehlgeschlagen: {error}", type="negative")
+                    finally:
+                        runtime_activity.set_visibility(False)
+                        runtime_repair_button.enable()
+
+                with ui.row().classes("items-center gap-2"):
+                    runtime_repair_button = ui.button(
+                        "Laufzeit reparieren",
+                        on_click=lambda: runtime_repair_confirmation.open(),
+                        icon="handyman",
+                    ).props("outline")
+                    runtime_activity = ui.spinner(size="lg", color="primary")
+                    runtime_activity.set_visibility(False)
+                    if not (
+                        configured_runtime
+                        and is_managed_runtime(configured_runtime, path.value)
+                    ):
+                        runtime_repair_button.disable()
+                        runtime_repair_button.tooltip(
+                            "Wähle oder erstelle zuerst eine verwaltete PyKIM-Kursumgebung."
+                        )
+
+                    def copy_runtime_diagnostics() -> None:
+                        import json
+
+                        report = json.dumps(
+                            runtime_diagnostics(path.value),
+                            ensure_ascii=False,
+                            indent=2,
+                        )
+                        ui.clipboard.write(report)
+                        ui.notify("Runtime-Diagnose wurde kopiert.", type="positive")
+
+                    ui.button(
+                        "Diagnose kopieren",
+                        on_click=copy_runtime_diagnostics,
+                        icon="content_copy",
+                    ).props("flat")
+
+                with ui.dialog() as runtime_repair_confirmation, ui.card():
+                    ui.label("PyKIM-Laufzeit reparieren?").classes("text-xl font-bold")
+                    ui.label(
+                        "PyKIM, Pyxel und benötigte Pakete werden in der verwalteten "
+                        "Kursumgebung erneut installiert."
+                    )
+                    ui.label("Schülerdateien werden nicht verändert.").classes("text-sm text-grey-7")
+                    with ui.row().classes("w-full justify-end"):
+                        ui.button("Abbrechen", on_click=runtime_repair_confirmation.close).props("flat")
+                        ui.button(
+                            "Jetzt reparieren",
+                            on_click=repair_selected_runtime,
+                            icon="handyman",
+                        )
+
                 def setup() -> None:
                     try:
                         result = create_course(path.value, student.value)
@@ -521,7 +580,7 @@ def main(
                 ).props("outline")
 
             with ui.tab_panel(tools_tab):
-                ui.label("IDE, Updates und Pyxel-Werkzeuge").classes("text-2xl font-bold")
+                ui.label("IDE, Dateien und Updates").classes("text-2xl font-bold")
                 ui.markdown(
                     "Diese Werkzeuge werden lokal gestartet und öffnen sich in einem "
                     "**eigenen Fenster** neben dem PyKIM-Lernstudio."
@@ -572,114 +631,159 @@ def main(
 
                     ui.separator()
                     ui.label("Pyxel-Ressourceneditor").classes("text-xl font-bold")
-                    ui.markdown("Der offizielle Editor bearbeitet **Sprites, Tilemaps, Sounds und Musik** in einer gemeinsamen `.pyxres`-Datei.")
-                    resource = ui.input(
-                        "Ressourcendatei",
-                        value=str(course / "eigene_projekte" / "mein_spiel.pyxres"),
-                    ).classes("w-full")
-
-                    def start_editor() -> None:
-                        start_local(
-                            lambda: launch_pyxel_editor(resource.value),
-                            "Pyxel-Editor wurde gestartet.",
-                        )
-
-                    ui.button("Sprite- und Musikeditor öffnen", on_click=start_editor, icon="palette")
-
-                    ui.separator()
-                    ui.label("Offizielle Pyxel-Beispiele").classes("text-xl font-bold")
                     ui.markdown(
-                        "Die Beispiele gehören zur installierten Pyxel-Version und öffnen "
-                        "sich als ausführbare Programme in einem eigenen Fenster."
+                        "Ressourcendateien gehören immer zu einem Projekt. Lege unter "
+                        "**Meine Projekte** ein Pyxel-Spiel an und öffne dort den "
+                        "Sprite- und Musikeditor."
                     )
-                    examples = pyxel_examples()
-                    if not examples:
-                        ui.label("Es wurden keine Pyxel-Beispiele gefunden.").classes("text-orange")
-                    else:
-                        example_options = {
-                            str(example): example.stem.replace("_", " ")
-                            for example in examples
-                        }
-                        selected_example = ui.select(
-                            example_options,
-                            value=str(examples[0]),
-                            label="Beispiel auswählen",
-                        ).classes("w-full")
-
-                        with ui.row():
-                            ui.button(
-                                "Beispiel starten",
-                                on_click=lambda: start_local(
-                                    lambda: launch_pyxel_example(selected_example.value),
-                                    "Pyxel-Beispiel wurde gestartet.",
-                                ),
-                                icon="play_arrow",
-                            )
-                            ui.button(
-                                "Quellcode öffnen",
-                                on_click=lambda: start_local(
-                                    lambda: open_path(selected_example.value),
-                                    "Beispielcode wurde geöffnet.",
-                                ),
-                                icon="code",
-                            ).props("outline")
+                    ui.button(
+                        "Zu meinen Projekten",
+                        on_click=lambda: tabs.set_value(projects_tab),
+                        icon="folder_special",
+                    )
 
                 ui.separator()
-                ui.label("Updates aus GitHub").classes("text-xl font-bold")
-                update_label = ui.label("Noch nicht geprüft.")
+                ui.label("Updates").classes("text-xl font-bold")
+                ui.label(
+                    "App und Lerninhalte werden getrennt geprüft. Schülerlösungen und "
+                    "Lernstand werden dabei niemals verändert."
+                ).classes("text-grey-7")
+                app_update_label = ui.label("App-Version wird geprüft …")
+                content_update_label = ui.label("Inhaltsversion wird geprüft …")
+                update_state: dict[str, object] = {"status": None}
 
-                def check_update() -> None:
+                def open_app_download() -> None:
+                    status = update_state["status"]
+                    if status is None or status.app is None:
+                        return
+                    target = status.app.download_url or status.app.release_url
+                    if target:
+                        ui.navigate.to(target, new_tab=True)
+
+                async def activate_content_update() -> None:
+                    status = update_state["status"]
+                    if status is None or status.content is None:
+                        return
                     try:
-                        info = github_version()
-                        update_label.text = (
-                            f"Installiert: {info['installed']} · GitHub: {info['github']}"
+                        await nicegui_run.io_bound(
+                            install_content_update, status.content.manifest
                         )
-                    except OSError as error:
-                        update_label.text = f"Updateprüfung fehlgeschlagen: {error}"
-
-                def perform_update() -> None:
-                    try:
-                        update_from_github()
-                        ui.notify("Update installiert. Bitte Suite neu starten.", type="positive")
+                        content_update_label.text = (
+                            f"Inhalte {status.content.available} wurden aktiviert."
+                        )
+                        content_button.disable()
+                        ui.notify(
+                            "Neue Lerninhalte aktiviert. Bitte die Suite neu starten.",
+                            type="positive",
+                        )
                     except Exception as error:
-                        ui.notify(f"Update fehlgeschlagen: {error}", type="negative")
+                        ui.notify(f"Inhaltsupdate fehlgeschlagen: {error}", type="negative")
 
-                with ui.row():
-                    ui.button("GitHub-Version prüfen", on_click=check_update, icon="refresh")
-                    with ui.dialog() as confirmation, ui.card():
-                        ui.label("PyKIM wirklich aus dem GitHub-main-Branch aktualisieren?")
-                        ui.label("Schülerdateien im Kursordner werden dabei nicht verändert.")
-                        with ui.row():
-                            ui.button("Abbrechen", on_click=confirmation.close).props("flat")
-                            ui.button("Update installieren", on_click=lambda: (confirmation.close(), perform_update()))
-                    ui.button("Entwicklungsversion installieren", on_click=confirmation.open, icon="system_update")
+                with ui.row().classes("items-center"):
+                    app_button = ui.button(
+                        "App-Update öffnen", on_click=open_app_download, icon="download"
+                    )
+                    content_button = ui.button(
+                        "Lerninhalte aktualisieren",
+                        on_click=activate_content_update,
+                        icon="library_books",
+                    )
+                    refresh_button = ui.button(
+                        "Jetzt prüfen", icon="refresh"
+                    ).props("outline")
+                app_button.disable()
+                content_button.disable()
+
+                async def refresh_updates() -> None:
+                    refresh_button.disable()
+                    update_badge.text = "Updates werden geprüft …"
+                    try:
+                        status = await nicegui_run.io_bound(
+                            check_updates, PACKAGED_CONTENT_ROOT
+                        )
+                        update_state["status"] = status
+                        if status.app is None:
+                            app_update_label.text = "App-Prüfung nicht verfügbar."
+                            app_button.disable()
+                        elif status.app.newer:
+                            app_update_label.text = (
+                                f"Neue App: {status.app.available} · installiert: "
+                                f"{status.app.installed}"
+                            )
+                            app_button.enable()
+                        else:
+                            app_update_label.text = (
+                                f"App {status.app.installed} ist aktuell."
+                            )
+                            app_button.disable()
+                        if status.content is None:
+                            content_update_label.text = "Inhaltsprüfung nicht verfügbar."
+                            content_button.disable()
+                        elif status.content.newer and status.content.compatible:
+                            content_update_label.text = (
+                                f"Neue Lerninhalte: {status.content.available} · aktiv: "
+                                f"{status.content.installed}"
+                            )
+                            content_button.enable()
+                        elif not status.content.compatible:
+                            content_update_label.text = (
+                                "Die neuen Inhalte benötigen zuerst ein App-Update."
+                            )
+                            content_button.disable()
+                        else:
+                            content_update_label.text = (
+                                f"Lerninhalte {status.content.installed} sind aktuell."
+                            )
+                            content_button.disable()
+                        if status.error:
+                            update_badge.text = "Updateprüfung teilweise offline"
+                            update_badge.props("color=warning")
+                        elif (
+                            (status.app is not None and status.app.newer)
+                            or (status.content is not None and status.content.newer)
+                        ):
+                            update_badge.text = "Update verfügbar"
+                            update_badge.props("color=orange")
+                        else:
+                            update_badge.text = "Aktuell"
+                            update_badge.props("color=positive")
+                    finally:
+                        refresh_button.enable()
+
+                refresh_button.on("click", refresh_updates)
+                ui.timer(0.2, refresh_updates, once=True)
+
+                render_authoring_view(ui)
 
             with ui.tab_panel(overview_tab):
-                progress = load_progress()
-                latest = _latest_attempts(progress)
-                completed = sum(bool(item.get("successful")) for item in latest.values())
-                ui.label("Mein Lernstand").classes("text-2xl font-bold")
-                ui.linear_progress(value=completed / max(1, len(exercise_names())))
-                ui.label(f"{completed} von {len(exercise_names())} Aufgaben vollständig gelöst")
-                with ui.grid(columns=2).classes("w-full gap-4"):
-                    for name in exercise_names():
-                        exercise = get_exercise(name)
-                        attempt = latest.get(name)
-                        with ui.card().classes("w-full"):
-                            ui.label(exercise.title).classes("font-bold")
-                            if attempt is None:
-                                ui.label("Noch nicht begonnen").classes("text-grey")
-                            else:
-                                ui.label(f"Tests: {attempt['passed']}/{attempt['total']}")
-                                optimization = attempt.get("optimization")
-                                if isinstance(optimization, dict):
-                                    ui.label(f"Optimierung: {optimization['score']} %")
+                overview_container = ui.column().classes("w-full")
+
+                def refresh_overview() -> None:
+                    overview_container.clear()
+                    with overview_container:
+                        render_overview(ui)
+
+                refresh_overview()
 
             with ui.tab_panel(tasks_tab):
                 progress = load_progress()
                 journal = progress.get("journal", {})
                 ui.label("Aufgaben und Testfälle").classes("text-2xl font-bold")
-                for name in exercise_names():
+                current_paradigm = None
+                for task_document in (
+                    document
+                    for paradigm in PARADIGMS
+                    for document in task_documents(paradigm)
+                ):
+                    name = task_document.name
+                    if task_document.paradigm != current_paradigm:
+                        current_paradigm = task_document.paradigm
+                        ui.separator()
+                        ui.label(
+                            "Imperative Aufgaben"
+                            if current_paradigm == "imperativ"
+                            else "Objektorientierte Aufgaben"
+                        ).classes("text-xl font-bold text-primary")
                     exercise = get_exercise(name)
                     with ui.expansion(exercise.title, icon="task_alt").classes("w-full"):
                         assignment = get_assignment(name)
@@ -688,10 +792,9 @@ def main(
                                 ui.label("Aufgabenstellung").classes("text-lg font-bold")
                                 ui.space()
                                 ui.badge(assignment.difficulty.upper(), color="primary")
-                            ui.label(assignment.summary).classes("text-base")
-                            with ui.column().classes("gap-1"):
-                                for requirement in assignment.requirements:
-                                    ui.label(f"• {requirement}")
+                            ui.markdown(render_task_markdown(task_document.content)).classes(
+                                "prose max-w-none"
+                            )
                         target = exercise_file(name)
                         if target is not None:
                             course = get_course_directory()
@@ -714,6 +817,24 @@ def main(
                                 line_wrapping=False,
                             ).classes("w-full").style("height: 24rem")
 
+                            editor_state = {
+                                "disk_hash": source_hash(source),
+                                "dirty": False,
+                            }
+                            save_state = ui.label("Gespeichert").classes("text-grey-7 text-sm")
+
+                            def mark_dirty(
+                                _, exercise_name=name, state=editor_state,
+                                label=save_state,
+                            ) -> None:
+                                state["dirty"] = True
+                                dirty_exercises.add(exercise_name)
+                                label.set_text("Ungespeicherte Änderungen")
+                                label.classes(replace="text-orange-8 text-sm")
+                                ui.run_javascript("window.pykimHasUnsavedChanges = true")
+
+                            source_editor.on("change", mark_dirty)
+
                             action_row = ui.row()
                             with ui.expansion(
                                 "Programmausgabe",
@@ -732,19 +853,44 @@ def main(
                             ) -> None:
                                 container.clear()
                                 with container:
-                                    _render_test_results(ui, exercise_name)
+                                    render_exercise_test_results(ui, exercise_name)
 
                             render_test_results()
 
-                            def save_task(path=target, editor=source_editor) -> bool:
+                            def save_task(
+                                path=target, editor=source_editor, state=editor_state,
+                                label=save_state, exercise_name=name, notify=True,
+                            ) -> bool:
                                 selected_course = get_course_directory()
                                 if selected_course is None:
                                     ui.notify("Richte zuerst einen Kursordner ein.", type="warning")
                                     return False
                                 try:
-                                    save_student_source(path, editor.value, selected_course)
-                                    ui.notify("Quellcode wurde gespeichert.", type="positive")
+                                    save_student_source(
+                                        path, editor.value, selected_course,
+                                        expected_hash=state["disk_hash"],
+                                    )
+                                    state["disk_hash"] = source_hash(editor.value)
+                                    state["dirty"] = False
+                                    dirty_exercises.discard(exercise_name)
+                                    label.set_text("Gespeichert")
+                                    label.classes(replace="text-grey-7 text-sm")
+                                    ui.run_javascript(
+                                        "window.pykimHasUnsavedChanges = "
+                                        + str(bool(dirty_exercises)).lower()
+                                    )
+                                    if notify:
+                                        ui.notify("Quellcode wurde gespeichert.", type="positive")
                                     return True
+                                except SourceConflictError:
+                                    label.set_text("Datei wurde außerhalb der Suite geändert")
+                                    label.classes(replace="text-negative text-sm")
+                                    ui.notify(
+                                        "Die Datei wurde inzwischen in einer IDE geändert. "
+                                        "Lade sie neu, damit nichts überschrieben wird.",
+                                        type="warning",
+                                    )
+                                    return False
                                 except (OSError, ValueError) as error:
                                     ui.notify(f"Speichern fehlgeschlagen: {error}", type="negative")
                                     return False
@@ -754,16 +900,28 @@ def main(
                                 editor=source_editor,
                                 output_view=execution_output,
                                 refresh_tests=render_test_results,
+                                refresh_summary=refresh_overview,
+                                save_current=save_task,
+                                exercise_name=name,
+                                code_editor=source_editor,
                             ) -> None:
                                 selected_course = get_course_directory()
                                 if selected_course is None:
                                     ui.notify("Richte zuerst einen Kursordner ein.", type="warning")
                                     return
+                                if execution_manager.is_running(path):
+                                    ui.notify("Diese Aufgabe läuft bereits.", type="warning")
+                                    return
+                                if not save_current(notify=False):
+                                    return
+                                run_button.disable()
+                                stop_button.enable()
+                                run_status.set_text("LÄUFT")
+                                run_status.props("color=warning")
                                 try:
-                                    save_student_source(path, editor.value, selected_course)
                                     output_view.set_content("Programm läuft …")
                                     result = await nicegui_run.io_bound(
-                                        execute_student_program, path, selected_course
+                                        execution_manager.execute, path, selected_course
                                     )
                                     output = result.stdout
                                     if result.stderr:
@@ -773,14 +931,78 @@ def main(
                                         or f"Programm beendet (Code {result.returncode}), ohne Ausgabe."
                                     )
                                     refresh_tests()
+                                    refresh_summary()
+                                    if result.stderr:
+                                        line, message = friendly_python_error(result.stderr)
+                                        code_editor.line_tooltips = {line: message} if line else {}
+                                    else:
+                                        code_editor.line_tooltips = {}
                                     ui.notify(
-                                        "Tests aktualisiert."
+                                        "Programm wurde gestoppt."
+                                        if result.stopped else "Tests aktualisiert."
                                         if result.returncode == 0
                                         else f"Programm mit Fehlercode {result.returncode} beendet.",
-                                        type="positive" if result.returncode == 0 else "negative",
+                                        type="warning" if result.stopped else
+                                        "positive" if result.returncode == 0 else "negative",
+                                    )
+                                except (OSError, ValueError, RuntimeError) as error:
+                                    ui.notify(str(error), type="negative")
+                                finally:
+                                    run_button.enable()
+                                    stop_button.disable()
+                                    run_status.set_text("BEREIT")
+                                    run_status.props("color=grey")
+
+                            def stop_task(path=target, output_view=execution_output) -> None:
+                                if execution_manager.stop(path):
+                                    output_view.set_content("Programm wird beendet …")
+                                    run_status.set_text("WIRD BEENDET")
+                                else:
+                                    ui.notify("Diese Aufgabe läuft gerade nicht.", type="info")
+
+                            def reload_task(
+                                path=target, editor=source_editor, state=editor_state,
+                                label=save_state, exercise_name=name,
+                            ) -> None:
+                                selected_course = get_course_directory()
+                                if selected_course is None:
+                                    return
+                                try:
+                                    current = read_student_source(path, selected_course)
+                                    editor.set_value(current)
+                                    state.update(disk_hash=source_hash(current), dirty=False)
+                                    dirty_exercises.discard(exercise_name)
+                                    label.set_text("Neu von Datei geladen")
+                                    label.classes(replace="text-grey-7 text-sm")
+                                    ui.run_javascript(
+                                        "window.pykimHasUnsavedChanges = "
+                                        + str(bool(dirty_exercises)).lower()
                                     )
                                 except (OSError, ValueError) as error:
-                                    ui.notify(str(error), type="negative")
+                                    ui.notify(f"Neuladen fehlgeschlagen: {error}", type="negative")
+
+                            def reset_task(
+                                exercise_name=name, editor=source_editor,
+                                state=editor_state, label=save_state,
+                                refresh_tests=render_test_results,
+                                refresh_summary=refresh_overview,
+                            ) -> None:
+                                selected_course = get_course_directory()
+                                if selected_course is None:
+                                    return
+                                try:
+                                    reset_path = reset_exercise_file(exercise_name, selected_course)
+                                    clear_exercise_progress(exercise_name, selected_course)
+                                    current = read_student_source(reset_path, selected_course)
+                                    editor.set_value(current)
+                                    state.update(disk_hash=source_hash(current), dirty=False)
+                                    dirty_exercises.discard(exercise_name)
+                                    label.set_text("Aufgabe zurückgesetzt; Backup wurde angelegt")
+                                    refresh_tests()
+                                    refresh_summary()
+                                    ui.notify("Aufgabe und Lernstand wurden zurückgesetzt.", type="positive")
+                                except (OSError, ValueError) as error:
+                                    ui.notify(f"Zurücksetzen fehlgeschlagen: {error}", type="negative")
 
                             def open_task_in_ide(path=target) -> None:
                                 try:
@@ -799,11 +1021,15 @@ def main(
                                     on_click=save_task,
                                     icon="save",
                                 )
-                                ui.button(
+                                run_button = ui.button(
                                     "Ausführen",
                                     on_click=save_and_start_task,
                                     icon="play_arrow",
                                 )
+                                stop_button = ui.button(
+                                    "Stoppen", on_click=stop_task, icon="stop",
+                                ).props("outline")
+                                stop_button.disable()
                                 ui.button(
                                     "Kopieren",
                                     on_click=copy_task_source,
@@ -815,6 +1041,30 @@ def main(
                                     icon="open_in_new",
                                 ).props("outline")
                                 ide_open_buttons.append(ide_button)
+                                ui.button(
+                                    "Neu laden", on_click=reload_task, icon="refresh",
+                                ).props("flat")
+                                with ui.dialog() as reset_dialog, ui.card():
+                                    ui.label("Aufgabe wirklich zurücksetzen?").classes("font-bold")
+                                    ui.label(
+                                        "Quellcode und Lernstand werden zurückgesetzt. "
+                                        "Vorher legt PyKIM Backups an."
+                                    )
+                                    with ui.row():
+                                        ui.button("Abbrechen", on_click=reset_dialog.close).props("flat")
+                                        ui.button(
+                                            "Zurücksetzen",
+                                            on_click=lambda dialog=reset_dialog, reset=reset_task: (
+                                                dialog.close(), reset()
+                                            ),
+                                        )
+                                ui.button(
+                                    "Zurücksetzen", on_click=reset_dialog.open, icon="restart_alt",
+                                ).props("flat color=negative")
+                                run_status = ui.badge("BEREIT", color="grey")
+
+                            source_editor.map_key("Mod-s", save_task)
+                            source_editor.map_key("F5", save_and_start_task)
                         old_entry = journal.get(name, {}) if isinstance(journal, dict) else {}
                         notes = ui.textarea(
                             "Mein Dokubuch-Eintrag",
@@ -829,80 +1079,10 @@ def main(
                         )
 
             with ui.tab_panel(examples_tab):
-                ui.label("PyKIM-Beispiele").classes("text-2xl font-bold")
-                ui.markdown(
-                    "Die Originale gehören zum Paket und bleiben unverändert. "
-                    "Zum Bearbeiten wird automatisch eine persönliche Kopie unter "
-                    "`eigene_projekte/beispiele` verwendet."
-                )
-                for example in example_programs():
-                    with ui.expansion(example.title, icon="code").classes("w-full"):
-                        with ui.row().classes("w-full items-center"):
-                            ui.label(example.description).classes("text-base")
-                            ui.space()
-                            ui.badge(example.category, color="secondary")
-                        example_editor = ui.codemirror(
-                            value=example.source,
-                            language="Python",
-                            line_wrapping=False,
-                        ).classes("w-full").style("height: 24rem")
-                        example_editor.disable()
+                render_examples_view(ui, _preferred_ide_label(), ide_open_buttons)
 
-                        def copy_example_source(editor=example_editor) -> None:
-                            ui.clipboard.write(editor.value)
-                            ui.notify("Beispielcode wurde kopiert.", type="positive")
-
-                        def start_example(example_name=example.name) -> None:
-                            try:
-                                launch_example(example_name)
-                                ui.notify("Beispiel wurde gestartet.", type="positive")
-                            except (OSError, ValueError) as error:
-                                ui.notify(f"Start fehlgeschlagen: {error}", type="negative")
-
-                        def save_example_copy(example_name=example.name) -> None:
-                            course = get_course_directory()
-                            if course is None:
-                                ui.notify("Richte zuerst einen Kursordner ein.", type="warning")
-                                return
-                            try:
-                                target, created = copy_example_to_course(example_name, course)
-                                ui.notify(
-                                    f"Kopie angelegt: {target.relative_to(course)}"
-                                    if created
-                                    else "Die persönliche Kopie ist bereits vorhanden.",
-                                    type="positive",
-                                )
-                            except (OSError, ValueError) as error:
-                                ui.notify(str(error), type="negative")
-
-                        def open_example_in_ide(example_name=example.name) -> None:
-                            course = get_course_directory()
-                            if course is None:
-                                ui.notify("Richte zuerst einen Kursordner ein.", type="warning")
-                                return
-                            try:
-                                target, _created = copy_example_to_course(example_name, course)
-                                open_in_preferred_ide(target)
-                                ui.notify("Beispiel wurde in der IDE geöffnet.", type="positive")
-                            except (OSError, RuntimeError, ValueError) as error:
-                                ui.notify(str(error), type="negative")
-
-                        with ui.row():
-                            ui.button("Ausführen", on_click=start_example, icon="play_arrow")
-                            ui.button(
-                                "Kopieren", on_click=copy_example_source, icon="content_copy"
-                            ).props("outline")
-                            example_ide_button = ui.button(
-                                f"In {_preferred_ide_label()} öffnen",
-                                on_click=open_example_in_ide,
-                                icon="open_in_new",
-                            ).props("outline")
-                            ide_open_buttons.append(example_ide_button)
-                            ui.button(
-                                "Als eigenes Projekt speichern",
-                                on_click=save_example_copy,
-                                icon="content_copy",
-                            ).props("outline")
+            with ui.tab_panel(projects_tab):
+                render_projects_view(ui, _preferred_ide_label(), ide_open_buttons)
 
             with ui.tab_panel(submission_tab):
                 ui.label("Verschlüsselte Moodle-Abgabe").classes("text-2xl font-bold")
@@ -1030,17 +1210,29 @@ def main(
             with ui.tab_panel(sheet_tab):
                 ui.markdown(CHEATSHEET).classes("prose max-w-none")
             with ui.tab_panel(script_tab):
-                ui.markdown(SCRIPT).classes("prose max-w-none")
+                render_script_reader(ui)
             with ui.tab_panel(pyxel_tab):
                 ui.markdown(PYXEL_REFERENCE).classes("prose max-w-none")
+                ui.separator()
+                render_pyxel_examples_view(
+                    ui, _preferred_ide_label(), ide_open_buttons
+                )
             with ui.tab_panel(browser_tab):
-                ui.label("Python direkt im Browser").classes("text-2xl font-bold")
+                ui.label("Python-Grundlagen im Browser").classes("text-2xl font-bold")
                 ui.markdown(
-                    "Diese erste Pyodide-Spielwiese führt normales Python vollständig "
-                    "im Browser aus. Ein browserfähiges PyKIM-Canvas folgt als nächste Stufe."
+                    "Diese Pyodide-Spielwiese ist nur für **reines Python ohne PyKIM und "
+                    "Pyxel** gedacht, zum Beispiel für Variablen, Schleifen, Listen und "
+                    "Funktionen. PyKIM- und Pyxel-Programme benötigen Grafik, Audio und "
+                    "die lokale Runtime und werden deshalb über **Ausführen** in der Suite "
+                    "gestartet."
                 )
                 ui.html(PYODIDE_PLAYGROUND, sanitize=False).classes("w-full")
 
+    if not run_server:
+        return
+
+    nicegui_app.on_shutdown(execution_manager.stop_all)
+    nicegui_app.on_shutdown(script_example_manager.stop_all)
     ui.run(
         title="PyKIM-Begleitheft",
         favicon="🤖",
@@ -1052,5 +1244,5 @@ def main(
     )
 
 
-if __name__ in {"__main__", "__mp_main__"}:
+if __name__ == "__main__":
     main()

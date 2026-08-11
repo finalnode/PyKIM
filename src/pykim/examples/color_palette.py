@@ -11,5 +11,6 @@ for color in range(16):
     for x in range(20, 140):
         set_x(x)
         paint()
+        paint_stop()
 
 run()

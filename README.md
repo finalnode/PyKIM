@@ -20,6 +20,54 @@ python -m pip install -e '.[test]'
 pytest
 ```
 
+Der normale Testlauf prüft die API, Weltlogik, Trainer, Kursdateien und
+Suite-Helfer. Der echte NiceGUI-Navigationslauf ist bewusst separat, weil er
+zusätzliche Desktop-/Browser-Abhängigkeiten benötigt:
+
+```bash
+python -m pip install -e '.[e2e]'
+pytest -m e2e
+```
+
+Die ergänzende manuelle Prüfmatrix für Windows, Thonny und synchronisierte
+Netzlaufwerke steht in `QUALITAETSSICHERUNG.md`.
+
+### Eigenständige macOS-App
+
+Der erste gebündelte Release-Weg konzentriert sich auf macOS. Der Build enthält
+Python, PyKIM, Pyxel, NiceGUI, die Trainer-Aufgaben, Skripte, Beispiele und ein
+Offline-Wheelhouse. Auf dem Schülergerät ist deshalb keine eigene
+Python-Installation nötig.
+
+```bash
+python tools/build_macos_app.py
+open 'dist/macos/PyKIM Suite.app'
+```
+
+Für schnelle Wiederholungs-Builds kann das bereits erzeugte Wheelhouse erhalten
+bleiben:
+
+```bash
+python tools/build_macos_app.py --skip-wheelhouse
+```
+
+Aus dem fertigen App-Bundle entsteht ein Intel-DMG mit einer Verknüpfung zum
+Programme-Ordner:
+
+```bash
+python tools/build_macos_dmg.py
+```
+
+Mit `--rebuild-app` werden App, Wheelhouse, Icon und DMG in einem Durchlauf neu
+erzeugt. Das Ergebnis trägt Version und Architektur im Dateinamen.
+
+Der Build muss auf macOS und für dieselbe Prozessorarchitektur wie das Zielgerät
+erzeugt werden. Der derzeit lokal erzeugte Build ist `x86_64`. Für Apple Silicon
+wird später auf einem Apple-Silicon-Mac ein eigener `arm64`-Build erstellt.
+Ohne Apple-Developer-Zertifikat ist die App nur ad-hoc signiert und noch nicht
+notarisiert; das ist für lokale Entwicklung geeignet, aber noch kein fertiger
+Schul-Rollout.
+
 ## Lokales Begleitheft und Kursordner
 
 Der optionale NiceGUI-Prototyp bündelt Setup, Aufgabenübersicht, einzelne
@@ -55,9 +103,11 @@ Die Suite bindet ausschließlich an `127.0.0.1`. Andere Geräte im Schul- oder
 Heimnetz können ihre lokalen Start-, Installations- und Updateaktionen daher
 nicht aufrufen.
 
-### Verschlüsselte Moodle-Dateiabgaben
+### Verschlüsselte Moodle-Dateiabgaben (experimentell, vorerst zurückgestellt)
 
-Moodle wird ohne Plugin ausschließlich als authentifizierter Datei-Transport
+Diese technische Grundlage ist vorhanden, gehört aber noch nicht zum
+stabilisierten Schüler-Workflow. Zuerst werden Skript, Aufgaben und lokales
+Arbeiten gefestigt. Moodle wird ohne Plugin ausschließlich als Datei-Transport
 verwendet. Die Lehrkraft erzeugt einmalig ein öffentliches Kurszertifikat und
 einen passwortgeschützten privaten Schlüssel:
 
@@ -109,18 +159,88 @@ Der Tab **Setup** erkennt Python, PyKIM, Pyxel, Thonny und Visual Studio Code
 und verweist bei fehlenden IDEs auf die offiziellen Installationsseiten. Im
 Tab **Werkzeuge** kann der Kursordner mit der erkannten IDE geöffnet werden.
 
+Schülerprogramme werden nicht mehr implizit mit irgendeinem globalen Python
+gestartet. Die Suite prüft gefundene Interpreter auf Python-Version, PyKIM und
+Pyxel und speichert eine gemeinsame Schüler-Laufzeit. Dieselbe Laufzeit gilt
+für die Ausführen-Schaltflächen und die externe IDE. Verwaltete Umgebungen
+liegen lokal unter `~/.pykim/runtimes`; sie werden deshalb nicht versehentlich
+über WebDAV zwischen verschiedenen Betriebssystemen synchronisiert.
+
+Beim Öffnen eines Kursordners in VS Code ergänzt die Suite dessen lokale
+`.vscode/settings.json` um den ausgewählten Interpreter und empfiehlt die
+offizielle Python-Erweiterung. Andere vorhandene Workspace-Einstellungen
+bleiben erhalten. Thonny wird mit dem Kursordner gestartet; die automatische,
+plattformübergreifende Übergabe des Interpreters verwendet ein eigenes
+PyKIM-Thonny-Profil unter `~/.pykim/thonny`. Persönliche Thonny-Einstellungen
+werden dadurch nicht überschrieben.
+
+### App- und Inhaltsupdates
+
+Beim Öffnen prüft die Suite beide Updatekanäle im Hintergrund. Ein fehlendes
+Netz blockiert den Start nicht.
+
+- **App:** Die Suite liest das neueste GitHub-Release und bietet das zur
+  Prozessorarchitektur passende DMG an. Eine installierte App ersetzt sich
+  niemals selbst und lädt keine Entwicklungsversion aus `main`.
+- **Lerninhalte:** Skripte und Aufgaben können als eigenes ZIP aktualisiert
+  werden. Paket- und Dateiprüfsummen werden vor der atomaren Aktivierung
+  kontrolliert. Schülercode, Projekte und `.pykim/progress.json` liegen
+  außerhalb des Inhaltsverzeichnisses und bleiben unverändert.
+
+Aktive Downloads liegen unter `~/.pykim/content/versions`. Ist ein Paket
+unvollständig oder beschädigt, verwendet die Suite weiterhin die mit der App
+ausgelieferten Inhalte. Ein Releasepaket wird so erzeugt:
+
+```bash
+python tools/build_content_package.py --version 2026.08.1
+```
+
+Dabei entstehen `dist/content/pykim-content-<version>.zip` sowie das zugehörige
+`content-manifest.json`. Das ZIP wird als GitHub-Release-Asset unter dem im
+Manifest angegebenen Tag veröffentlicht; das Manifest selbst liegt im
+Repository und dient der Startprüfung.
+
+### Offline-Laufzeit
+
+Die Offline-Pakete für das aktuelle Betriebssystem und die aktuelle
+Prozessorarchitektur werden mit folgendem Befehl gebaut:
+
+```bash
+python tools/build_wheelhouse.py
+```
+
+Das Ergebnis liegt unter `dist/wheelhouse`. Erkennt die Suite diesen Ordner,
+installiert und repariert sie PyKIM und Pyxel mit `--no-index`; ein Zugriff auf
+PyPI findet dann nicht statt. Windows-, macOS- und Linux-Wheels müssen später
+jeweils auf der passenden Plattform durch die Build-Matrix erzeugt werden.
+
+Im Setup kann eine verwaltete Kursumgebung repariert und eine datensparsame
+Runtime-Diagnose kopiert werden. Die Diagnose enthält Plattform, Interpreter,
+Paketstatus und Wheelhouse-Pfad, aber weder Quellcode noch Lernstand.
+
 Die Suite kann außerdem die Versionsnummer des GitHub-main-Branches prüfen.
 Eine Installation der Entwicklungsversion erfolgt nur nach einer expliziten
 Bestätigung und verändert keine Dateien im Kursordner.
 
-Für Pyxel-Projekte startet die Suite den offiziellen Ressourceneditor mit:
+Im Bereich **Meine Projekte** erzeugt die Suite vollständige Projektordner. Ein
+Pyxel-Projekt sieht beispielsweise so aus:
 
-```bash
-pyxel edit mein_spiel.pyxres
+```text
+Projekte/mein_spiel/
+├── main.py
+├── projekt.json
+└── ressourcen.pyxres
 ```
 
-Eine `.pyxres`-Datei enthält Sprites, Tilemaps, Sounds und Musik. Sie liegt
-standardmäßig unter `eigene_projekte/` im Kursordner.
+Eine `.pyxres`-Datei enthält Sprites, Tilemaps, Sounds und Musik. Der Editor
+wird direkt an der Projektkarte geöffnet. Beim ersten Speichern legt Pyxel die
+Datei an. Projektstart und Editor verwenden dieselbe in der Suite ausgewählte
+Python-Laufzeit. `main.py` wird mit dem Projektordner als Arbeitsverzeichnis
+gestartet, weshalb `pyxel.load("ressourcen.pyxres")` portabel funktioniert.
+
+Der frühere Ordner `eigene_projekte/` wird aus Kompatibilitätsgründen nicht
+gelöscht oder verschoben. Neue Projekte und bearbeitbare Beispielkopien liegen
+unter `Projekte/`.
 
 Der Tab **Python im Browser** enthält eine erste Pyodide-Spielwiese. Sie lädt
 Python als WebAssembly im Browser und führt normalen Python-Code ohne lokale
@@ -137,7 +257,7 @@ from pykim import *
 set_position(20, 20)
 speed(30)
 set_color("purple")
-paint_start()
+paint()
 
 for _ in range(30):
     right()
@@ -199,36 +319,35 @@ left(steps=1)
 right(steps=1)
 ```
 
-Farbe auswählen, einen einzelnen Pixel färben, eine Spur beginnen oder
-beenden und Pixel lesen:
+Eine Farbspur beginnen oder beenden und Pixel lesen:
 
 ```python
-set_color("purple")  # oder set_color(2)
-paint()              # färbt nur den aktuellen Pixel
-paint_start()
+paint("purple")      # färbt hier und schaltet die Spur ein
 right(20)            # malt jeden besuchten Pixel
 paint_stop()
+paint("orange")      # nur diese Position färben:
+paint_stop()         # Spur sofort wieder ausschalten
 get_color()          # aktueller Pixel
 get_color("right")   # unmittelbarer Nachbar
 get_color(100, 50)   # beliebige Position
 ```
 
-`paint_start()` färbt sofort den aktuellen Pixel und danach jeden Pixel, über
+`paint()` färbt sofort den aktuellen Pixel und danach jeden Pixel, über
 den Kim sich bewegt. `paint_stop()` beendet die Spur. Ohne vorherige
 Farbauswahl wird Weiß verwendet:
 
 ```python
-paint_start()
+paint()
 right(20)
 paint_stop()
 
-paint_start("orange")
+paint("orange")
 down(10)
 paint_stop()
 ```
 
-Der bisherige Name `paint_path()` funktioniert weiterhin als Alias für
-`paint_start()`. `paint()` bleibt bewusst eine atomare Ein-Pixel-Operation.
+Die bisherigen Namen `paint_start()` und `paint_path()` funktionieren als
+Kompatibilitätsaliase für `paint()`, werden aber nicht mehr aktiv gelehrt.
 
 `get_color()` gibt immer einen lesbaren, kanonischen Farbnamen zurück. Die 16
 Farben sind: `black`, `navy`, `purple`, `green`, `brown`, `dark_blue`,
@@ -243,9 +362,10 @@ kann deshalb auch objektorientiert geschrieben werden:
 ```python
 from pykim import kim, world
 
-kim.set_position(20, 20)
-kim.paint_path("purple")
+kim.position = (20, 20)
+kim.paint("purple")
 kim.right(10)
+kim.paint_stop()
 
 world.speed(30)
 world.run()
@@ -257,17 +377,20 @@ Welt zusätzliche Pixel:
 ```python
 from pykim import kim, world
 
-kim.set_position(20, 20)
-kim.paint_path("purple")
+kim.position = (20, 20)
+kim.paint("purple")
 kim.right(10)
+kim.paint_stop()
 
 mia = world.new_pixel("MIA", x=20, y=30)
-mia.paint_path("orange")
+mia.paint("orange")
 mia.right(10)
+mia.paint_stop()
 
 leo = world.new_pixel("LEO", x=20, y=40)
-leo.paint_path("cyan")
+leo.paint("cyan")
 leo.right(10)
+leo.paint_stop()
 leo.hide()  # Spur behalten, Figur verstecken
 
 world.run()
@@ -284,6 +407,23 @@ mia.show()
 
 Für KIM funktionieren zusätzlich die freien Kurzformen `hide()` und `show()`.
 Das Verstecken entfernt weder die gemalte Spur noch die aktuelle Position.
+
+Im Objektweg werden Positionen über Eigenschaften gelesen und gesetzt:
+
+```python
+print(kim.x, kim.y)
+print(kim.position)
+kim.position = (40, 30)
+```
+
+Töne können sowohl von einer Figur als auch direkt von der Welt ausgelöst
+werden. Beide Wege verwenden dieselbe Tonwarteschlange:
+
+```python
+kim.play_tone("C4")
+world.play_tone("E4", beats=2)
+world.play_pause()
+```
 
 Normalerweise werden Befehle in ihrer geschriebenen Reihenfolge animiert. In
 einem `parallel()`-Block beginnen die Bewegungen verschiedener Pixel dagegen
@@ -334,7 +474,7 @@ enthält Eingaben und Zustandsänderungen, `draw()` baut das aktuelle Bild auf:
 from pykim import kim, world
 
 def update():
-    if world.btn("right") and kim.get_x() < world.width - 1:
+    if world.btn("right") and kim.x < world.width - 1:
         kim.right()
 
 def draw():
@@ -395,7 +535,7 @@ class MusikPixel(Pixel):
             self.play_tone(self.note)
 
     def draw(self):
-        self.world.pset(self.get_x(), self.get_y(), "purple")
+        self.world.pset(self.x, self.y, "purple")
 
 mia = world.spawn(MusikPixel, "MIA", 40, 60, note="C4")
 leo = world.spawn(MusikPixel, "LEO", 80, 60, note="E4")
@@ -446,7 +586,7 @@ Schleife kurz formuliert wurden:
 
 ```python
 set_position(50, 50)
-paint_path("purple")
+paint("purple")
 for _ in range(5):
     right(5)
     down(5)

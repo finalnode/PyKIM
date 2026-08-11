@@ -18,11 +18,11 @@ right(10)
 ## Farben und Malen
 
 ```python
-set_color("purple")
-paint()                    # genau ein Pixel
-paint_start("orange")      # Spur beginnen
+paint("purple")            # aktuellen Pixel färben, Spur beginnen
 right(10)
 paint_stop()               # Spur beenden
+paint("orange")            # genau ein Pixel: sofort wieder stoppen
+paint_stop()
 get_color()                # Farbe unter KIM
 get_color("right")         # Farbe rechts von KIM
 ```
@@ -43,7 +43,7 @@ play_pause()
 
 ```python
 mia = world.new_pixel("MIA", 20, 30)
-mia.paint_start("orange")
+mia.paint("orange")
 mia.right(10)
 
 with world.parallel():
@@ -78,7 +78,7 @@ Ein Programm ist zunächst eine Folge eindeutiger Anweisungen. KIM startet bei
 from pykim import *
 
 set_position(20, 20)
-paint_start("purple")
+paint("purple")
 right(10)
 down(5)
 run()
@@ -182,11 +182,13 @@ Die vollständige, jeweils aktuelle Referenz steht in der
 
 PYODIDE_PLAYGROUND = r"""
 <div class="pykim-playground">
-  <p id="pyodide-status"><strong>Python im Browser wird geladen …</strong></p>
+  <p id="pyodide-status"><strong>Python wird erst beim Ausführen geladen.</strong></p>
   <textarea id="pyodide-code" spellcheck="false">for zahl in range(1, 6):
     print(zahl, zahl * zahl)</textarea>
   <div style="margin: .75rem 0">
     <button class="pykim-run-button" onclick="window.runPyKIMPython()">▶ Ausführen</button>
+    <button class="pykim-clear-button" onclick="window.stopPyKIMBrowserPython()">■ Stoppen</button>
+    <button class="pykim-clear-button" onclick="window.resetPyKIMBrowserExample()">Beispiel laden</button>
     <button class="pykim-clear-button" onclick="document.getElementById('pyodide-output').textContent = ''">Ausgabe leeren</button>
   </div>
   <pre id="pyodide-output">Bereit.</pre>

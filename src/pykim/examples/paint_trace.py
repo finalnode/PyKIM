@@ -7,7 +7,7 @@ from pykim import *
 set_x(40)
 set_y(30)
 animate()
-paint_start("orange")
+paint("orange")
 
 for _ in range(2):
     right(60)

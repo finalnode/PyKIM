@@ -4,6 +4,32 @@ Trainerdateien beschreiben nur, **was** eine richtige Lösung ausmacht. Der
 `ExerciseBuilder` übernimmt Weltzugriff, Farbumwandlung, Audiovergleich,
 Quellcodeanalyse und den Aufbau der deutschen Rückmeldung.
 
+## Autorenwerkzeuge in der Suite
+
+Unter **Werkzeuge → Trainer-Autorenwerkzeuge** zeigt die Suite für jede
+registrierte Aufgabe:
+
+- die verwendeten Prüfbausteine,
+- Erfolgs-, Fehler- und Tipptexte aus Sicht der Lernenden,
+- redaktionelle Warnungen,
+- einen stabilen Definitions-Hash.
+
+Darunter erzeugt ein kleiner Bausteineditor aus Kennung, Titel, Prüfungen und
+optionaler Codeschwelle eine vollständige Trainerdatei und das zugehörige
+Aufgaben-Markdown. Vorhandene Aufgaben können als Ausgangspunkt geladen werden.
+Beide Texte bleiben bewusst normaler, editierbarer Quelltext: Positionen,
+Farben und besondere Fachwerte lassen sich direkt und nachvollziehbar anpassen.
+
+Die Suite validiert Python-Syntax, Kennung, `EXERCISE`, Markdown-Titel,
+Schwierigkeitsgrad und Anforderungen fortlaufend. Beim Speichern entstehen
+immer beide Dateien unter `.pykim/author_drafts/` im Kursordner. Vorhandene
+Entwürfe werden nur nach bewusst gesetztem Haken überschrieben. Installierte
+Paketdateien bleiben dadurch unverändert.
+
+Der Definitions-Hash ändert sich, sobald sich Titel, Reihenfolge, Art oder
+Feedback der Prüfungen ändern. Er identifiziert damit eine konkrete
+Testdefinition, ersetzt aber keine Versionsverwaltung.
+
 ## Kleinste Aufgabe
 
 ```python
@@ -171,5 +197,10 @@ statt technische Logik in mehreren Aufgaben zu duplizieren.
 
 Die Datei muss lediglich in `src/pykim/trainer/exercises/` liegen und eine
 Variable namens `EXERCISE` exportieren. Die Registry entdeckt sie beim Start
-automatisch; eine Importliste muss nicht gepflegt werden. Die Aufgabenstellung
-selbst kommt zusätzlich in die gemeinsame `AUFGABEN.md`.
+automatisch; eine Importliste muss nicht gepflegt werden. Die Registry prüft
+Kennung, Titel, Prüfbausteine und Definitions-Hash beim Laden.
+
+Die Aufgabenstellung liegt als gleichnamige Markdown-Datei unter
+`src/pykim/guide/Aufgaben/imperativ/` oder `Aufgaben/oop/`. Diese Datei ist die
+einzige Quelle für den Aufgabentext und den Schwierigkeitsgrad; eine gemeinsame
+`AUFGABEN.md` muss nicht zusätzlich gepflegt werden.

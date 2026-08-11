@@ -1,10 +1,23 @@
 import pytest
 import pykim
+import pykim.trainer.exercises as exercise_registry
 
 from pykim import down, left, paint, paint_path, right, set_x, set_y, up
 from pykim.trainer.runner import check_exercise
 from pykim.trainer.optimization import evaluate_stairs
 from pykim.trainer import ExerciseBuilder
+from pykim.trainer.authoring import audit_exercise, generate_exercise_source
+from pykim.trainer.exercises import exercise_names, get_exercise
+
+
+def test_builtin_exercises_work_without_searchable_package_directory(monkeypatch):
+    """Ein eingefrorenes PyInstaller-Paket kann nicht mit pkgutil gesucht werden."""
+    monkeypatch.setattr(exercise_registry, "iter_modules", lambda _path: ())
+
+    exercises = exercise_registry._discover_exercises()
+
+    assert "farben-melodie" in exercises
+    assert set(exercises) == set(exercise_names())
 
 
 def efficient_stairs():
@@ -254,10 +267,12 @@ def test_dotted_line_exercise_accepts_compact_loop_solution(capsys):
     pykim.set_color("purple")
     for _ in range(8):
         pykim.paint()
+        pykim.paint_stop()
         pykim.right(2)
     source = """
 for _ in range(8):
     paint()
+    paint_stop()
     right(2)
 """
 
@@ -528,3 +543,67 @@ c = 3
 def test_line_score_rejects_invalid_threshold(value):
     with pytest.raises((TypeError, ValueError), match="optimal"):
         ExerciseBuilder("test-zeilen", "Codezeilen").optimize_lines(value)
+def test_builder_exposes_rule_preview_and_stable_definition_hash():
+    first = (
+        ExerciseBuilder("autorentest", "Autorentest")
+        .expect_position((20, 20))
+        .require_loop()
+        .build()
+    )
+    second = (
+        ExerciseBuilder("autorentest", "Autorentest")
+        .expect_position((20, 20))
+        .require_loop()
+        .build()
+    )
+
+    assert [rule.kind for rule in first.rules] == ["position", "loop"]
+    assert first.rules[0].failure
+    assert first.rules[0].hint
+    assert first.definition_hash == second.definition_hash
+    assert len(first.definition_hash) == 64
+    assert audit_exercise(first).valid
+
+
+def test_all_published_exercises_have_complete_author_metadata():
+    for name in exercise_names():
+        exercise = get_exercise(name)
+        audit = audit_exercise(exercise)
+        assert audit.valid, name
+        assert not audit.issues, (name, audit.issues)
+        assert all(rule.kind not in {"custom", "dynamic"} for rule in exercise.rules)
+
+
+def test_definition_hash_changes_with_visible_feedback():
+    first = ExerciseBuilder("hash-test", "Hash-Test").require_loop().build()
+    second = (
+        ExerciseBuilder("hash-test", "Hash-Test")
+        .require_loop(success="Eine Schleife ist vorhanden.")
+        .build()
+    )
+
+    assert first.definition_hash != second.definition_hash
+
+
+def test_authoring_generator_creates_complete_parseable_builder_source():
+    source = generate_exercise_source(
+        "neue-aufgabe",
+        "Neue Aufgabe",
+        ("pixels", "loop"),
+        optimal_lines=8,
+    )
+
+    compile(source, "neue_aufgabe.py", "exec")
+    assert 'ExerciseBuilder("neue-aufgabe", \'Neue Aufgabe\')' in source
+    assert '.expect_pixels({(20, 20): "purple"})' in source
+    assert ".require_loop()" in source
+    assert ".optimize_lines(optimal=8)" in source
+
+
+@pytest.mark.parametrize(
+    ("name", "title", "rules"),
+    (("Nicht gültig", "Titel", ("loop",)), ("gueltig", "", ("loop",)), ("gueltig", "Titel", ())),
+)
+def test_authoring_generator_rejects_incomplete_metadata(name, title, rules):
+    with pytest.raises(ValueError):
+        generate_exercise_source(name, title, rules)

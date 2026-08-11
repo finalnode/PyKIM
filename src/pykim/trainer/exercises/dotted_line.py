@@ -20,8 +20,8 @@ EXERCISE = (
     .require_loop(
         success="Du verwendest eine Schleife für die acht Wiederholungen.",
         failure="Die Punktlinie wurde noch ohne Schleife formuliert.",
-        hint="Setze paint() und right(2) in eine for-Schleife.",
+        hint="Setze paint(), paint_stop() und right(2) in eine for-Schleife.",
     )
-    .optimize_lines(optimal=9)
+    .optimize_lines(optimal=10)
     .build()
 )

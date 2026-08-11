@@ -14,7 +14,7 @@ def zeichne_quadrat():
 
 speed(30)
 set_position(20, 20)
-paint_path("purple")
+paint("purple")
 
 for _ in range(4):
     zeichne_quadrat()

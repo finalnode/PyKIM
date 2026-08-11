@@ -10,16 +10,19 @@ for x in range(20, 60):
     set_y(60)
     set_color("green")
     paint()
+    paint_stop()
 
 for x in range(60, 100):
     set_x(x)
     set_color("yellow")
     paint()
+    paint_stop()
 
 for x in range(100, 140):
     set_x(x)
     set_color("red")
     paint()
+    paint_stop()
 
 # Walk over the path and play a different tone for each section.
 paint_stop()

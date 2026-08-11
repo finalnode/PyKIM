@@ -20,12 +20,22 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+e2e = [
+  "pytest>=8",
+  "nicegui[native]>=3,<4",
+]
 guide = [
   "nicegui[native]>=3,<4",
   "cryptography>=39,<47",
   "tomli>=2; python_version < '3.11'",
 ]
 submission = ["cryptography>=39,<47"]
+build-macos = [
+    "nicegui[native]>=3,<4",
+    "cryptography>=39,<47",
+    "pillow>=10,<13",
+    "pyinstaller>=6,<7",
+]
 
 [project.scripts]
 pykim-guide = "pykim.guide.app:main"
@@ -34,7 +44,22 @@ pykim-teacher = "pykim.submission.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+pykim = [
+  "guide/content-manifest.json",
+  "guide/Skripte/imperativ/*.md",
+  "guide/Skripte/oop/*.md",
+  "guide/Skripte/README.md",
+  "guide/Aufgaben/imperativ/*.md",
+  "guide/Aufgaben/oop/*.md",
+]
+
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra -m 'not e2e'"
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "e2e: browserloser NiceGUI-Gesamtworkflow (explizit mit -m e2e starten)",
+  "anyio: asynchroner Test über AnyIO",
+  "nicegui_main_file(path): Einstiegspunkt für NiceGUIs User-Simulation",
+]
