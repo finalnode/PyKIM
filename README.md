@@ -1,413 +1,320 @@
 # PyKIM
 
-PyKIM 0.3.0 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
-kleine Drohne, bewegt sich pixelweise durch eine 160 × 120 Pixel große Welt,
-liest und verändert Farben und kann einfache Töne spielen. Die gesamte Logik
-funktioniert auch ohne ein geöffnetes Grafikfenster und ist daher gut testbar.
-
-## Was PyKIM 0.3 kann
-
-### Programmieren mit KIM
-
-- Pixelweise Bewegungen in einer 160 × 120 Pixel großen Welt
-- Farben lesen, einzelne Punkte malen und farbige Spuren zeichnen
-- Geschwindigkeit und schrittweise Animationen steuern
-- Töne, Pausen, Rhythmen und Melodien abspielen
-- Imperative Kurzbefehle sowie einen objektorientierten Zugang verwenden
-- Mehrere benannte Pixel sequenziell oder parallel bewegen
-- Pixel ein- und ausblenden sowie eigene Pixelklassen ableiten
-- Interaktive Programme mit Tastaturabfragen und einer Spielschleife schreiben
-- Schrittweise von PyKIM zu den entsprechenden Pyxel-Befehlen wechseln
-
-### Lernen und Testen in der Suite
-
-- Aufgaben direkt bearbeiten, speichern und ausführen
-- Automatische Testfälle mit deutschsprachigen Hinweisen anzeigen
-- Kontrollstrukturen und Codeumfang als Optimierungshinweise auswerten
-- Lernstand und persönliche Dokubuch-Einträge lokal speichern
-- Skriptkapitel, Cheatsheet, Beispiele und Pyxel-Beispiele anzeigen
-- Code aus der Suite in Thonny, VS Code oder einer eigenen IDE öffnen
-- Geeignete lokale Python-Interpreter erkennen und eine verwaltete Laufzeit nutzen
-- Eigene Pyxel-Projekte mit `.pyxres`-Ressourcen anlegen
-
-### Kurse und eigene Erweiterungen
-
-- Einen portablen Kursordner auf lokalen, USB- oder WebDAV-Laufwerken verwenden
-- Kurs, Repository, Branch und Inhaltspfade über eine schlanke
-  `.pykim-setup`-Datei konfigurieren
-- Skripte, Aufgaben und YAML-Trainer aus einem öffentlichen Git-Repository
-  synchronisieren
-- Trainerdaten vor einer Bewertung anhand der Repository-Hashes prüfen
-- Ohne Kurs-Setupdatei mit einer bewusst rudimentären Suite starten
-- Eigene Funktionen und Klassen in `erweiterungen.py` sammeln
-- Alle Erweiterungen oder einzelne Funktionen per kopierbarem Import verwenden
-- Doppelte Funktions- und Klassennamen vor dem Speichern erkennen
-
-Die Suite arbeitet lokal. Der derzeit ausgeblendete verschlüsselte
-Abgabe-Workflow ist technische Vorarbeit und noch nicht Bestandteil von 0.3.
-
-## Installation
-
-Python 3.10 oder neuer wird benötigt. Im Projektverzeichnis:
-
-```bash
-python -m pip install -e .
-```
-
-Für die Entwicklung und Tests:
-
-```bash
-python -m pip install -e '.[test]'
-pytest
-```
-
-Der normale Testlauf prüft die API, Weltlogik, Trainer, Kursdateien und
-Suite-Helfer. Der echte NiceGUI-Navigationslauf ist bewusst separat, weil er
-zusätzliche Desktop-/Browser-Abhängigkeiten benötigt:
-
-```bash
-python -m pip install -e '.[e2e]'
-pytest -m e2e
-```
-
-Die ergänzende manuelle Prüfmatrix für Windows, Thonny und synchronisierte
-Netzlaufwerke steht in `QUALITAETSSICHERUNG.md`.
-
-### Eigenständige macOS-App
-
-Der erste gebündelte Release-Weg konzentriert sich auf macOS. Der Build enthält
-Python, PyKIM, Pyxel, NiceGUI, die Trainer-Aufgaben, Skripte, Beispiele und ein
-Offline-Wheelhouse. Auf dem Schülergerät ist deshalb keine eigene
-Python-Installation nötig.
-
-```bash
-python tools/build_macos_app.py
-open 'dist/macos/PyKIM Suite.app'
-```
-
-Für schnelle Wiederholungs-Builds kann das bereits erzeugte Wheelhouse erhalten
-bleiben:
-
-```bash
-python tools/build_macos_app.py --skip-wheelhouse
-```
-
-Aus dem fertigen App-Bundle entsteht ein Intel-DMG mit einer Verknüpfung zum
-Programme-Ordner:
-
-```bash
-python tools/build_macos_dmg.py
-```
-
-Mit `--rebuild-app` werden App, Wheelhouse, Icon und DMG in einem Durchlauf neu
-erzeugt. Das Ergebnis trägt Version und Architektur im Dateinamen.
-
-Der Build muss auf macOS und für dieselbe Prozessorarchitektur wie das Zielgerät
-erzeugt werden. Der derzeit lokal erzeugte Build ist `x86_64`. Für Apple Silicon
-wird später auf einem Apple-Silicon-Mac ein eigener `arm64`-Build erstellt.
-Ohne Apple-Developer-Zertifikat ist die App nur ad-hoc signiert und noch nicht
-notarisiert; das ist für lokale Entwicklung geeignet, aber noch kein fertiger
-Schul-Rollout.
-
-## Lokales Begleitheft und Kursordner
-
-Der optionale NiceGUI-Prototyp bündelt Setup, Aufgabenübersicht, einzelne
-Trainer-Testfälle, Cheatsheet, Dokubuch sowie PyKIM- und Pyxel-Dokumentation:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[guide]'
-pykim-guide
-```
-
-Standardmäßig öffnet sich das Lernstudio als eigenes Desktopfenster. Falls der
-native Fenstermodus auf einem Rechner nicht funktioniert oder das Begleitheft
-bewusst in einem Browser laufen soll, steht derselbe Funktionsumfang so bereit:
-
-```bash
-pykim-guide --browser
-```
-
-Eine isolierte Umgebung verhindert Konflikte mit älteren FastAPI-, Pydantic-
-oder NiceGUI-Versionen anderer Projekte. PyKIM benötigt Python 3.10 oder
-neuer; der Setup-Systemcheck weist auf eine zu alte Python-Version hin.
-
-Das Begleitheft läuft technisch weiterhin ausschließlich lokal. Im Setup kann ein beliebiger
-Kursordner gewählt werden, auch auf einem als Laufwerk eingebundenen
-WebDAV-Speicher. Technisch ist WebDAV für Dateien zuständig; CalDAV ist das
-darauf aufbauende Kalenderprotokoll und eignet sich nicht selbst als
-Dateisystem.
-
-Die Suite bindet ausschließlich an `127.0.0.1`. Andere Geräte im Schul- oder
-Heimnetz können ihre lokalen Start-, Installations- und Updateaktionen daher
-nicht aufrufen.
-
-### Verschlüsselte Moodle-Dateiabgaben (experimentell, vorerst zurückgestellt)
-
-Diese technische Grundlage ist vorhanden, gehört aber noch nicht zum
-stabilisierten Schüler-Workflow. Zuerst werden Skript, Aufgaben und lokales
-Arbeiten gefestigt. Moodle wird ohne Plugin ausschließlich als Datei-Transport
-verwendet. Die Lehrkraft erzeugt einmalig ein öffentliches Kurszertifikat und
-einen passwortgeschützten privaten Schlüssel:
-
-```bash
-pykim-teacher keygen \
-  --teacher "Frau Beispiel" \
-  --school "OSZ KIM" \
-  --course "Informatik 11A" \
-  --content-repository "https://github.com/finalnode/PyKIM_Kurs.git" \
-  --content-branch main \
-  --output ./kurs-schluessel
-```
-
-Repository, Branch und die standardmäßigen Inhaltspfade `Skripte`, `Aufgaben`
-und `Trainer` werden als X.509-Erweiterung mit signiert. Sie können daher nicht
-nachträglich in der Zertifikatsdatei ausgetauscht werden. Für einen Testkurs
-kann stattdessen `--content-branch beta` verwendet werden. Abweichende Pfade
-lassen sich mit `--scripts-path`, `--assignments-path` und `--trainers-path`
-festlegen.
-
-Die `.pykim-cert`-Datei wird im Lernraum bereitgestellt. Der private
-`.pykim-private-key` verbleibt ausschließlich bei der Lehrkraft und sollte
-zusätzlich gesichert werden. Schüler importieren das Zertifikat auf der
-Abgabeseite des Lernstudios. Der verschlüsselte Export erscheint im Unterordner
-`abgaben` des Kursordners und kann als normale Datei in Moodle hochgeladen
-werden.
-
-Ein heruntergeladener Moodle-Abgabeordner wird lokal ausgewertet:
-
-```bash
-pykim-teacher report ./moodle-download \
-  --key ./kurs-schluessel/informatik-11a.pykim-private-key \
-  --output ./bericht
-```
-
-Das Werkzeug fragt das Schlüsselpasswort verdeckt ab und erzeugt einen HTML-
-Bericht sowie eine CSV-Leistungsübersicht. Es berechnet alle Codefingerprints
-erneut. Original-, formatierter und AST-Strukturhash dienen nur als
-Ähnlichkeitshinweise und niemals als automatischer Plagiatsnachweis.
-
-Das Setup legt eine gegliederte Aufgabenstruktur an und überschreibt niemals
-vorhandene Lösungen. Trainerläufe und Dokubuch-Einträge werden portabel unter
-`.pykim/progress.json` im Kursordner gespeichert. Wer zwischen Schule und
-Zuhause wechselt, bindet denselben Ordner ein und wählt ihn einmal im Setup.
-Alternativ kann der Pfad gesetzt werden:
-
-```bash
-export PYKIM_COURSE_DIR="/Pfad/zum/eingebundenen/PyKIM-Kurs"
-```
-
-Bei gleichzeitigem Bearbeiten auf mehreren Geräten können
-Synchronisationskonflikte entstehen. Der Prototyp ist für das nacheinander
-Weiterarbeiten auf Schule- und Heimgerät ausgelegt.
-
-### Suite-Werkzeuge
-
-Der Tab **Setup** erkennt Python, PyKIM, Pyxel, Thonny und Visual Studio Code
-und verweist bei fehlenden IDEs auf die offiziellen Installationsseiten. Im
-Tab **Werkzeuge** kann der Kursordner mit der erkannten IDE geöffnet werden.
-
-Schülerprogramme werden nicht mehr implizit mit irgendeinem globalen Python
-gestartet. Die Suite prüft gefundene Interpreter auf Python-Version, PyKIM und
-Pyxel und speichert eine gemeinsame Schüler-Laufzeit. Dieselbe Laufzeit gilt
-für die Ausführen-Schaltflächen und die externe IDE. Verwaltete Umgebungen
-liegen lokal unter `~/.pykim/runtimes`; sie werden deshalb nicht versehentlich
-über WebDAV zwischen verschiedenen Betriebssystemen synchronisiert.
-
-Beim Öffnen eines Kursordners in VS Code ergänzt die Suite dessen lokale
-`.vscode/settings.json` um den ausgewählten Interpreter und empfiehlt die
-offizielle Python-Erweiterung. Andere vorhandene Workspace-Einstellungen
-bleiben erhalten. Thonny wird mit dem Kursordner gestartet; die automatische,
-plattformübergreifende Übergabe des Interpreters verwendet ein eigenes
-PyKIM-Thonny-Profil unter `~/.pykim/thonny`. Persönliche Thonny-Einstellungen
-werden dadurch nicht überschrieben.
-
-### App- und Inhaltsupdates
-
-Beim Öffnen prüft die Suite beide Updatekanäle im Hintergrund. Ein fehlendes
-Netz blockiert den Start nicht.
-
-- **App:** Die Suite liest das neueste GitHub-Release und bietet das zur
-  Prozessorarchitektur passende DMG an. Eine installierte App ersetzt sich
-  niemals selbst und lädt keine Entwicklungsversion aus `main`.
-- **Lerninhalte:** Skripte und Aufgaben können als eigenes ZIP aktualisiert
-  werden. Paket- und Dateiprüfsummen werden vor der atomaren Aktivierung
-  kontrolliert. Schülercode, Projekte und `.pykim/progress.json` liegen
-  außerhalb des Inhaltsverzeichnisses und bleiben unverändert.
-
-Aktive Downloads liegen unter `~/.pykim/content/versions`. Ist ein Paket
-unvollständig oder beschädigt, verwendet die Suite weiterhin die mit der App
-ausgelieferten Inhalte. Ein Releasepaket wird so erzeugt:
-
-```bash
-python tools/build_content_package.py --version 2026.08.1
-```
-
-Dabei entstehen `dist/content/pykim-content-<version>.zip` sowie das zugehörige
-`content-manifest.json`. Das ZIP wird als GitHub-Release-Asset unter dem im
-Manifest angegebenen Tag veröffentlicht; das Manifest selbst liegt im
-Repository und dient der Startprüfung.
-
-### Offline-Laufzeit
-
-Die Offline-Pakete für das aktuelle Betriebssystem und die aktuelle
-Prozessorarchitektur werden mit folgendem Befehl gebaut:
-
-```bash
-python tools/build_wheelhouse.py
-```
-
-Das Ergebnis liegt unter `dist/wheelhouse`. Erkennt die Suite diesen Ordner,
-installiert und repariert sie PyKIM und Pyxel mit `--no-index`; ein Zugriff auf
-PyPI findet dann nicht statt. Windows-, macOS- und Linux-Wheels müssen später
-jeweils auf der passenden Plattform durch die Build-Matrix erzeugt werden.
-
-Im Setup kann eine verwaltete Kursumgebung repariert und eine datensparsame
-Runtime-Diagnose kopiert werden. Die Diagnose enthält Plattform, Interpreter,
-Paketstatus und Wheelhouse-Pfad, aber weder Quellcode noch Lernstand.
-
-Die Suite kann außerdem die Versionsnummer des GitHub-main-Branches prüfen.
-Eine Installation der Entwicklungsversion erfolgt nur nach einer expliziten
-Bestätigung und verändert keine Dateien im Kursordner.
-
-Im Bereich **Meine Projekte** erzeugt die Suite vollständige Projektordner. Ein
-Pyxel-Projekt sieht beispielsweise so aus:
-
-```text
-Projekte/mein_spiel/
-├── main.py
-├── projekt.json
-└── ressourcen.pyxres
-```
-
-Eine `.pyxres`-Datei enthält Sprites, Tilemaps, Sounds und Musik. Der Editor
-wird direkt an der Projektkarte geöffnet. Beim ersten Speichern legt Pyxel die
-Datei an. Projektstart und Editor verwenden dieselbe in der Suite ausgewählte
-Python-Laufzeit. `main.py` wird mit dem Projektordner als Arbeitsverzeichnis
-gestartet, weshalb `pyxel.load("ressourcen.pyxres")` portabel funktioniert.
-
-Der frühere Ordner `eigene_projekte/` wird aus Kompatibilitätsgründen nicht
-gelöscht oder verschoben. Neue Projekte und bearbeitbare Beispielkopien liegen
-unter `Projekte/`.
-
-Der Tab **Python im Browser** enthält eine erste Pyodide-Spielwiese. Sie lädt
-Python als WebAssembly im Browser und führt normalen Python-Code ohne lokale
-Datei aus. Dafür ist beim ersten Laden eine Internetverbindung erforderlich.
-Pyxel selbst wird dort nicht mit `micropip` installiert; ein späteres
-browserfähiges PyKIM benötigt ein eigenes Canvas-Backend beziehungsweise die
-offizielle Pyxel-WASM-Laufzeit.
-
-## Erstes Programm
+PyKIM 0.3.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
+[Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
+bewegt sich durch eine 160 × 120 Pixel große Welt, liest und verändert Farben,
+zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
+einfachen Befehlen, später objektorientiert und schließlich mit der Pyxel-API
+verwenden.
+
+Zum Projekt gehören zwei eng verbundene Teile:
+
+- **PyKIM-Bibliothek:** testbare Zeichen-, Bewegungs-, Audio- und Weltlogik.
+- **PyKIM Suite:** lokale Desktop-Lernumgebung mit Skript, Aufgaben, Tests,
+  Lernstand, IDE-Anbindung, Projekten und persönlichen Erweiterungen.
+
+Die fachliche Weltlogik liegt nicht nur im Grafikfenster. Aufgaben können
+deshalb deterministisch geprüft werden, ohne Bildschirminhalte vergleichen zu
+müssen.
+
+> Entwicklungsstand: Alpha. Der aktuelle Releaseweg konzentriert sich auf
+> macOS. Die Python-Bibliothek selbst ist plattformunabhängig; vollständige
+> Desktop-Bundles für Windows und Linux sind noch nicht fertiggestellt.
+
+## Inhalt
+
+- [Funktionsumfang](#funktionsumfang)
+- [Schnellstart](#schnellstart)
+- [Grundmodell](#grundmodell)
+- [Imperative API](#imperative-api)
+- [Farben und Zeichnen](#farben-und-zeichnen)
+- [Animation](#animation)
+- [Töne und Musik](#töne-und-musik)
+- [Objektorientierte API](#objektorientierte-api)
+- [Mehrere Pixel und Parallelität](#mehrere-pixel-und-parallelität)
+- [Interaktive Programme](#interaktive-programme)
+- [Aufgaben und Trainer](#aufgaben-und-trainer)
+- [PyKIM Suite](#pykim-suite)
+- [Kursordner und Setupdatei](#kursordner-und-setupdatei)
+- [Externes Kurs-Repository](#externes-kurs-repository)
+- [Eigene Erweiterungen](#eigene-erweiterungen)
+- [Eigene Projekte und Pyxel-Ressourcen](#eigene-projekte-und-pyxel-ressourcen)
+- [IDE und Python-Laufzeit](#ide-und-python-laufzeit)
+- [Speicherorte und Datenschutz](#speicherorte-und-datenschutz)
+- [Installation und Entwicklung](#installation-und-entwicklung)
+- [macOS-App und DMG](#macos-app-und-dmg)
+- [Grenzen und zurückgestellte Funktionen](#grenzen-und-zurückgestellte-funktionen)
+- [Lizenzierung](#lizenzierung)
+
+## Funktionsumfang
+
+### Programmieren mit PyKIM
+
+- Bewegungen nach oben, unten, links und rechts
+- absolute Positionierung und lesbare Koordinaten
+- 16 Farben der Pyxel-Standardpalette
+- einzelne Farbpixel und durchgehende Malspuren
+- Farbsensor am aktuellen Feld, an Nachbarfeldern oder beliebigen Koordinaten
+- schrittweise Animation mit einer Geschwindigkeit von 1 bis 100
+- Töne, Pausen, Tonlängen, Rhythmen und Melodien
+- imperative Kurzbefehle für Einsteiger
+- objektorientierte Steuerung über `Pixel` und `World`
+- mehrere benannte Pixel in derselben Welt
+- parallele Bewegungsblöcke
+- eigene Pixel-Unterklassen mit `update()` und `draw()`
+- interaktive Spielschleifen und Tastaturabfragen
+- Pyxel-nahe Zeichenoperationen als vorbereiteter API-Übergang
+
+### Lernen mit der Suite
+
+- lokaler Kursordner, der auch auf USB- oder WebDAV-Laufwerken liegen kann
+- Kursauswahl durch eine kleine `.pykim-setup`-Datei
+- Skripte, Aufgaben und Trainer aus einem externen GitHub-Repository
+- eingebautes Skript mit Inhaltsnavigation
+- ausführbare und kopierbare Codebeispiele
+- Aufgabenbearbeitung in einem Codeeditor
+- Speichern, Starten, Stoppen, Kopieren und Öffnen in einer externen IDE
+- deutschsprachige automatische Testfälle mit ausklappbaren Details
+- Analyse von Schleifen, Funktionen, Bedingungen, Klassen und Parallelität
+- Optimierungsbewertung anhand relevanter Codezeilen
+- lokaler Lernstand und persönliches Dokubuch
+- Beispielgalerie und Pyxel-Beispiele
+- eigene Python-, PyKIM- und Pyxel-Projekte
+- Start des Pyxel-Ressourceneditors für Sprites, Tilemaps, Sounds und Musik
+- persönliches Modul `erweiterungen.py` für eigene Funktionen und Klassen
+- Erkennung von Thonny, VS Code, PyCharm und benutzerdefinierten IDEs
+- Erkennung und Auswahl geeigneter Python-Interpreter
+- verwaltete lokale Python-Laufzeit mit Offline-Wheelhouse
+- getrennte Updateprüfung für App und Lerninhalte
+
+## Schnellstart
+
+Ein minimales Programm:
 
 ```python
 from pykim import *
 
-set_position(20, 20)
 speed(30)
-set_color("purple")
-paint()
-
-for _ in range(30):
-    right()
+paint("orange")
+right(10)
+down(5)
+paint_stop()
 
 run()
 ```
 
-`animate()` zeigt Kims Bewegungen beim späteren `run()` Schritt für Schritt.
-Die Standardverzögerung beträgt `0.1` Sekunden pro Pixel und kann angepasst
-werden, zum Beispiel mit `animate(0.25)`. Auch `right(10)` zeigt dabei alle
-zehn Zwischenpositionen. Wird die Zeile entfernt, erscheint Kim wie bisher
-sofort an der Endposition.
+KIM startet bei `(0, 0)`. Der Ursprung liegt links oben. `x` wächst nach
+rechts, `y` nach unten.
 
-Alternativ bietet `speed(...)` eine einfache Skala von 1 bis 100:
+Eine typische Aufgabe mit automatischer Prüfung endet so:
+
+```python
+run(check="quadrat-5")
+```
+
+Der Trainer wertet vor dem Öffnen des Fensters die logische Welt und den
+Quellcode aus und gibt verständliche Rückmeldungen auf der Konsole und in der
+Suite aus.
+
+## Grundmodell
+
+Die Welt besitzt die feste Größe:
+
+```python
+WIDTH = 160
+HEIGHT = 120
+```
+
+Gültige Koordinaten sind daher:
+
+- `x`: `0` bis `159`
+- `y`: `0` bis `119`
+
+Bewegungen außerhalb der Welt werden nicht abgeschnitten, sondern mit einer
+verständlichen `ValueError`-Exception abgewiesen. Schrittweiten und Beats
+müssen ganze Zahlen sein; Boolesche Werte werden dabei nicht als Zahlen
+akzeptiert.
+
+PyKIM stellt direkt zwei Objekte bereit:
+
+```python
+from pykim import kim, world
+```
+
+- `kim` ist der mitgelieferte Standardpixel.
+- `world` ist die gemeinsame Welt aller Pixel.
+- Freie Befehle wie `right()` steuern dasselbe Objekt wie `kim.right()`.
+
+## Imperative API
+
+Der Einsteigerweg verwendet:
+
+```python
+from pykim import *
+```
+
+### Position lesen und setzen
+
+| Funktion | Wirkung |
+|---|---|
+| `get_x()` | aktuelle x-Koordinate lesen |
+| `get_y()` | aktuelle y-Koordinate lesen |
+| `set_position(x, y)` | beide Koordinaten setzen |
+| `set_x(x)` | nur x setzen |
+| `set_y(y)` | nur y setzen |
+
+```python
+set_position(20, 30)
+print(get_x())  # 20
+print(get_y())  # 30
+```
+
+### Relativ bewegen
+
+| Funktion | Standard | Wirkung |
+|---|---:|---|
+| `up(steps=1)` | 1 | nach oben |
+| `down(steps=1)` | 1 | nach unten |
+| `left(steps=1)` | 1 | nach links |
+| `right(steps=1)` | 1 | nach rechts |
+
+```python
+set_position(20, 20)
+right(8)
+down(4)
+print(get_x(), get_y())  # 28 24
+```
+
+Eine Schrittweite von `0` ist erlaubt. Negative Schrittweiten sind nicht
+zulässig; für die Gegenrichtung wird der entsprechende Bewegungsbefehl
+verwendet.
+
+### Sichtbarkeit
+
+```python
+hide()
+show()
+```
+
+`hide()` versteckt KIM, löscht aber weder Position noch Malspur. Ein
+versteckter Pixel kann sich weiterhin bewegen und malen.
+
+## Farben und Zeichnen
+
+PyKIM verwendet die 16 Farben der Pyxel-Standardpalette:
+
+| Index | Name | Index | Name |
+|---:|---|---:|---|
+| 0 | `black` | 8 | `red` |
+| 1 | `navy` | 9 | `orange` |
+| 2 | `purple` | 10 | `yellow` |
+| 3 | `green` | 11 | `lime` |
+| 4 | `brown` | 12 | `cyan` |
+| 5 | `dark_blue` | 13 | `gray` |
+| 6 | `light_blue` | 14 | `pink` |
+| 7 | `white` | 15 | `peach` |
+
+Farben dürfen als Name oder Index angegeben werden:
+
+```python
+set_color("purple")
+set_color(2)
+```
+
+### Malspur
+
+```python
+paint("purple")  # aktuelles Feld malen und Spur einschalten
+right(10)        # alle besuchten Felder malen
+paint_stop()     # Spur ausschalten
+```
+
+`paint()` malt sofort die aktuelle Position. Ohne Argument verwendet es die
+zuletzt mit `set_color()` gewählte Farbe, andernfalls Weiß. Für genau einen
+Punkt wird die Spur direkt wieder beendet:
+
+```python
+paint("orange")
+paint_stop()
+```
+
+`paint_start()` und `paint_path()` existieren als Kompatibilitätsaliase für
+`paint()`, werden aber nicht mehr als Standard-API gelehrt und sind nicht in
+`from pykim import *` enthalten.
+
+### Farben lesen
+
+```python
+get_color()          # aktuelle Position
+get_color("right")   # unmittelbarer rechter Nachbar
+get_color(100, 50)   # beliebige Position
+```
+
+Erlaubte Richtungsnamen sind `up`, `down`, `left` und `right`. Das Ergebnis
+ist immer ein kanonischer Farbname aus der Tabelle. Bei aktiver Animation wird
+das gelesene Feld kurz als Sensor markiert, ohne seine gespeicherte Farbe zu
+verändern.
+
+## Animation
+
+Ohne Animation erscheint die Welt direkt im Endzustand. Mit `animate()` werden
+alle Zwischenschritte aufgezeichnet:
+
+```python
+animate()       # 0,1 Sekunden pro Schritt
+animate(0.25)   # 0,25 Sekunden pro Schritt
+```
+
+Die schülerfreundliche Alternative ist:
 
 ```python
 speed(1)    # sehr langsam
 speed(50)   # schnell
-speed(100)  # Bewegungen sofort anzeigen
+speed(100)  # Endzustand sofort anzeigen
 ```
 
-`speed(...)` wird wie `animate(...)` vor den Bewegungen aufgerufen. Der Wert
-muss eine ganze Zahl zwischen 1 und 100 sein.
+`speed()` akzeptiert nur ganze Zahlen von 1 bis 100. Animation und
+Geschwindigkeit werden vor den Bewegungen konfiguriert.
 
-`run()` öffnet am Ende das Pyxel-Fenster. Der Ursprung `(0, 0)` liegt links
-oben; `x` wächst nach rechts und `y` nach unten. Kim startet bei `(0, 0)`.
-Bewegungen, die die Welt verlassen würden, lösen eine verständliche Exception
-aus. Kim erscheint als einzelner Pixel, der durch alle sichtbaren Farben der
-Pyxel-Palette rotiert. Trifft die Cursorfarbe auf dieselbe Farbe im
-Hintergrund, überspringt Kim sie automatisch. Mit `get_color(direction)` oder
-`get_color(x, y)` gelesene Pixel leuchten bei aktivem `animate()` kurz cyan
-auf, ohne dass sich ihre gespeicherte Farbe ändert.
+Beim Start zeigt PyKIM für jeden sichtbaren Pixel eine kurze Achsenanimation.
+Danach werden Bewegungen, Malereignisse, Sensorzugriffe und Sichtbarkeit in der
+aufgezeichneten Reihenfolge wiedergegeben.
 
-Beim Start kreuzen sich eine bildschirmfüllende x- und y-Achse an Kims
-Startposition. Beide Achsen schrumpfen zu Kims Pixel zusammen. Nach der
-Bewegungs- oder Musiksequenz bleibt Kim einfach als einzelner Pixel stehen.
-
-## Schüler-API
-
-Position lesen und absolut setzen:
+## Töne und Musik
 
 ```python
-get_x()
-get_y()
-set_position(x, y)
-set_x(x)
-set_y(y)
+play_tone("C4")
+play_tone("F#4", beats=2)
+play_tone(60)
+play_pause()
+play_pause(beats=2)
 ```
 
-`set_position(x, y)` ist der einfache Standardweg. `set_x(...)` und
-`set_y(...)` bleiben verfügbar, wenn nur eine Koordinate geändert werden soll.
+### Tonhöhen
 
-Relativ bewegen (Standardschrittweite `1`):
+- MIDI-Zahlen von `36` bis `95`
+- Notennamen von `C2` bis `B6`
+- Vorzeichen `#` und `b`, beispielsweise `F#4` oder `Bb3`
+
+PyKIM verwendet die verbreitete MIDI-Benennung, bei der `C4` der MIDI-Note 60
+entspricht. Pyxel benennt seinen internen Bereich anders; PyKIM übersetzt die
+Notennamen beim Abspielen automatisch.
+
+`beats` ist eine positive ganze Zahl. Töne und Pausen werden in einer
+gemeinsamen Warteschlange gespeichert und nach dem Start des Fensters in
+Reihenfolge abgespielt.
 
 ```python
-up(steps=1)
-down(steps=1)
-left(steps=1)
-right(steps=1)
+notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
+
+for note in notes:
+    play_tone(note)
 ```
 
-Eine Farbspur beginnen oder beenden und Pixel lesen:
+## Objektorientierte API
 
-```python
-paint("purple")      # färbt hier und schaltet die Spur ein
-right(20)            # malt jeden besuchten Pixel
-paint_stop()
-paint("orange")      # nur diese Position färben:
-paint_stop()         # Spur sofort wieder ausschalten
-get_color()          # aktueller Pixel
-get_color("right")   # unmittelbarer Nachbar
-get_color(100, 50)   # beliebige Position
-```
-
-`paint()` färbt sofort den aktuellen Pixel und danach jeden Pixel, über
-den Kim sich bewegt. `paint_stop()` beendet die Spur. Ohne vorherige
-Farbauswahl wird Weiß verwendet:
-
-```python
-paint()
-right(20)
-paint_stop()
-
-paint("orange")
-down(10)
-paint_stop()
-```
-
-Die bisherigen Namen `paint_start()` und `paint_path()` funktionieren als
-Kompatibilitätsaliase für `paint()`, werden aber nicht mehr aktiv gelehrt.
-
-`get_color()` gibt immer einen lesbaren, kanonischen Farbnamen zurück. Die 16
-Farben sind: `black`, `navy`, `purple`, `green`, `brown`, `dark_blue`,
-`light_blue`, `white`, `red`, `orange`, `yellow`, `lime`, `cyan`, `gray`,
-`pink` und `peach`.
-
-### Objektweg und mehrere Pixel
-
-Die freien Befehle steuern den mitgelieferten Pixel `kim`. Dieselbe Bewegung
-kann deshalb auch objektorientiert geschrieben werden:
+Die freie und die objektorientierte Schreibweise greifen auf denselben
+Standardpixel zu:
 
 ```python
 from pykim import kim, world
@@ -421,162 +328,105 @@ world.speed(30)
 world.run()
 ```
 
-Beide Schreibweisen verändern dieselbe Welt. Für mehrere Figuren erzeugt die
-Welt zusätzliche Pixel:
+### `Pixel`
+
+Konstruktor:
+
+```python
+Pixel(pixel_world, name, x=0, y=0)
+```
+
+Normalerweise werden Pixel mit `world.new_pixel()` oder `world.spawn()`
+erzeugt, nicht durch einen direkten Konstruktoraufruf.
+
+| Eigenschaft/Methode | Bedeutung |
+|---|---|
+| `name` | eindeutiger Anzeigename |
+| `world` | zugehörige Welt |
+| `x`, `y` | les- und schreibbare Koordinaten |
+| `position` | Tupel `(x, y)`, les- und schreibbar |
+| `visible` | aktueller Sichtbarkeitszustand |
+| `set_position(x, y)` | Position setzen |
+| `set_x(x)`, `set_y(y)` | einzelne Koordinate setzen |
+| `up/down/left/right(steps=1)` | bewegen |
+| `set_color(color)` | Malfarbe auswählen |
+| `paint(color=None)` | Feld malen und Spur aktivieren |
+| `paint_stop()` | Spur beenden |
+| `get_color(...)` | Farbe lesen |
+| `hide()`, `show()` | Sichtbarkeit steuern |
+| `play_tone(...)`, `play_pause(...)` | Audioereignis einreihen |
+| `update()` | Hook pro Frame im interaktiven Modus |
+| `draw()` | Figur im interaktiven Modus zeichnen |
+
+### `World`
+
+| Eigenschaft/Methode | Bedeutung |
+|---|---|
+| `width`, `height` | Weltgröße |
+| `cells` | logische Farbmatrix |
+| `pixels` | Tupel aus KIM und allen weiteren Pixeln |
+| `frame_count` | aktueller Pyxel-Frame, außerhalb des Fensters `0` |
+| `new_pixel(name, x=0, y=0)` | normalen Pixel erzeugen |
+| `spawn(PixelClass, name, ...)` | eigene Pixel-Unterklasse erzeugen |
+| `animate(delay=0.1)` | Animation einschalten |
+| `speed(value)` | Geschwindigkeit 1 bis 100 |
+| `play_tone(...)`, `play_pause(...)` | gemeinsames Audiosystem |
+| `parallel()` | parallelen Befehlsblock starten |
+| `cls(color="black")` | Anzeige bzw. Welt leeren |
+| `clear(color="black")` | Alias für `cls()` |
+| `pset(x, y, color)` | einen Weltpixel setzen |
+| `rect(x, y, width, height, color)` | gefülltes Rechteck zeichnen |
+| `text(x, y, value, color="white")` | Text in `draw()` zeichnen |
+| `btn(key)` | Taste wird gehalten |
+| `btnp(key)` | Taste wurde neu gedrückt |
+| `btnr(key)` | Taste wurde losgelassen |
+| `run(...)` | Fenster, Spielschleife oder Trainer starten |
+
+Pixelnamen müssen eindeutig sein. `KIM` ist für den Standardpixel
+reserviert.
+
+## Mehrere Pixel und Parallelität
 
 ```python
 from pykim import kim, world
 
+world.speed(25)
+
 kim.position = (20, 20)
 kim.paint("purple")
-kim.right(10)
-kim.paint_stop()
 
-mia = world.new_pixel("MIA", x=20, y=30)
+mia = world.new_pixel("MIA", x=60, y=20)
 mia.paint("orange")
-mia.right(10)
-mia.paint_stop()
 
-leo = world.new_pixel("LEO", x=20, y=40)
+leo = world.new_pixel("LEO", x=40, y=60)
 leo.paint("cyan")
-leo.right(10)
+
+with world.parallel():
+    kim.right(15)
+    mia.left(15)
+    leo.up(20)
+
+kim.paint_stop()
+mia.paint_stop()
 leo.paint_stop()
-leo.hide()  # Spur behalten, Figur verstecken
+leo.hide()
 
 world.run()
 ```
 
-Ein vollständiges Beispiel steht in `src/pykim/examples/mehrere_pixel.py`.
+Innerhalb von `world.parallel()` werden die Ereignisse verschiedener Pixel
+zeitgleich wiedergegeben. Unterschiedlich lange Bewegungen sind erlaubt; ein
+früher fertiger Pixel wartet an seiner Zielposition. Parallele Blöcke dürfen
+nicht ineinander verschachtelt werden.
 
-Jeder Pixel kann unabhängig versteckt und wieder gezeigt werden:
-
-```python
-mia.hide()
-mia.show()
-```
-
-Für KIM funktionieren zusätzlich die freien Kurzformen `hide()` und `show()`.
-Das Verstecken entfernt weder die gemalte Spur noch die aktuelle Position.
-
-Im Objektweg werden Positionen über Eigenschaften gelesen und gesetzt:
-
-```python
-print(kim.x, kim.y)
-print(kim.position)
-kim.position = (40, 30)
-```
-
-Töne können sowohl von einer Figur als auch direkt von der Welt ausgelöst
-werden. Beide Wege verwenden dieselbe Tonwarteschlange:
-
-```python
-kim.play_tone("C4")
-world.play_tone("E4", beats=2)
-world.play_pause()
-```
-
-Normalerweise werden Befehle in ihrer geschriebenen Reihenfolge animiert. In
-einem `parallel()`-Block beginnen die Bewegungen verschiedener Pixel dagegen
-im selben Animationsschritt:
-
-```python
-with world.parallel():
-    kim.right(20)
-    mia.left(20)
-    leo.up(10)
-```
-
-Die Figuren dürfen unterschiedlich viele Schritte ausführen. Eine früher
-fertige Figur wartet an ihrem Ziel, während die anderen weiterlaufen.
-
-Das Beispiel `src/pykim/examples/mehrere_pixel.py` wird mit
-`world.run(check="mehrere-pixel")` geprüft. Der Trainer vergleicht die Namen
-und Endpositionen aller Figuren, jeden farbigen Weltpixel, LEOs Sichtbarkeit
-und die Verwendung eines `world.parallel()`-Blocks.
-
-Töne akzeptieren MIDI-Zahlen von 36 bis 95 (`C2` bis `B6`) oder übliche
-Notennamen. Dieser Bereich entspricht den 60 von Pyxel unterstützten Tonhöhen:
-
-```python
-play_tone(60)
-play_tone("C4")
-play_tone("F#4", beats=2)
-play_pause()
-play_pause(beats=2)
-```
-
-> **Hinweis zur Oktavbenennung:** PyKIM verwendet die verbreitete
-> MIDI-Konvention, bei der `C4` der MIDI-Note 60 entspricht. Pyxel benennt
-> seine 60 Tonhöhen dagegen von `C0` bis `B4`. Deshalb entspricht zum Beispiel
-> PyKIMs `C4` klanglich Pyxels `C2`; PyKIM rechnet die Bezeichnungen beim
-> Abspielen automatisch um.
-
-`beats` ist eine positive ganze Zahl und bestimmt die Länge eines Tons oder
-einer Pause. Töne, die vor `run()` angefordert werden, werden gespeichert und
-nach dem Öffnen des Fensters nacheinander abgespielt.
-
-### Interaktiver Modus und Übergang zu Pyxel
-
-Neben fertigen Befehlsfolgen unterstützt PyKIM eine Spielschleife. `update()`
-enthält Eingaben und Zustandsänderungen, `draw()` baut das aktuelle Bild auf:
-
-```python
-from pykim import kim, world
-
-def update():
-    if world.btn("right") and kim.x < world.width - 1:
-        kim.right()
-
-def draw():
-    world.cls("black")
-    world.text(5, 5, "Pfeiltaste rechts", "white")
-    kim.draw()
-
-world.run(update, draw)
-```
-
-Eingaben stehen als `world.btn(key)` für gehaltene, `world.btnp(key)` für neu
-gedrückte und `world.btnr(key)` für losgelassene Tasten bereit. Vordefinierte
-Namen sind `left`, `right`, `up`, `down`, `space`, `enter` und `escape`;
-Buchstaben wie `a` funktionieren ebenfalls.
-
-Die Pyxel-nahen Weltoperationen lauten:
-
-```python
-world.cls("black")
-world.pset(10, 20, "purple")
-world.rect(10, 20, 30, 15, "orange")
-world.text(5, 5, "Punkte: 3", "white")
-
-world.width
-world.height
-world.frame_count
-```
-
-Im späteren Pyxel-Programm werden daraus hauptsächlich andere Namen:
-
-```text
-world.btn("right")  -> pyxel.btn(pyxel.KEY_RIGHT)
-world.cls("black")  -> pyxel.cls(0)
-world.pset(...)      -> pyxel.pset(...)
-world.run(...)       -> pyxel.run(...)
-```
-
-Wird nur `update` übergeben, leert PyKIM die Anzeige und zeichnet alle
-sichtbaren Pixel automatisch. Mit einer eigenen `draw()`-Funktion lernen
-Schüler bewusst die für Pyxel zentrale Trennung von Logik und Darstellung.
-
-### Eigene Pixel-Klassen
-
-`world.spawn()` erzeugt Instanzen eigener `Pixel`-Unterklassen. Ihre
-`update()`-Methoden werden im interaktiven Modus automatisch einmal pro Frame
-aufgerufen:
+### Eigene Pixelklassen
 
 ```python
 from pykim import Pixel, world
 
+
 class MusikPixel(Pixel):
-    def __init__(self, pixel_world, name, x, y, *, note):
+    def __init__(self, pixel_world, name, x=0, y=0, note="C4"):
         super().__init__(pixel_world, name, x, y)
         self.note = note
 
@@ -584,139 +434,606 @@ class MusikPixel(Pixel):
         if self.world.btnp("space"):
             self.play_tone(self.note)
 
-    def draw(self):
-        self.world.pset(self.x, self.y, "purple")
 
-mia = world.spawn(MusikPixel, "MIA", 40, 60, note="C4")
-leo = world.spawn(MusikPixel, "LEO", 80, 60, note="E4")
-world.run(lambda: None)
+mia = world.spawn(MusikPixel, "MIA", 40, 30, note="E4")
+world.run()
 ```
 
-Damit können Unterrichtsreihen von Objektbenutzung über eigene Attribute und
-Methoden zu Vererbung, Überschreiben und polymorphem Verhalten führen.
+`world.spawn()` reicht zusätzliche benannte Argumente an den Konstruktor der
+Unterklasse weiter und registriert die Figur für Welt und Animation.
 
-## Tests und Aufgaben
+## Interaktive Programme
 
-Zusätzliche, nicht zur Anfänger-API gehörende Hilfen liegen in
-`pykim.testing`:
+Wird `run()` ohne Callbacks aufgerufen, zeigt PyKIM eine vorberechnete
+Befehlsfolge. Mit `update` und `draw` arbeitet PyKIM als echte Spielschleife:
 
 ```python
-from pykim.testing import reset_world, set_pixel_for_test, get_world_state
+from pykim import kim, world
+
+
+def update():
+    if world.btn("right") and kim.x < world.width - 1:
+        kim.right()
+    if world.btn("left") and kim.x > 0:
+        kim.left()
+
+
+def draw():
+    world.cls("black")
+    world.text(5, 5, "Pfeiltasten bewegen KIM", "white")
+    kim.draw()
+
+
+world.run(update, draw)
 ```
 
-Weitere vollständige Programme stehen im Paketordner `src/pykim/examples`
-und in der Beispielsektion des Lernstudios.
-Alle automatisch prüfbaren Aufgabenstellungen stehen gesammelt in
-[`AUFGABEN.md`](AUFGABEN.md).
-
-### Lokale Aufgabenprüfung in Thonny
-
-Mit `pykim.trainer` können Lernende eine Aufgabe direkt in ihrem Programm
-prüfen und erhalten deutschsprachige Hinweise. Die Welt beginnt immer bei
-`(0, 0)`. Verlangt eine Aufgabe wie hier den Startpunkt `(50, 50)`, müssen die
-Lernenden ihn selbst setzen:
-
-```python
-from pykim import *
-
-# Lösung hier einfügen
-set_position(50, 50)
-
-run(check="quadrat-5")
-```
-
-Die Prüfung bewertet die fertige Zeichnung und nicht die verwendete
-Befehlsfolge. Das Quadrat darf daher in unterschiedlichen Richtungen und auch
-mithilfe einer Schleife gezeichnet werden. Ein vollständiges Beispiel liegt in
-`src/pykim/examples/quadrat_aufgabe.py`.
-
-Eine zweite Aufgabe fordert eine Treppe aus fünf jeweils 5 Pixel breiten und
-hohen Stufen. Dabei wird auch geprüft, ob die wiederholten Bewegungen mit einer
-Schleife kurz formuliert wurden:
-
-```python
-set_position(50, 50)
-paint("purple")
-for _ in range(5):
-    right(5)
-    down(5)
-run(check="treppe-5")
-```
-
-`run(check=...)` prüft zuerst die Zeichnung und erkennt dabei auch die
-verwendete Schleife. Anschließend öffnet es wie gewohnt das Pyxel-Fenster. Das
-vollständige Beispiel steht in `src/pykim/examples/treppe_aufgabe.py`.
-
-#### Neue Trainer-Aufgaben ergänzen
-
-Der Trainer ist nach Verantwortlichkeiten aufgeteilt:
+Vordefinierte Tastennamen:
 
 ```text
-pykim/trainer/
-├── models.py             # Ergebnisse und Aufgabenmodell
-├── feedback.py           # deutsche Konsolenausgabe
-├── optimization.py       # optionale Bewertung von Codequalität
-├── builder.py            # interne Prüfbausteine und Codeanalyse
-├── definitions.py        # sicherer YAML-Lader und Schema-Prüfung
-├── runner.py             # Einstieg für run(check=...)
-└── exercises/
-    └── __init__.py       # validierte Aufgaben-Registry
+left right up down space enter escape
 ```
 
-Die aktualisierbaren Trainingsdaten liegen zusammen mit Skript und Aufgaben in
-`pykim/guide/Trainer/definitions.yml`.
+Buchstaben wie `a`, `w`, `s` und `d` werden ebenfalls auf die entsprechenden
+Pyxel-Tastenkonstanten abgebildet. Außerhalb einer aktiven Spielschleife geben
+Tastenabfragen `False` zurück.
 
-Neue Aufgaben werden in YAML deklarativ beschrieben. Technische
-Weltabfragen, Farbindizes und AST-Analysen gehören nicht in die Aufgabendatei.
-Eine vollständige Anleitung mit kopierbaren Vorlagen steht in
-[`TRAINER_AUTOREN.md`](TRAINER_AUTOREN.md). Die Registry lädt und validiert die
-YAML-Definitionen beim Start. Der PyKIM-Kern und `run(check=...)` müssen dafür
-nicht verändert werden.
-
-Alle mitgelieferten Aufgaben geben zusätzlich zur fachlichen Prüfung eine
-prozentuale Bewertung der Codelänge aus. Die jeweilige Schwelle entspricht der
-mitgelieferten kompakten Musterlösung; Leerzeilen und reine Kommentarzeilen
-werden nicht gezählt:
+Der API-Übergang zu Pyxel ist bewusst sichtbar:
 
 ```text
-Optimierung: 100 %
-✓ Dein Code ist für diese Aufgabe optimal aufgebaut.
+world.btn("right")  -> pyxel.btn(pyxel.KEY_RIGHT)
+world.cls("black")  -> pyxel.cls(0)
+world.pset(...)      -> pyxel.pset(...)
+world.rect(...)      -> pyxel.rect(...)
+world.text(...)      -> pyxel.text(...)
 ```
 
-Bei einer längeren Lösung erscheinen stattdessen die tatsächliche und die
-optimale Zeilenzahl als konkreter Tipp. Geforderte Kontrollstrukturen wie
-Schleifen oder Funktionen werden unabhängig davon fachlich geprüft.
-## Kurszertifikat mit externen Lerninhalten
+## `run()` und Headless-Betrieb
 
-Die Lehrkraft erzeugt ein öffentliches Zertifikat für die Lernenden und einen
-verschlüsselten privaten Schlüssel für spätere Abgaben getrennt voneinander:
+Signaturen:
+
+```text
+run(update=None, draw=None, *, check=None)
+world.run(update=None, draw=None, *, check=None)
+```
+
+- Ohne Callbacks: aufgezeichnete Welt und Animation anzeigen.
+- Mit `update`/`draw`: interaktive Pyxel-Schleife starten.
+- Mit `check="kennung"`: vor dem Fenster den Trainer ausführen.
+- Mit `PYKIM_HEADLESS=1`: Logik und Tests ausführen, kein Fenster öffnen.
+
+`update` und `draw` müssen Funktionen oder `None` sein.
+
+## Aufgaben und Trainer
+
+Trainerdefinitionen sind YAML-Dateien. Damit müssen Autoren für reguläre
+Aufgaben keine Python-Prüfdatei schreiben.
+
+```yaml
+format: 1
+id: treppe-5
+title: Treppe mit 5 Stufen
+tests:
+  - type: position
+    position: [75, 75]
+    hint: Prüfe die letzte Bewegung.
+  - type: loop
+    hint: Verwende eine for-Schleife.
+optimization:
+  optimal_lines: 8
+```
+
+Eine Datei darf eine einzelne Aufgabe oder eine Liste unter `exercises`
+enthalten. Jede Aufgabe besitzt:
+
+- eindeutige `id`
+- angezeigten `title`
+- mindestens einen Eintrag unter `tests`
+- optional `optimization.optimal_lines`
+
+### Unterstützte Prüftypen
+
+| Typ | Prüft |
+|---|---|
+| `pixels` | erwartete Farbpositionen, Pfade, Treppen oder Schachbrett |
+| `no-extra-pixels` | keine zusätzlichen gemalten Felder |
+| `pixel-count` | exakte Anzahl gemalter Pixel |
+| `square` | Start, Ende, Seitenlänge und geschlossener Rand |
+| `position` | Endposition eines Pixels |
+| `positions` | Endpositionen mehrerer Pixel |
+| `pixel-names` | exakte Figurenmenge |
+| `visibility` | sichtbar oder versteckt |
+| `audio` | Noten, Pausen, Reihenfolge und Beats |
+| `loop` | mindestens eine `for`- oder `while`-Schleife |
+| `nested-loop` | verschachtelte Schleifen |
+| `condition` | Bedingung und optional erforderliche Aufrufe |
+| `function` | eigene Funktion, optional mit festem Namen |
+| `calls` | geforderte Funktions- oder Methodenaufrufe |
+| `parallel` | `with world.parallel():` |
+| `class` | Klasse und optionale Basisklasse |
+| `methods` | geforderte Methoden einer Klasse |
+| `super-init` | Aufruf von `super().__init__()` |
+
+Jeder Test kann eigene Texte für `success`, `failure` und `hint` besitzen.
+Unbekannte YAML-Felder und unsichere Prüftypen werden abgewiesen.
+
+### Optimierungsbewertung
+
+`optimal_lines` zählt nichtleere Zeilen ohne reine Kommentare:
+
+```text
+Bewertung = min(100, optimal_lines / verwendete_Zeilen × 100)
+```
+
+Die Optimierungszahl ist ein Lernhinweis und entscheidet nicht automatisch
+über die fachliche Korrektheit.
+
+### Trainer-Hash
+
+Jede geladene YAML-Definition erhält einen reproduzierbaren SHA-256-Hash. Vor
+einer Bewertung vergleicht die Suite die lokalen Trainerdateien mit
+`.pykim/trainer-hashes.json` des konfigurierten Kurs-Repositorys. Bei einer
+erreichbaren Quelle werden abweichende Trainer neu synchronisiert. Offline
+wird mit dem zuletzt erfolgreich synchronisierten Stand gearbeitet.
+
+## PyKIM Suite
+
+Start als Desktopanwendung:
 
 ```bash
-pykim-teacher keygen \
-  --teacher "Vorname Nachname" \
-  --school "OSZ KIM" \
-  --course "Python 11A" \
-  --output ./kurszugang \
-  --content-repository https://github.com/finalnode/PyKIM_Kurs.git \
-  --content-branch main \
-  --scripts-path Skripte \
-  --assignments-path Aufgaben \
-  --trainers-path Trainer
+pykim-guide
 ```
 
-Das Passwort schützt ausschließlich den privaten Lehrerschlüssel. Die erzeugte
-Datei `*.pykim-cert` wird an die Lernenden verteilt und in der Suite unter
-**Setup → Kurszertifikat und Lerninhalte** ausgewählt. Beim Import synchronisiert
-die Suite den angegebenen Repository-Stand.
+Alternativ im Browserfenster:
 
-Zusätzlich entsteht unter
-`certificates/<kursname>.pykim-cert` eine gleichnamige Textdatei mit
-dem SHA-256-Hash des Zertifikats. Diese Datei wird in denselben Pfad des
-Kurs-Repositories übernommen. Die Suite prüft sie beim Import, vor bewerteten
-Ausführungen und erneut vor dem Abgabeexport.
+```bash
+pykim-guide --browser
+```
 
-Vor jeder bewerteten Ausführung werden bei erreichbarem Repository außerdem
-ausschließlich die Prüfsummen aus `.pykim/trainer-hashes.json` kontrolliert.
-Offline bleibt der zuletzt vollständig verifizierte Stand für Aufgabenläufe
-nutzbar; ein neuer verschlüsselter Export verlangt eine erfolgreiche
-Online-Zertifikatsprüfung.
+Die Suite bindet nur an `127.0.0.1`. Andere Geräte im Netzwerk können die
+lokalen Aktionen nicht aufrufen.
+
+### Bereiche der Suite
+
+| Bereich | Funktion |
+|---|---|
+| **Setup** | Kursordner, Name, Python-Laufzeit und `.pykim-setup` |
+| **Werkzeuge** | Ordner, IDE, Interpreter, Pyxel und Updates |
+| **Übersicht** | Lernstand und Status der Aufgaben |
+| **Aufgaben** | Aufgabenstellung, Editor, Tests, Optimierung und Dokubuch |
+| **Beispiele** | mitgelieferte Programme starten, kopieren oder übernehmen |
+| **Meine Projekte** | Python-, PyKIM- und Pyxel-Projekte verwalten |
+| **Erweiterungen** | eigene Funktionen und Klassen wiederverwenden |
+| **Cheatsheet** | kompakte Befehlsreferenz |
+| **Skript** | Kapitelansicht mit seitlichem Inhaltsverzeichnis |
+| **Pyxel** | Pyxel-Referenz, Beispiele und Übergang von PyKIM |
+| **Python-Spielwiese** | normales Python mit Pyodide im Browser |
+
+Der experimentelle Bereich **Abgabe** ist im aktuellen Schülerworkflow
+ausgeblendet.
+
+Codeblöcke im Skript können durch Autorenanweisungen gesteuert werden:
+
+````markdown
+@button:run
+@button:copy
+```python
+print("Hallo")
+```
+````
+
+`@button:run` ist nur für vollständige, freigegebene Programme vorgesehen.
+
+## Kursordner und Setupdatei
+
+Der Kursordner enthält Schülerdateien und bleibt von Inhaltsupdates getrennt:
+
+```text
+PyKIM-Kurs/
+├── .pykim-course.json
+├── .pykim/
+│   ├── course.pykim-setup
+│   ├── progress.json
+│   └── backups/
+├── Aufgaben/
+│   ├── imperativ/
+│   └── oop/
+├── Projekte/
+└── erweiterungen.py
+```
+
+Vorhandene Lösungen werden beim erneuten Setup nicht überschrieben.
+Zurückgesetzte Aufgaben und Lernstände werden vorher unter `.pykim/backups`
+gesichert.
+
+### Format der Setupdatei
+
+```json
+{
+  "format": "pykim-course-setup-v1",
+  "name": "pykim-standardkurs.pykim-setup",
+  "teacher": "Lehrkraft",
+  "school": "OSZ KIM",
+  "course": "PyKIM Standardkurs",
+  "repository": "https://github.com/finalnode/PyKIM_Kurs.git",
+  "branch": "main",
+  "scripts_path": "Skripte",
+  "assignments_path": "Aufgaben",
+  "trainers_path": "Trainer"
+}
+```
+
+Die Datei enthält bewusst keine Schlüssel, Zertifikate oder
+Verschlüsselungsdaten. Sie ist in Version 0.3 eine Konfigurationsdatei und
+nicht kryptografisch authentifiziert.
+
+Erzeugen:
+
+```bash
+pykim-teacher setup \
+  --teacher "Frau Beispiel" \
+  --school "OSZ KIM" \
+  --course "Python 11A" \
+  --repository "https://github.com/finalnode/PyKIM_Kurs.git" \
+  --branch main \
+  --output ./setupdatei
+```
+
+Ohne importierte Setupdatei zeigt die Suite nur den rudimentären lokalen
+Funktionsumfang. Skript, Aufgaben und Lernstand werden erst nach erfolgreicher
+Synchronisation eingeblendet. Der Kursname erscheint danach im Header.
+
+## Externes Kurs-Repository
+
+Empfohlene Struktur:
+
+```text
+PyKIM_Kurs/
+├── content.yml
+├── .pykim/
+│   └── trainer-hashes.json
+├── Skripte/
+│   ├── imperativ/
+│   └── oop/
+├── Aufgaben/
+│   ├── imperativ/
+│   └── oop/
+└── Trainer/
+    └── *.yml
+```
+
+`content.yml` listet explizit alle freigegebenen Kapitel, Aufgaben und
+Trainerdateien. Die Suite lädt nicht beliebige Repository-Dateien. Sie ermittelt
+zuerst den Commit des konfigurierten Branches und speichert den vollständigen
+Stand danach versionsweise und atomar unter `~/.pykim/content/versions`.
+
+Für Vorabstände kann eine Setupdatei beispielsweise auf den Branch `beta`
+verweisen. Ein Wechsel des Branches erfolgt durch eine andere Setupdatei.
+
+## Eigene Erweiterungen
+
+Die Suite legt im Kursordner genau ein persönliches Modul an:
+
+```text
+erweiterungen.py
+```
+
+Schüler können dort selbst entwickelte Funktionen und Klassen speichern:
+
+```python
+def square(length):
+    for _ in range(4):
+        right(length)
+        down(length)
+```
+
+Alle Erweiterungen importieren:
+
+```python
+from erweiterungen import *
+```
+
+Gezielt importieren:
+
+```python
+from erweiterungen import square
+```
+
+Die Suite prüft vor dem Hinzufügen:
+
+- gültige Python-Syntax
+- mindestens eine öffentliche Funktion oder Klasse
+- keine doppelten Namen
+- keine Beispielaufrufe oder sonstige Ausführung auf Modulebene
+
+Vorhandene Definitionen können einzeln bearbeitet werden. Andere Funktionen
+bleiben dabei unverändert. Der Kursordner wird beim Ausführen automatisch dem
+Python-Suchpfad hinzugefügt, sodass der Import auch aus Aufgaben-Unterordnern
+funktioniert.
+
+Eine alte, kurzzeitig verwendete Paketstruktur wird bei Bedarf nach
+`erweiterungen_altes_paket` verschoben und nicht gelöscht.
+
+## Eigene Projekte und Pyxel-Ressourcen
+
+Die Suite kennt drei Projektvorlagen:
+
+- `empty`: normales Python-Projekt
+- `pykim`: PyKIM-Projekt
+- `pyxel`: Pyxel-Spiel mit Ressourcen
+
+Beispiel:
+
+```text
+Projekte/mein_spiel/
+├── main.py
+├── projekt.json
+└── ressourcen.pyxres
+```
+
+`projekt.json` speichert Projektname, Typ, Einstiegspunkt und Ressourcenpfad.
+Pfade werden auf den jeweiligen Projektordner begrenzt.
+
+`.pyxres` enthält Pyxel-Sprites, Tilemaps, Sounds und Musik. Die Suite startet
+den offiziellen Editor sinngemäß mit:
+
+```bash
+python -m pyxel edit ressourcen.pyxres
+```
+
+Ein Pyxel-Projekt wird erst gestartet, nachdem seine konfigurierte
+Ressourcendatei existiert. Das Arbeitsverzeichnis ist immer der Projektordner;
+dadurch funktioniert `pyxel.load("ressourcen.pyxres")` portabel.
+
+Mitgelieferte Beispiele bleiben unverändert. Zum Bearbeiten erstellt die Suite
+eine persönliche Kopie unter `Projekte/beispiele`.
+
+## IDE und Python-Laufzeit
+
+Die Suite erkennt unterstützte Installationen und typische Systempfade für:
+
+- Thonny
+- Visual Studio Code
+- PyCharm
+- eigene IDE-Pfade
+
+Die Auswahl wird sofort lokal gespeichert. Aufgaben und Beispiele zeigen den
+Namen der ausgewählten IDE im Öffnen-Button.
+
+### VS Code
+
+Beim Öffnen ergänzt die Suite im Kursordner:
+
+```text
+.vscode/settings.json
+.vscode/extensions.json
+```
+
+Der ausgewählte Python-Interpreter wird gesetzt und die offizielle
+Python-Erweiterung empfohlen. Vorhandene Einstellungen bleiben erhalten.
+
+### Thonny
+
+PyKIM verwendet ein eigenes Profil unter `~/.pykim/thonny`, damit persönliche
+Thonny-Einstellungen nicht überschrieben werden. Kursordner und ausgewählter
+Interpreter werden gemeinsam gestartet.
+
+### Interpreter
+
+Die Suite sucht unter anderem nach:
+
+- dem Interpreter der laufenden App
+- System-Python-Installationen
+- virtuellen Umgebungen
+- pyenv-Installationen
+- Conda-Umgebungen
+- Windows-Python-Launcher-Einträgen
+- Thonnys mitgeliefertem Python
+- manuell ausgewählten Programmpfaden
+
+Ein Kandidat wird auf Python-Version, PyKIM und Pyxel untersucht. PyKIM
+benötigt Python 3.10 oder neuer.
+
+Verwaltete Umgebungen liegen unter `~/.pykim/runtimes` und werden nicht in den
+portablen Kursordner geschrieben. Dadurch werden plattformspezifische Pakete
+nicht versehentlich über ein Netzlaufwerk synchronisiert.
+
+## Updates
+
+Die Suite prüft App und Lerninhalte getrennt im Hintergrund. Ein fehlendes Netz
+blockiert den Start nicht.
+
+### App-Update
+
+- liest das neueste GitHub-Release
+- vergleicht die semantische Versionsnummer
+- wählt ein zur macOS-Architektur passendes DMG
+- öffnet die Downloadseite
+- ersetzt eine installierte App niemals ungefragt selbst
+
+### Kursinhalte
+
+- werden durch Setupdatei, Repository und Branch bestimmt
+- werden commitgenau synchronisiert
+- werden in einem Staging-Verzeichnis validiert
+- werden erst danach atomar aktiviert
+- verändern keine Schülerlösungen, Projekte oder Lernstände
+- prüfen insbesondere Trainer gegen die Repository-Hashliste
+
+Der ältere ZIP-basierte Inhaltsupdatekanal ist technisch noch vorhanden. Der
+aktuelle Kursworkflow verwendet jedoch die direkte GitHub-Synchronisation.
+
+## Speicherorte und Datenschutz
+
+### Im Kursordner
+
+- Schülername in `.pykim-course.json`
+- Aufgabenlösungen
+- Projekte
+- `erweiterungen.py`
+- Lernstand und Dokubuch in `.pykim/progress.json`
+- Sicherungen unter `.pykim/backups`
+- installierte Kurs-Setupdatei
+
+### Lokal auf dem Rechner
+
+- Suite-Konfiguration: `~/.pykim/config.json`
+- synchronisierte Inhaltsversionen: `~/.pykim/content/versions`
+- verwaltete Python-Laufzeiten: `~/.pykim/runtimes`
+- eigenes Thonny-Profil: `~/.pykim/thonny`
+
+Der Kursordner darf auf einem lokalen Laufwerk, USB-Datenträger oder
+eingebundenen WebDAV-Laufwerk liegen. CalDAV ist ein Kalenderprotokoll und kein
+Dateisystem. Gleichzeitiges Bearbeiten desselben synchronisierten Ordners auf
+mehreren Geräten kann Konflikte erzeugen; vorgesehen ist nacheinander erfolgendes
+Arbeiten in Schule und Zuhause.
+
+Die Runtime-Diagnose enthält Plattform, Interpreter, Paketstatus und
+Wheelhouse-Pfad, aber keinen Quellcode und keinen Lernstand.
+
+## Python-Spielwiese
+
+Die Spielwiese lädt Pyodide und führt normales Python im Browserkontext aus.
+Beim ersten Laden ist eine Internetverbindung erforderlich. Das lokale
+PyKIM-/Pyxel-Paket steht dort nicht automatisch zur Verfügung. Ein vollständiges
+browserfähiges PyKIM benötigt ein eigenes Canvas-Backend oder die offizielle
+Pyxel-WASM-Laufzeit.
+
+## Installation und Entwicklung
+
+Voraussetzung: Python 3.10 oder neuer.
+
+### Bibliothek installieren
+
+```bash
+python -m pip install -e .
+```
+
+### Suite installieren
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[guide]'
+pykim-guide
+```
+
+Unter Windows wird die Umgebung so aktiviert:
+
+```powershell
+.venv\Scripts\activate
+```
+
+### Tests
+
+```bash
+python -m pip install -e '.[test]'
+pytest
+```
+
+Der reguläre Lauf prüft API, Weltlogik, Animation, Audio, Trainer,
+Kursdateien, Erweiterungen, Projekte, Laufzeiten und Suite-Helfer.
+
+NiceGUI-E2E-Test separat:
+
+```bash
+python -m pip install -e '.[e2e]'
+pytest -m e2e
+```
+
+Manuelle Plattformtests stehen in `QUALITAETSSICHERUNG.md`.
+
+### Test-Helfer
+
+`pykim.testing` stellt bereit:
+
+| Funktion | Zweck |
+|---|---|
+| `reset_world()` | gesamten Zustand zurücksetzen |
+| `set_pixel_for_test(x, y, color)` | Testpixel setzen |
+| `get_world_state()` | unveränderliche Weltmatrix lesen |
+| `get_painted_pixels()` | alle nicht schwarzen Koordinaten lesen |
+| `get_pending_tones()` | ausstehende MIDI-Noten lesen |
+| `get_pending_audio_events()` | Noten und Beats lesen |
+
+## Offline-Wheelhouse
+
+```bash
+python tools/build_wheelhouse.py
+```
+
+Das Ergebnis liegt unter `dist/wheelhouse`. Erkennt die Suite diesen Ordner,
+installiert oder repariert sie PyKIM und Pyxel ohne Zugriff auf PyPI. Wheels
+sind betriebssystem- und architekturabhängig und müssen auf passenden Runnern
+gebaut werden.
+
+## macOS-App und DMG
+
+Eigenständige App inklusive Python, PyKIM, Pyxel, NiceGUI und Wheelhouse:
+
+```bash
+python tools/build_macos_app.py
+open 'dist/macos/PyKIM Suite.app'
+```
+
+Schneller Wiederholungs-Build:
+
+```bash
+python tools/build_macos_app.py --skip-wheelhouse
+```
+
+DMG mit Verknüpfung zum Programme-Ordner:
+
+```bash
+python tools/build_macos_dmg.py
+```
+
+App und DMG gemeinsam neu bauen:
+
+```bash
+python tools/build_macos_dmg.py --rebuild-app
+```
+
+Der Dateiname enthält Version und Architektur, beispielsweise:
+
+```text
+PyKIM-Suite-0.3.0-macos-x86_64.dmg
+```
+
+Der Build muss auf derselben macOS-Architektur wie das Ziel erzeugt werden.
+Intel (`x86_64`) und Apple Silicon (`arm64`) benötigen getrennte Builds. Ohne
+Apple-Developer-Zertifikat wird die App nur ad hoc signiert und nicht
+notarisiert.
+
+## Grenzen und zurückgestellte Funktionen
+
+- Die Setupdatei ist noch nicht signiert oder kryptografisch authentifiziert.
+- Der verschlüsselte Moodle-Dateiexport ist experimentell und ausgeblendet.
+- Der alte Zertifikats-/Schlüsselcode ist technische Vorarbeit, nicht Teil des
+  stabilen 0.3-Workflows.
+- Die automatische Übernahme einer bestandenen Aufgabenfunktion nach
+  `erweiterungen.py` ist noch nicht implementiert; Erweiterungen werden derzeit
+  manuell hinzugefügt.
+- Die Browser-Spielwiese kann normales Python, aber noch kein lokales PyKIM.
+- Windows- und Linux-Desktop-Bundles fehlen noch.
+- macOS-Signierung und Notarisierung sind noch offen.
+- Das Projekt befindet sich im Alpha-Stadium und ist noch kein abgesicherter
+  flächendeckender Schul-Rollout.
+
+## Lizenzierung
+
+Der aktuelle Repository-Code steht unter der MIT License; siehe `LICENSE`.
+
+Für die geplante Trennung des Kurs-Repositorys ist vorgesehen:
+
+- Software und wiederverwendbarer Beispielcode: MIT
+- Skript, Aufgabenstellungen und eigene didaktische Medien: CC BY-NC-SA 4.0
+- Schülerlösungen: verbleiben bei den jeweiligen Schülerinnen und Schülern
+- externe Medien: jeweilige Originallizenz
+
+Die Inhaltslizenz ist erst verbindlich, wenn sie im Kurs-Repository mit einer
+eigenen Lizenzdatei veröffentlicht wurde.
+
+> **Concept by human. Crafted by human + AI.**  
+> Konzept und pädagogische Verantwortung: Projektverantwortliche von PyKIM  
+> KI-Unterstützung: OpenAI Codex

@@ -456,11 +456,12 @@ def test_project_launch_uses_selected_runtime_and_project_working_directory(
     )
     monkeypatch.setattr(
         "pykim.guide.projects.subprocess.Popen",
-        lambda command, cwd=None: calls.append((command, cwd)),
+        lambda command, cwd=None, env=None: calls.append((command, cwd, env)),
     )
 
     assert launch_project(project, tmp_path) == project.entrypoint
-    assert calls == [([str(python), str(project.entrypoint)], project.directory)]
+    assert calls[0][:2] == ([str(python), str(project.entrypoint)], project.directory)
+    assert str(tmp_path.resolve()) in calls[0][2]["PYTHONPATH"].split(__import__("os").pathsep)
 
 
 def test_project_slug_rejects_empty_names():

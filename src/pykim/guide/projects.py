@@ -192,7 +192,16 @@ def launch_project(project: StudentProject, course: str | Path) -> Path:
     from .runtime import selected_runtime
 
     python = selected_runtime(course_root).executable
-    subprocess.Popen([*command_for(python), str(project.entrypoint)], cwd=project.directory)
+    environment = os.environ.copy()
+    existing_pythonpath = environment.get("PYTHONPATH", "")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(course_root), existing_pythonpath) if part
+    )
+    subprocess.Popen(
+        [*command_for(python), str(project.entrypoint)],
+        cwd=project.directory,
+        env=environment,
+    )
     return project.entrypoint
 
 
