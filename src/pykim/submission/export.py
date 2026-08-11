@@ -18,14 +18,22 @@ from .crypto import CertificateInfo, certificate_info, encrypt_payload
 from .fingerprints import code_fingerprints
 
 
-def _certificate_path(course: str | Path) -> Path:
+def course_certificate_path(course: str | Path) -> Path:
     return Path(course).expanduser().resolve() / ".pykim" / "submission-certificate.pykim-cert"
 
 
 def install_course_certificate(data: bytes, course: str | Path) -> CertificateInfo:
     """Prüfe und speichere das öffentliche Zertifikat im portablen Kursordner."""
     info = certificate_info(data)
-    target = _certificate_path(course)
+    if info.content is not None:
+        from pykim.guide.updates import (
+            sync_certificate_content,
+            verify_certificate_authorization,
+        )
+
+        verify_certificate_authorization(data, info.content)
+        sync_certificate_content(info.content)
+    target = course_certificate_path(course)
     target.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile("wb", dir=target.parent, delete=False) as temporary:
         temporary.write(data)
@@ -35,10 +43,28 @@ def install_course_certificate(data: bytes, course: str | Path) -> CertificateIn
 
 
 def course_certificate_info(course: str | Path) -> CertificateInfo | None:
-    target = _certificate_path(course)
+    target = course_certificate_path(course)
     if not target.exists():
         return None
     return certificate_info(target)
+
+
+def verify_installed_course_certificate(
+    course: str | Path, *, allow_offline: bool = False
+):
+    """Prüfe das installierte Zertifikat erneut gegen sein Kurs-Repository."""
+    target = course_certificate_path(course)
+    if not target.is_file():
+        raise FileNotFoundError("Importiere zuerst das Zertifikat deiner Lehrkraft.")
+    data = target.read_bytes()
+    info = certificate_info(data)
+    if info.content is None:
+        raise ValueError("Das Kurszertifikat enthält keine externe Inhaltsquelle.")
+    from pykim.guide.updates import verify_certificate_authorization
+
+    return info, verify_certificate_authorization(
+        data, info.content, allow_offline=allow_offline
+    )
 
 
 def _latest_attempts(progress: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -111,10 +137,12 @@ def create_encrypted_submission(
     include_journal: bool = False,
 ) -> Path:
     root = Path(course).expanduser().resolve()
-    certificate_path = _certificate_path(root)
+    certificate_path = course_certificate_path(root)
     if not certificate_path.exists():
         raise FileNotFoundError("Importiere zuerst das Zertifikat deiner Lehrkraft.")
     info = certificate_info(certificate_path)
+    if info.content is not None:
+        verify_installed_course_certificate(root, allow_offline=False)
     payload = build_submission_payload(root, include_journal=include_journal)
     envelope = encrypt_payload(payload, certificate_path.read_bytes())
     destination = (

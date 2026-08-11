@@ -128,7 +128,7 @@ def starter_source(exercise_name: str) -> str:
     """Erzeuge eine bewusst lösungsfreie Schülerdatei."""
     return (
         f'"""PyKIM-Aufgabe: {exercise_name}\n\n'
-        "Die Aufgabenstellung und Hilfen findest du im PyKIM-Begleitheft.\n"
+        "Die Aufgabenstellung und Hilfen findest du in der PyKIM Suite.\n"
         '"""\n\n'
         "from pykim import *\n\n"
         "# Schreibe deine Lösung hier.\n\n\n"

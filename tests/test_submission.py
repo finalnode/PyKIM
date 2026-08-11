@@ -1,4 +1,5 @@
 import json
+import hashlib
 
 import pytest
 
@@ -76,6 +77,118 @@ def test_certificate_export_decrypt_and_tamper_detection(tmp_path, monkeypatch):
         decrypt_payload(envelope, private_key.read_bytes(), "sehr-geheim")
 
 
+def test_certificate_contains_hashed_content_repository_configuration(tmp_path, monkeypatch):
+    certificate, _private_key = generate_course_credentials(
+        tmp_path,
+        teacher="Frau Beispiel",
+        school="OSZ KIM",
+        course="Python Beta",
+        password="sehr-geheim",
+        content_repository="https://github.com/finalnode/PyKIM_Kurs.git",
+        content_branch="beta",
+    )
+
+    info = certificate_info(certificate)
+
+    assert info.content is not None
+    assert info.content.repository == "https://github.com/finalnode/PyKIM_Kurs.git"
+    assert info.content.branch == "beta"
+    assert info.content.scripts_path == "Skripte"
+    assert info.content.assignments_path == "Aufgaben"
+    assert info.content.trainers_path == "Trainer"
+    assert info.content.certificate_name == "python-beta.pykim-cert"
+    authorization = tmp_path / "certificates/python-beta.pykim-cert"
+    assert authorization.is_file()
+    assert authorization.read_text(encoding="ascii").strip() == (
+        "sha256:" + hashlib.sha256(certificate.read_bytes()).hexdigest()
+    )
+
+    document = json.loads(certificate.read_text(encoding="utf-8"))
+    document["content"]["branch"] = "main"
+    changed = json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8")
+    changed_info = certificate_info(changed)
+    monkeypatch.setattr(
+        "pykim.guide.updates._download",
+        lambda *_args: authorization.read_bytes(),
+    )
+    from pykim.guide.updates import verify_certificate_authorization
+
+    with pytest.raises(ValueError, match="nicht zugelassen"):
+        verify_certificate_authorization(changed, changed_info.content)
+
+
+def test_teacher_cli_accepts_certificate_validity():
+    options = parser().parse_args([
+        "keygen",
+        "--teacher", "Frau Beispiel",
+        "--school", "OSZ KIM",
+        "--course", "Python 11A",
+        "--output", "kurszugang",
+        "--valid-days", "365",
+        "--content-repository", "https://github.com/finalnode/PyKIM_Kurs.git",
+    ])
+
+    assert options.valid_days == 365
+    assert options.content_branch == "main"
+
+
+def test_wrong_teacher_key_reports_both_fingerprints(tmp_path):
+    certificate, _ = generate_course_credentials(
+        tmp_path / "first",
+        teacher="Frau A",
+        school="OSZ KIM",
+        course="Kurs A",
+        password="sehr-geheim",
+    )
+    _, wrong_key = generate_course_credentials(
+        tmp_path / "second",
+        teacher="Herr B",
+        school="OSZ KIM",
+        course="Kurs B",
+        password="noch-geheimer",
+    )
+    from pykim.submission.crypto import encrypt_payload
+
+    envelope = encrypt_payload({"test": True}, certificate.read_bytes())
+    with pytest.raises(ValueError, match="Erwarteter Fingerabdruck.*verwendeter Fingerabdruck"):
+        decrypt_payload(envelope, wrong_key.read_bytes(), "noch-geheimer")
+
+
+def test_external_certificate_is_checked_on_import_and_export(tmp_path, monkeypatch):
+    from pykim.guide.updates import TrainerVerification
+
+    certificate, _ = generate_course_credentials(
+        tmp_path / "keys",
+        teacher="Frau Beispiel",
+        school="OSZ KIM",
+        course="Python 11A",
+        password="sehr-geheim",
+        content_repository="https://github.com/finalnode/PyKIM_Kurs.git",
+    )
+    checks = []
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setattr(
+        "pykim.guide.updates.verify_certificate_authorization",
+        lambda data, configuration, **kwargs: (
+            checks.append((data, configuration, kwargs))
+            or TrainerVerification(True, False)
+        ),
+    )
+    monkeypatch.setattr(
+        "pykim.guide.updates.sync_certificate_content",
+        lambda _configuration: tmp_path / "content",
+    )
+    course = tmp_path / "course"
+    create_course(course, "Ada")
+
+    install_course_certificate(certificate.read_bytes(), course)
+    create_encrypted_submission(course, tmp_path / "exports")
+
+    assert len(checks) == 2
+    assert checks[0][1].certificate_name == "python-11a.pykim-cert"
+    assert checks[1][2] == {"allow_offline": False}
+
+
 def test_submission_payload_excludes_journal_by_default(tmp_path, monkeypatch):
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     course = tmp_path / "course"
@@ -117,9 +230,13 @@ def test_teacher_report_reads_moodle_download_folder(tmp_path, monkeypatch):
 
 
 def test_teacher_cli_exposes_all_offline_commands():
-    assert parser().parse_args([
+    keygen = parser().parse_args([
         "keygen", "--teacher", "T", "--school", "S", "--course", "C", "--output", "."
-    ]).command == "keygen"
+        , "--content-repository", "https://github.com/finalnode/PyKIM_Kurs.git",
+        "--content-branch", "beta",
+    ])
+    assert keygen.command == "keygen"
+    assert keygen.content_branch == "beta"
     assert parser().parse_args([
         "decrypt", "x.pykim-abgabe", "--key", "key", "--output", "out.json"
     ]).command == "decrypt"

@@ -205,12 +205,21 @@ def exercise_from_data(data: dict) -> Exercise:
 
 def load_exercises(path: str | Path) -> dict[str, Exercise]:
     source = Path(path)
-    data = yaml.safe_load(source.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or data.get("format") != 1:
-        raise ValueError(f"{source.name}: unbekanntes Trainingsformat.")
-    definitions = data.get("exercises")
-    if not isinstance(definitions, list):
-        raise ValueError(f"{source.name}: exercises muss eine Liste sein.")
+    documents = (
+        [yaml.safe_load(item.read_text(encoding="utf-8")) for item in sorted(source.glob("*.yml"))]
+        if source.is_dir()
+        else [yaml.safe_load(source.read_text(encoding="utf-8"))]
+    )
+    definitions = []
+    for data in documents:
+        if not isinstance(data, dict) or data.get("format") != 1:
+            raise ValueError(f"{source.name}: unbekanntes Trainingsformat.")
+        if "exercises" in data:
+            if not isinstance(data["exercises"], list):
+                raise ValueError(f"{source.name}: exercises muss eine Liste sein.")
+            definitions.extend(data["exercises"])
+        else:
+            definitions.append({key: value for key, value in data.items() if key != "format"})
     result = {}
     for definition in definitions:
         exercise = exercise_from_data(definition)

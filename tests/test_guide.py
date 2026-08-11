@@ -87,6 +87,10 @@ from pykim.guide.updates import (
     check_content_update,
     install_content_update,
     check_updates,
+    format_content_version,
+    sync_certificate_content,
+    verify_certificate_trainers,
+    verify_certificate_authorization,
 )
 from pykim.guide.system import (
     execute_student_program,
@@ -838,6 +842,37 @@ def test_trainer_records_an_attempt_when_course_is_configured(
     assert progress["attempts"][0]["successful"]
 
 
+def test_trainer_check_verifies_certificate_repository_first(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from pykim.guide.updates import TrainerVerification
+    from pykim.trainer import runner
+
+    course = tmp_path / "course"
+    course.mkdir()
+    content = SimpleNamespace(repository="https://github.com/example/course.git")
+    calls = []
+    monkeypatch.setenv("PYKIM_COURSE_DIR", str(course))
+    monkeypatch.setattr(
+        "pykim.submission.export.course_certificate_info",
+        lambda _course: SimpleNamespace(content=content),
+    )
+    monkeypatch.setattr(
+        "pykim.submission.export.verify_installed_course_certificate",
+        lambda _course, allow_offline: (
+            SimpleNamespace(content=content),
+            TrainerVerification(True, False),
+        ),
+    )
+    monkeypatch.setattr(
+        "pykim.guide.updates.verify_certificate_trainers",
+        lambda configuration: calls.append(configuration) or TrainerVerification(True, False),
+    )
+
+    runner._refresh_remote_trainers()
+
+    assert calls == [content]
+
+
 def test_record_attempt_is_disabled_without_a_configured_course(
     tmp_path, monkeypatch
 ):
@@ -1057,6 +1092,225 @@ def test_content_update_compares_bundled_manifest(tmp_path, monkeypatch):
     assert update.installed == "2026.08.1"
     assert update.newer
     assert update.compatible
+
+
+def test_content_version_is_displayed_as_german_date():
+    assert format_content_version("2026.08.1") == "01.08.2026"
+    assert format_content_version("commit-abc") == "commit-abc"
+
+
+def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, monkeypatch):
+    from pykim.submission.crypto import ContentConfiguration
+
+    files = {
+        "content.yml": (
+            b"format: 1\nid: testkurs\nchapters:\n  imperativ:\n"
+            b"    - Skripte/imperativ/01_start.md\nexercises:\n"
+            b"  - id: quadrat-5\n    assignment: Aufgaben/imperativ/quadrat-5.md\n"
+            b"    trainer: Trainer/quadrat-5.yml\n"
+        ),
+        "Skripte/imperativ/01_start.md": b"# Start\n",
+        "Aufgaben/imperativ/quadrat-5.md": b"# Quadrat\n",
+        "Trainer/quadrat-5.yml": (
+            b"format: 1\nid: quadrat-5\ntitle: Quadrat\ntests:\n"
+            b"  - type: square\n    start: [50, 50]\n    side: 5\n"
+        ),
+    }
+    index = {
+        "format": 1,
+        "scope": "trainer",
+        "files": {
+            name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+            for name, data in files.items() if name.startswith("Trainer/")
+        },
+    }
+    revision = "a" * 40
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setattr(
+        "pykim.guide.updates._json_url",
+        lambda _url, _timeout: {"sha": revision},
+    )
+
+    def download(url, _timeout):
+        if url.endswith("/.pykim/trainer-hashes.json"):
+            return json.dumps(index).encode("utf-8")
+        return files[next(name for name in files if url.endswith("/" + name))]
+
+    monkeypatch.setattr("pykim.guide.updates._download", download)
+    configuration = ContentConfiguration(
+        "https://github.com/finalnode/PyKIM_Kurs.git",
+        "main",
+        "Skripte",
+        "Aufgaben",
+        "Trainer",
+    )
+
+    target = sync_certificate_content(configuration)
+
+    assert target.name == revision
+    assert (target / "Skripte/imperativ/01_start.md").read_bytes() == files[
+        "Skripte/imperativ/01_start.md"
+    ]
+    assert active_content_root(PACKAGED_CONTENT_ROOT) == target
+
+
+def test_certificate_authorization_uses_same_named_repository_hash(monkeypatch):
+    from pykim.submission.crypto import ContentConfiguration
+
+    certificate = b'{"format":"test-certificate"}'
+    expected = hashlib.sha256(certificate).hexdigest()
+    requested = []
+    monkeypatch.setattr(
+        "pykim.guide.updates._download",
+        lambda url, _timeout: requested.append(url) or f"sha256:{expected}\n".encode("ascii"),
+    )
+    configuration = ContentConfiguration(
+        "https://github.com/finalnode/PyKIM_Kurs.git",
+        "main",
+        "Skripte",
+        "Aufgaben",
+        "Trainer",
+        "python-11a.pykim-cert",
+    )
+
+    result = verify_certificate_authorization(certificate, configuration)
+
+    assert result.checked_online
+    assert requested == [
+        "https://raw.githubusercontent.com/finalnode/PyKIM_Kurs/main/"
+        "certificates/python-11a.pykim-cert"
+    ]
+
+
+def test_certificate_authorization_rejects_unlisted_certificate(monkeypatch):
+    from pykim.submission.crypto import ContentConfiguration
+
+    monkeypatch.setattr(
+        "pykim.guide.updates._download",
+        lambda *_args: b"sha256:" + b"0" * 64,
+    )
+    configuration = ContentConfiguration(
+        "https://github.com/finalnode/PyKIM_Kurs.git",
+        "main",
+        "Skripte",
+        "Aufgaben",
+        "Trainer",
+        "python-11a.pykim-cert",
+    )
+
+    with pytest.raises(ValueError, match="nicht zugelassen"):
+        verify_certificate_authorization(b"anderes Zertifikat", configuration)
+
+
+def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, monkeypatch):
+    from pykim.submission.crypto import ContentConfiguration
+
+    files = {
+        "content.yml": (
+            b"format: 1\nid: testkurs\nchapters: {}\nexercises:\n"
+            b"  - id: quadrat-5\n    assignment: Aufgaben/imperativ/quadrat-5.md\n"
+            b"    trainer: Trainer/quadrat-5.yml\n"
+        ),
+        "Aufgaben/imperativ/quadrat-5.md": b"# Alte Aufgabe\n",
+        "Trainer/quadrat-5.yml": (
+            b"format: 1\nid: quadrat-5\ntitle: Quadrat\ntests:\n"
+            b"  - type: square\n    start: [50, 50]\n    side: 5\n"
+        ),
+    }
+    index = {
+        "format": 1,
+        "scope": "trainer",
+        "files": {
+            name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+            for name, data in files.items() if name.startswith("Trainer/")
+        },
+    }
+    revision = "b" * 40
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setattr("pykim.guide.updates._json_url", lambda *_args: {"sha": revision})
+
+    def download(url, _timeout):
+        if url.endswith("/.pykim/trainer-hashes.json"):
+            return json.dumps(index).encode("utf-8")
+        return files[next(name for name in files if url.endswith("/" + name))]
+
+    monkeypatch.setattr("pykim.guide.updates._download", download)
+    configuration = ContentConfiguration(
+        "https://github.com/finalnode/PyKIM_Kurs.git",
+        "main",
+        "Skripte",
+        "Aufgaben",
+        "Trainer",
+    )
+    sync_certificate_content(configuration)
+
+    files["Aufgaben/imperativ/quadrat-5.md"] = b"# Neue Aufgabenformulierung\n"
+    result = verify_certificate_trainers(configuration)
+
+    assert result.checked_online
+    assert not result.updated
+
+
+def test_trainer_verification_replaces_changed_trainer_data(tmp_path, monkeypatch):
+    from pykim.submission.crypto import ContentConfiguration
+
+    old_trainer = (
+        b"format: 1\nid: quadrat-5\ntitle: Quadrat\ntests:\n"
+        b"  - type: square\n    start: [50, 50]\n    side: 5\n"
+    )
+    new_trainer = old_trainer.replace(b"side: 5", b"side: 6")
+    files = {
+        "content.yml": (
+            b"format: 1\nid: testkurs\nchapters: {}\nexercises:\n"
+            b"  - id: quadrat-5\n    assignment: Aufgaben/imperativ/quadrat-5.md\n"
+            b"    trainer: Trainer/quadrat-5.yml\n"
+        ),
+        "Aufgaben/imperativ/quadrat-5.md": b"# Quadrat\n",
+        "Trainer/quadrat-5.yml": old_trainer,
+    }
+
+    def index():
+        return {
+            "format": 1,
+            "scope": "trainer",
+            "files": {
+                name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+                for name, data in files.items() if name.startswith("Trainer/")
+            },
+        }
+
+    revisions = iter(("c" * 40, "d" * 40))
+    current_revision = [next(revisions)]
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setattr(
+        "pykim.guide.updates._json_url",
+        lambda *_args: {"sha": current_revision[0]},
+    )
+
+    def download(url, _timeout):
+        if url.endswith("/.pykim/trainer-hashes.json"):
+            return json.dumps(index()).encode("utf-8")
+        return files[next(name for name in files if url.endswith("/" + name))]
+
+    monkeypatch.setattr("pykim.guide.updates._download", download)
+    configuration = ContentConfiguration(
+        "https://github.com/finalnode/PyKIM_Kurs.git",
+        "main",
+        "Skripte",
+        "Aufgaben",
+        "Trainer",
+    )
+    sync_certificate_content(configuration)
+
+    files["Trainer/quadrat-5.yml"] = new_trainer
+    current_revision[0] = next(revisions)
+    result = verify_certificate_trainers(configuration)
+
+    assert result.checked_online
+    assert result.updated
+    assert (
+        active_content_root(PACKAGED_CONTENT_ROOT) / "Trainer/quadrat-5.yml"
+    ).read_bytes() == new_trainer
 
 
 def test_missing_first_release_is_treated_as_current(tmp_path, monkeypatch):

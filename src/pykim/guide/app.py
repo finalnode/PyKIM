@@ -51,7 +51,7 @@ from .progress import clear_exercise_progress, load_progress, save_journal_entry
 from .script_view import render_script_reader
 from .script_api import register_script_api
 from .theme import configure_theme
-from .updates import check_updates, install_content_update
+from .updates import check_updates, install_content_update, format_content_version
 from .navigation import create_navigation
 from .system import (
     detected_ides,
@@ -84,8 +84,8 @@ def _preferred_ide_label() -> str:
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
-    """Lese die bewusst kleine Kommandozeile des Begleithefts."""
-    parser = argparse.ArgumentParser(description="PyKIM-Lernstudio starten")
+    """Lese die bewusst kleine Kommandozeile der Suite."""
+    parser = argparse.ArgumentParser(description="PyKIM Suite starten")
     parser.add_argument(
         "--browser",
         action="store_true",
@@ -106,7 +106,7 @@ def main(
         from nicegui import app as nicegui_app, run as nicegui_run, ui
     except ImportError:
         raise RuntimeError(
-            "Das Begleitheft benötigt NiceGUI. Installiere es mit "
+            "Die PyKIM Suite benötigt NiceGUI. Installiere es mit "
             "pip install 'pykim[guide]'."
         ) from None
 
@@ -121,9 +121,18 @@ def main(
         ui.link("Zum Hauptinhalt springen", "#pykim-main").classes("pykim-skip-link")
         with ui.header().classes("pykim-header"):
             with ui.row().classes("pykim-header-top w-full items-center no-wrap"):
-                ui.label("PyKIM-Begleitheft").classes("text-xl font-bold")
-                ui.space()
+                ui.label("PyKIM Suite").classes("text-xl font-bold")
                 configured = get_course_directory()
+                if configured is not None:
+                    try:
+                        header_certificate = course_certificate_info(configured)
+                    except (OSError, ValueError):
+                        header_certificate = None
+                    if header_certificate is not None:
+                        ui.badge(
+                            f"Kurs: {header_certificate.course}", color="primary"
+                        ).props("outline")
+                ui.space()
                 current_student = get_student_name(configured) or system_user_name()
                 ui.label(f"Hallo, {current_student}").classes("text-sm")
                 update_badge = ui.badge("Updates werden geprüft …", color="grey")
@@ -512,6 +521,95 @@ def main(
                 ui.button("Kursordner anlegen oder ergänzen", on_click=setup, icon="create_new_folder")
 
                 ui.separator()
+                ui.label("Kurszertifikat und Lerninhalte").classes("text-xl font-bold")
+                ui.label(
+                    "Das Zertifikat legt Repository, Branch und Inhaltspfade fest. "
+                    "Beim Import lädt die Suite den geprüften Kursinhalt und aktiviert "
+                    "ihn nach einem Neustart."
+                ).classes("text-sm text-grey-7")
+                setup_certificate_status = ui.column().classes("w-full gap-1")
+
+                def render_setup_certificate() -> None:
+                    setup_certificate_status.clear()
+                    course = Path(path.value).expanduser().resolve()
+                    with setup_certificate_status:
+                        try:
+                            info = course_certificate_info(course)
+                        except (OSError, ValueError) as error:
+                            ui.label(f"Zertifikat ungültig: {error}").classes("text-negative")
+                            return
+                        if info is None:
+                            ui.label("Noch kein Kurszertifikat importiert.").classes("text-grey-7")
+                        elif info.content is None:
+                            ui.label(f"Zertifikat für {info.course} – ohne Inhaltsquelle.")
+                        else:
+                            ui.label(f"Zertifikat für {info.course}").classes("font-bold")
+                            ui.label(f"{info.content.repository} · {info.content.branch}")
+                            if info.content.certificate_name:
+                                ui.label(f"Zulassung: {info.content.certificate_name}").classes(
+                                    "text-sm text-grey-7"
+                                )
+
+                async def import_setup_certificate(data: bytes) -> None:
+                    course = Path(path.value).expanduser().resolve()
+                    if not course.is_dir():
+                        ui.notify("Lege zuerst den Kursordner an.", type="warning")
+                        return
+                    certificate_activity.set_visibility(True)
+                    certificate_button.disable()
+                    try:
+                        info = await nicegui_run.io_bound(
+                            install_course_certificate, data, course
+                        )
+                        render_setup_certificate()
+                        message = f"Zertifikat für {info.course} importiert."
+                        if info.content is not None:
+                            message += " Lerninhalte wurden synchronisiert; bitte Suite neu starten."
+                        ui.notify(message, type="positive", timeout=8000)
+                    except Exception as error:
+                        ui.notify(f"Import oder Synchronisierung fehlgeschlagen: {error}", type="negative")
+                    finally:
+                        certificate_activity.set_visibility(False)
+                        certificate_button.enable()
+
+                async def choose_setup_certificate() -> None:
+                    if not desktop or nicegui_app.native.main_window is None:
+                        return
+                    import webview
+
+                    selected = await nicegui_app.native.main_window.create_file_dialog(
+                        dialog_type=webview.FileDialog.OPEN,
+                        directory=str(Path.home() / "Downloads"),
+                    )
+                    if selected:
+                        certificate_path = Path(selected[0])
+                        if certificate_path.suffix != ".pykim-cert":
+                            ui.notify("Wähle eine .pykim-cert-Datei.", type="negative")
+                            return
+                        await import_setup_certificate(certificate_path.read_bytes())
+
+                async def upload_setup_certificate(event) -> None:
+                    await import_setup_certificate(await event.file.read())
+
+                with ui.row().classes("items-center gap-2"):
+                    if desktop:
+                        certificate_button = ui.button(
+                            "Kurszertifikat auswählen",
+                            on_click=choose_setup_certificate,
+                            icon="workspace_premium",
+                        ).props("outline")
+                    else:
+                        certificate_button = ui.upload(
+                            label="Kurszertifikat auswählen",
+                            on_upload=upload_setup_certificate,
+                            auto_upload=True,
+                            max_file_size=1_000_000,
+                        ).props("accept=.pykim-cert")
+                    certificate_activity = ui.spinner(size="lg", color="primary")
+                    certificate_activity.set_visibility(False)
+                render_setup_certificate()
+
+                ui.separator()
                 ui.label("Systemcheck").classes("text-xl font-bold")
                 status = system_status()
 
@@ -583,7 +681,7 @@ def main(
                 ui.label("IDE, Dateien und Updates").classes("text-2xl font-bold")
                 ui.markdown(
                     "Diese Werkzeuge werden lokal gestartet und öffnen sich in einem "
-                    "**eigenen Fenster** neben dem PyKIM-Lernstudio."
+                    "**eigenen Fenster** neben der PyKIM Suite."
                 )
                 course = get_course_directory()
                 if course is None:
@@ -721,8 +819,9 @@ def main(
                             content_button.disable()
                         elif status.content.newer and status.content.compatible:
                             content_update_label.text = (
-                                f"Neue Lerninhalte: {status.content.available} · aktiv: "
-                                f"{status.content.installed}"
+                                "Neue Lerninhalte: "
+                                f"{format_content_version(status.content.available)} · aktiv: "
+                                f"{format_content_version(status.content.installed)}"
                             )
                             content_button.enable()
                         elif not status.content.compatible:
@@ -732,7 +831,8 @@ def main(
                             content_button.disable()
                         else:
                             content_update_label.text = (
-                                f"Lerninhalte {status.content.installed} sind aktuell."
+                                "Lerninhalte "
+                                f"{format_content_version(status.content.installed)} sind aktuell."
                             )
                             content_button.disable()
                         if status.error:
@@ -1114,6 +1214,21 @@ def main(
                             ui.label(f"Kurs: {info.course}").classes("font-bold")
                             ui.label(f"Lehrkraft: {info.teacher}")
                             ui.label(f"Schule: {info.school}")
+                            if info.content is not None:
+                                ui.label("Inhaltsquelle").classes("font-bold mt-2")
+                                ui.label(f"Repository: {info.content.repository}")
+                                ui.label(f"Branch: {info.content.branch}")
+                                if info.content.certificate_name:
+                                    ui.label(
+                                        f"Zertifikatshash: certificates/"
+                                        f"{info.content.certificate_name}"
+                                    )
+                                ui.label(
+                                    "Pfade: "
+                                    f"{info.content.scripts_path}, "
+                                    f"{info.content.assignments_path}, "
+                                    f"{info.content.trainers_path}"
+                                )
                             ui.label(f"Gültig bis: {info.valid_until}")
                             ui.label(f"Fingerabdruck: {info.fingerprint}").classes(
                                 "font-mono text-xs break-all"
@@ -1234,7 +1349,7 @@ def main(
     nicegui_app.on_shutdown(execution_manager.stop_all)
     nicegui_app.on_shutdown(script_example_manager.stop_all)
     ui.run(
-        title="PyKIM-Begleitheft",
+        title="PyKIM Suite",
         favicon="🤖",
         host="127.0.0.1",
         reload=False,

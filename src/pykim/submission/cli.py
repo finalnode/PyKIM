@@ -27,6 +27,12 @@ def parser() -> argparse.ArgumentParser:
     keygen.add_argument("--course", required=True)
     keygen.add_argument("--output", type=Path, required=True)
     keygen.add_argument("--password-file", type=str)
+    keygen.add_argument("--valid-days", type=int, default=730)
+    keygen.add_argument("--content-repository", default="")
+    keygen.add_argument("--content-branch", default="main")
+    keygen.add_argument("--scripts-path", default="Skripte")
+    keygen.add_argument("--assignments-path", default="Aufgaben")
+    keygen.add_argument("--trainers-path", default="Trainer")
 
     decrypt = commands.add_parser("decrypt", help="eine Abgabe entschlüsseln")
     decrypt.add_argument("submission", type=Path)
@@ -51,9 +57,18 @@ def main(arguments: list[str] | None = None) -> None:
             school=options.school,
             course=options.course,
             password=_password(options.password_file, confirm=True),
+            valid_days=options.valid_days,
+            content_repository=options.content_repository,
+            content_branch=options.content_branch,
+            scripts_path=options.scripts_path,
+            assignments_path=options.assignments_path,
+            trainers_path=options.trainers_path,
         )
         print(f"Öffentliches Schülerzertifikat: {certificate}")
         print(f"Privater Lehrerschlüssel: {private_key}")
+        authorization = certificate.parent / "certificates" / certificate.name
+        if authorization.is_file():
+            print(f"Zertifikatshash für das Kurs-Repository: {authorization}")
         return
     password = _password(options.password_file)
     if options.command == "decrypt":

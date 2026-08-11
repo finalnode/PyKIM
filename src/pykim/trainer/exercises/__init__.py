@@ -11,11 +11,18 @@ def _discover_exercises() -> dict[str, Exercise]:
 
     packaged_root = Path(__file__).resolve().parents[2] / "guide"
     bundled = packaged_root / "Trainer" / "definitions.yml"
-    updated = active_content_root(packaged_root) / "Trainer" / "definitions.yml"
-    return load_exercises(updated if updated.is_file() else bundled)
+    updated = active_content_root(packaged_root) / "Trainer"
+    return load_exercises(updated if list(updated.glob("*.yml")) else bundled)
 
 
 _EXERCISES = _discover_exercises()
+
+
+def refresh_exercises() -> tuple[str, ...]:
+    """Lade die Trainerdefinitionen nach einer Inhaltssynchronisation neu."""
+    global _EXERCISES
+    _EXERCISES = _discover_exercises()
+    return exercise_names()
 
 
 def get_exercise(name: str) -> Exercise:

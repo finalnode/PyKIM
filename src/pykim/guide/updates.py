@@ -14,9 +14,12 @@ import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError
+from urllib.error import URLError
 from urllib.request import Request, urlopen
+from urllib.parse import quote
 
 import pykim
+import yaml
 
 from .course import _config_directory
 
@@ -55,12 +58,69 @@ class UpdateStatus:
     error: str = ""
 
 
+@dataclass(frozen=True)
+class TrainerVerification:
+    """Ergebnis der Trainerprüfung vor einem Aufgabenlauf."""
+
+    checked_online: bool
+    updated: bool
+    message: str = ""
+
+
+def verify_certificate_authorization(
+    certificate_data: bytes,
+    configuration,
+    *,
+    timeout: float = 3.0,
+    allow_offline: bool = False,
+) -> TrainerVerification:
+    """Vergleiche das Zertifikat mit seiner gleichnamigen Repository-Hashdatei."""
+    name = configuration.certificate_name
+    if not name:
+        raise ValueError("Das Zertifikat enthält keinen signierten Zertifikatsnamen.")
+    repository = _repository_name(configuration.repository)
+    branch = quote(configuration.branch, safe="")
+    url = (
+        f"https://raw.githubusercontent.com/{repository}/{branch}/"
+        f"certificates/{quote(name, safe='')}"
+    )
+    try:
+        remote = _download(url, timeout).decode("ascii").strip()
+    except HTTPError as error:
+        raise ValueError(
+            f"Das Zertifikat ist im Kurs-Repository nicht zugelassen (HTTP {error.code})."
+        ) from error
+    except (URLError, TimeoutError, ConnectionError) as error:
+        if allow_offline:
+            return TrainerVerification(False, False, f"Zertifikatsprüfung offline: {error}")
+        raise ConnectionError("Das Kurs-Repository ist für die Zertifikatsprüfung nicht erreichbar.") from error
+    except UnicodeDecodeError as error:
+        raise ValueError("Der Zertifikatshash im Repository ist ungültig.") from error
+    expected = remote.removeprefix("sha256:").strip().casefold()
+    if len(expected) != 64 or any(character not in "0123456789abcdef" for character in expected):
+        raise ValueError("Der Zertifikatshash im Repository ist ungültig.")
+    actual = hashlib.sha256(certificate_data).hexdigest()
+    if actual != expected:
+        raise ValueError("Das Kurszertifikat ist im angegebenen Repository nicht zugelassen.")
+    return TrainerVerification(True, False)
+
+
 def _version(value: str) -> tuple[int, ...]:
     parts = []
     for item in value.strip().lstrip("v").split("."):
         digits = "".join(character for character in item if character.isdigit())
         parts.append(int(digits or 0))
     return tuple(parts)
+
+
+def format_content_version(value: str) -> str:
+    """Zeige datumsartige Inhaltsversionen im deutschen Datumsformat."""
+    parts = value.split(".")
+    if len(parts) == 3 and len(parts[0]) == 4 and all(part.isdigit() for part in parts):
+        year, month, day = (int(part) for part in parts)
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{day:02d}.{month:02d}.{year:04d}"
+    return value
 
 
 def _json_url(url: str, timeout: float) -> dict[str, object]:
@@ -207,6 +267,235 @@ def _validate_content(root: Path, manifest: dict[str, object]) -> None:
         actual = hashlib.sha256(target.read_bytes()).hexdigest()
         if actual != str(digest).removeprefix("sha256:"):
             raise ValueError(f"Prüfsumme stimmt nicht: {name}")
+
+
+def _repository_name(url: str) -> str:
+    match = __import__("re").fullmatch(
+        r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?", url
+    )
+    if match is None:
+        raise ValueError("Das Zertifikat enthält keine unterstützte GitHub-Adresse.")
+    return match.group(1)
+
+
+def _download(url: str, timeout: float) -> bytes:
+    request = Request(url, headers={"User-Agent": f"PyKIM/{pykim.__version__}"})
+    with urlopen(request, timeout=timeout) as response:
+        return response.read()
+
+
+def _hash_entries(data: object) -> dict[str, dict[str, object]]:
+    entries = data.get("files") if isinstance(data, dict) else None
+    if not isinstance(entries, dict) or not entries:
+        raise ValueError("Die Remote-Hashliste ist leer oder ungültig.")
+    result: dict[str, dict[str, object]] = {}
+    for name, details in entries.items():
+        if not isinstance(name, str) or not _safe_member(name):
+            raise ValueError(f"Unsicherer Remote-Pfad: {name!r}")
+        if not isinstance(details, dict):
+            raise ValueError(f"Ungültiger Hasheintrag: {name}")
+        digest = str(details.get("sha256", ""))
+        size = details.get("size")
+        if len(digest) != 64 or not isinstance(size, int) or size < 0:
+            raise ValueError(f"Ungültiger Hasheintrag: {name}")
+        result[name] = details
+    return result
+
+
+def _course_content_paths(catalog: object, configuration) -> set[str]:
+    """Lese die von content.yml explizit freigegebenen Kursdateien."""
+    if not isinstance(catalog, dict) or catalog.get("format") != 1:
+        raise ValueError("content.yml benötigt format: 1.")
+    paths = {"content.yml"}
+    chapters = catalog.get("chapters")
+    if not isinstance(chapters, dict):
+        raise ValueError("content.yml benötigt Kapitel.")
+    for entries in chapters.values():
+        if not isinstance(entries, list):
+            raise ValueError("Die Kapitelliste in content.yml ist ungültig.")
+        paths.update(entries)
+    exercises = catalog.get("exercises")
+    if not isinstance(exercises, list):
+        raise ValueError("content.yml benötigt Aufgaben.")
+    for exercise in exercises:
+        if not isinstance(exercise, dict):
+            raise ValueError("Ein Aufgabeneintrag in content.yml ist ungültig.")
+        paths.add(exercise.get("assignment"))
+        paths.add(exercise.get("trainer"))
+
+    allowed_roots = (
+        configuration.scripts_path.rstrip("/") + "/",
+        configuration.assignments_path.rstrip("/") + "/",
+        configuration.trainers_path.rstrip("/") + "/",
+    )
+    result: set[str] = set()
+    for name in paths:
+        if not isinstance(name, str) or not _safe_member(name):
+            raise ValueError(f"Unsicherer Inhaltspfad: {name!r}")
+        if name != "content.yml" and not name.startswith(allowed_roots):
+            raise ValueError(f"Nicht freigegebener Inhaltspfad: {name}")
+        result.add(name)
+    return result
+
+
+def verify_certificate_trainers(configuration, timeout: float = 3.0) -> TrainerVerification:
+    """Prüfe online ausschließlich die bewertungsrelevanten Trainerdateien.
+
+    Ist GitHub nicht erreichbar, bleibt der zuletzt beim Zertifikatimport
+    vollständig geprüfte Stand nutzbar. Eine erreichbare, aber ungültige
+    Hashliste ist dagegen ein harter Fehler.
+    """
+    repository = _repository_name(configuration.repository)
+    branch = quote(configuration.branch, safe="")
+    raw = f"https://raw.githubusercontent.com/{repository}/{branch}"
+    try:
+        document = json.loads(
+            _download(f"{raw}/.pykim/trainer-hashes.json", timeout).decode("utf-8")
+        )
+    except HTTPError as error:
+        raise ValueError(
+            f"Die Trainer-Hashliste ist im Repository nicht abrufbar (HTTP {error.code})."
+        ) from error
+    except (URLError, TimeoutError, ConnectionError) as error:
+        return TrainerVerification(
+            False,
+            False,
+            f"Trainerprüfung offline: {error}",
+        )
+    except UnicodeDecodeError as error:
+        raise ValueError("Die Remote-Hashliste ist nicht als UTF-8 lesbar.") from error
+    except json.JSONDecodeError as error:
+        raise ValueError("Die Remote-Hashliste ist kein gültiges JSON.") from error
+
+    entries = _hash_entries(document)
+    prefix = configuration.trainers_path.rstrip("/") + "/"
+    trainer_entries = {
+        name: details for name, details in entries.items() if name.startswith(prefix)
+    }
+    if not trainer_entries:
+        raise ValueError("Die Remote-Hashliste enthält keine Trainerdateien.")
+
+    packaged_root = Path(__file__).resolve().parent
+    local_root = active_content_root(packaged_root)
+    trainer_root = local_root / configuration.trainers_path
+    local_names = {
+        path.relative_to(local_root).as_posix()
+        for path in trainer_root.rglob("*.yml")
+        if path.is_file()
+    } if trainer_root.is_dir() else set()
+    current = local_names == set(trainer_entries)
+    for name, details in trainer_entries.items():
+        if not current:
+            break
+        target = local_root / PurePosixPath(name)
+        if not target.is_file():
+            current = False
+            break
+        data = target.read_bytes()
+        if len(data) != details["size"] or hashlib.sha256(data).hexdigest() != details["sha256"]:
+            current = False
+            break
+    if current:
+        return TrainerVerification(True, False)
+
+    sync_certificate_content(configuration, timeout=max(timeout, 20.0))
+    return TrainerVerification(True, True, "Trainerdaten wurden aktualisiert.")
+
+
+def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
+    """Spiegele den im Zertifikat festgelegten Git-Stand dateiweise und atomar."""
+    repository = _repository_name(configuration.repository)
+    branch = quote(configuration.branch, safe="")
+    commit = _json_url(
+        f"https://api.github.com/repos/{repository}/commits/{branch}", timeout
+    )
+    revision = str(commit.get("sha", ""))
+    if len(revision) != 40:
+        raise ValueError("Der Remote-Commit konnte nicht bestimmt werden.")
+    raw = f"https://raw.githubusercontent.com/{repository}/{revision}"
+    trainer_hashes = json.loads(
+        _download(f"{raw}/.pykim/trainer-hashes.json", timeout).decode("utf-8")
+    )
+    trainer_entries = _hash_entries(trainer_hashes)
+    trainer_prefix = configuration.trainers_path.rstrip("/") + "/"
+    if set(trainer_entries) != {
+        name for name in trainer_entries if name.startswith(trainer_prefix)
+    }:
+        raise ValueError("Die Trainer-Hashliste enthält fremde Dateien.")
+    content_data = _download(f"{raw}/content.yml", timeout)
+    try:
+        catalog = yaml.safe_load(content_data.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as error:
+        raise ValueError("content.yml ist ungültig.") from error
+    content_paths = _course_content_paths(catalog, configuration)
+    catalog_trainers = {name for name in content_paths if name.startswith(trainer_prefix)}
+    if set(trainer_entries) != catalog_trainers:
+        raise ValueError("Trainer-Hashliste und content.yml passen nicht zusammen.")
+    if len(content_paths) > MAX_CONTENT_FILES:
+        raise ValueError("Der Remote-Inhalt enthält zu viele Dateien.")
+
+    base = content_directory()
+    versions = base / "versions"
+    versions.mkdir(parents=True, exist_ok=True)
+    target = versions / revision
+    manifest_files: dict[str, str] = {}
+    manifest = {"content_version": revision, "files": manifest_files}
+    target_valid = False
+    if target.is_dir():
+        try:
+            stored_manifest = json.loads(
+                (target / "content-manifest.json").read_text(encoding="utf-8")
+            )
+            stored_files = stored_manifest.get("files")
+            if (
+                stored_manifest.get("content_version") != revision
+                or not isinstance(stored_files, dict)
+                or set(stored_files) != content_paths
+            ):
+                raise ValueError("Der lokale Inhaltskatalog ist nicht aktuell.")
+            _validate_content(target, stored_manifest)
+            target_valid = True
+        except (OSError, ValueError, TypeError):
+            target_valid = False
+    if not target_valid:
+        with tempfile.TemporaryDirectory(prefix="pykim-git-", dir=base) as temporary:
+            staging = Path(temporary) / "content"
+            staging.mkdir()
+            total_size = 0
+            for name in sorted(content_paths):
+                data = content_data if name == "content.yml" else _download(
+                    f"{raw}/{quote(name, safe='/')}", timeout
+                )
+                total_size += len(data)
+                if total_size > MAX_CONTENT_SIZE:
+                    raise ValueError("Der Remote-Inhalt ist zu groß.")
+                digest = hashlib.sha256(data).hexdigest()
+                if name in trainer_entries and (
+                    digest != trainer_entries[name]["sha256"]
+                    or len(data) != trainer_entries[name]["size"]
+                ):
+                    raise ValueError(f"Trainer-Prüfsumme stimmt nicht: {name}")
+                manifest_files[name] = digest
+                destination = staging / PurePosixPath(name)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(data)
+            _validate_content(staging, manifest)
+            from pykim.trainer.definitions import load_exercises
+
+            load_exercises(staging / configuration.trainers_path)
+            (staging / "content-manifest.json").write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            if target.exists():
+                shutil.rmtree(target)
+            os.replace(staging, target)
+    marker = base / "active.json"
+    temporary_marker = base / "active.json.tmp"
+    temporary_marker.write_text(
+        json.dumps({"content_version": revision}, indent=2), encoding="utf-8"
+    )
+    os.replace(temporary_marker, marker)
+    return target
 
 
 def install_content_update(manifest: dict[str, object], timeout: float = 30.0) -> Path:

@@ -116,8 +116,17 @@ pykim-teacher keygen \
   --teacher "Frau Beispiel" \
   --school "OSZ KIM" \
   --course "Informatik 11A" \
+  --content-repository "https://github.com/finalnode/PyKIM_Kurs.git" \
+  --content-branch main \
   --output ./kurs-schluessel
 ```
+
+Repository, Branch und die standardmäßigen Inhaltspfade `Skripte`, `Aufgaben`
+und `Trainer` werden als X.509-Erweiterung mit signiert. Sie können daher nicht
+nachträglich in der Zertifikatsdatei ausgetauscht werden. Für einen Testkurs
+kann stattdessen `--content-branch beta` verwendet werden. Abweichende Pfade
+lassen sich mit `--scripts-path`, `--assignments-path` und `--trainers-path`
+festlegen.
 
 Die `.pykim-cert`-Datei wird im Lernraum bereitgestellt. Der private
 `.pykim-private-key` verbleibt ausschließlich bei der Lehrkraft und sollte
@@ -636,3 +645,37 @@ Optimierung: 100 %
 Bei einer längeren Lösung erscheinen stattdessen die tatsächliche und die
 optimale Zeilenzahl als konkreter Tipp. Geforderte Kontrollstrukturen wie
 Schleifen oder Funktionen werden unabhängig davon fachlich geprüft.
+## Kurszertifikat mit externen Lerninhalten
+
+Die Lehrkraft erzeugt ein öffentliches Zertifikat für die Lernenden und einen
+verschlüsselten privaten Schlüssel für spätere Abgaben getrennt voneinander:
+
+```bash
+pykim-teacher keygen \
+  --teacher "Vorname Nachname" \
+  --school "OSZ KIM" \
+  --course "Python 11A" \
+  --output ./kurszugang \
+  --content-repository https://github.com/finalnode/PyKIM_Kurs.git \
+  --content-branch main \
+  --scripts-path Skripte \
+  --assignments-path Aufgaben \
+  --trainers-path Trainer
+```
+
+Das Passwort schützt ausschließlich den privaten Lehrerschlüssel. Die erzeugte
+Datei `*.pykim-cert` wird an die Lernenden verteilt und in der Suite unter
+**Setup → Kurszertifikat und Lerninhalte** ausgewählt. Beim Import synchronisiert
+die Suite den angegebenen Repository-Stand.
+
+Zusätzlich entsteht unter
+`certificates/<kursname>.pykim-cert` eine gleichnamige Textdatei mit
+dem SHA-256-Hash des Zertifikats. Diese Datei wird in denselben Pfad des
+Kurs-Repositories übernommen. Die Suite prüft sie beim Import, vor bewerteten
+Ausführungen und erneut vor dem Abgabeexport.
+
+Vor jeder bewerteten Ausführung werden bei erreichbarem Repository außerdem
+ausschließlich die Prüfsummen aus `.pykim/trainer-hashes.json` kontrolliert.
+Offline bleibt der zuletzt vollständig verifizierte Stand für Aufgabenläufe
+nutzbar; ein neuer verschlüsselter Export verlangt eine erfolgreiche
+Online-Zertifikatsprüfung.
