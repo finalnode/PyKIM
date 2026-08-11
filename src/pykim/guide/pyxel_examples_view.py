@@ -66,7 +66,12 @@ def copy_pyxel_example_to_course(
     return project.entrypoint, True
 
 
-def render_pyxel_examples_view(ui, preferred_ide_label: str, ide_open_buttons: list) -> None:
+def render_pyxel_examples_view(
+    ui,
+    preferred_ide_label: str,
+    ide_open_buttons: list,
+    on_project_saved=None,
+) -> None:
     ui.label("Pyxel-Beispiele").classes("text-2xl font-bold")
     ui.markdown(
         "Diese Programme gehören zur installierten Pyxel-Version. Du kannst sie "
@@ -121,12 +126,16 @@ def render_pyxel_examples_view(ui, preferred_ide_label: str, ide_open_buttons: l
                     if created else "Das persönliche Projekt ist bereits vorhanden.",
                     type="positive",
                 )
+                if on_project_saved is not None:
+                    on_project_saved()
 
             def open_in_ide(selected=example) -> None:
                 result = personal_copy(selected)
                 if result is None:
                     return
                 _course, (target, _created) = result
+                if on_project_saved is not None:
+                    on_project_saved()
                 try:
                     open_in_preferred_ide(target.parent)
                     ui.notify("Pyxel-Projekt wurde in der IDE geöffnet.", type="positive")

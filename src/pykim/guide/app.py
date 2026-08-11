@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 
+import pykim
 from pykim.trainer.exercises import get_exercise
 from pykim.trainer.assignments import get_assignment
 from .course_setup import course_setup_info, install_course_setup
@@ -161,7 +162,7 @@ def main(
             ) = create_navigation(ui)
 
         with ui.tab_panels(tabs, value=overview_tab).classes(
-            "w-full max-w-6xl mx-auto"
+            "w-full max-w-6xl mx-auto mb-10"
         ).props("id=pykim-main role=main"):
             with ui.tab_panel(setup_tab):
                 ui.label("Kursordner einrichten").classes("text-2xl font-bold")
@@ -1210,7 +1211,9 @@ def main(
                 render_examples_view(ui, _preferred_ide_label(), ide_open_buttons)
 
             with ui.tab_panel(projects_tab):
-                render_projects_view(ui, _preferred_ide_label(), ide_open_buttons)
+                refresh_projects = render_projects_view(
+                    ui, _preferred_ide_label(), ide_open_buttons
+                )
 
             with ui.tab_panel(extensions_tab):
                 render_extensions_view(ui)
@@ -1361,7 +1364,10 @@ def main(
                 ui.markdown(PYXEL_REFERENCE).classes("prose max-w-none")
                 ui.separator()
                 render_pyxel_examples_view(
-                    ui, _preferred_ide_label(), ide_open_buttons
+                    ui,
+                    _preferred_ide_label(),
+                    ide_open_buttons,
+                    on_project_saved=refresh_projects,
                 )
             with ui.tab_panel(browser_tab):
                 ui.label("Python-Grundlagen im Browser").classes("text-2xl font-bold")
@@ -1374,13 +1380,35 @@ def main(
                 )
                 ui.html(PYODIDE_PLAYGROUND, sanitize=False).classes("w-full")
 
+        with ui.element("footer").classes("pykim-footer w-full"):
+            with ui.row().classes(
+                "w-full max-w-6xl mx-auto items-center justify-between gap-3"
+            ):
+                ui.label("Concept by human. Crafted by human + AI.").classes(
+                    "pykim-footer-claim"
+                )
+                with ui.row().classes("items-center gap-4"):
+                    ui.label(f"Version {pykim.__version__}").classes(
+                        "pykim-footer-version"
+                    )
+                    ui.link(
+                        "PyKIM auf GitHub",
+                        "https://github.com/finalnode/PyKIM",
+                        new_tab=True,
+                    ).classes("pykim-footer-link")
+                    ui.link(
+                        "MIT-Lizenz",
+                        "https://github.com/finalnode/PyKIM/blob/main/LICENSE",
+                        new_tab=True,
+                    ).classes("pykim-footer-link")
+
     if not run_server:
         return
 
     nicegui_app.on_shutdown(execution_manager.stop_all)
     nicegui_app.on_shutdown(script_example_manager.stop_all)
     ui.run(
-        title="PyKIM Suite",
+        title=f"PyKIM Suite {pykim.__version__}",
         favicon="🤖",
         host="127.0.0.1",
         reload=False,

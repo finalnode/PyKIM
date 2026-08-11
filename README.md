@@ -1,6 +1,6 @@
 # PyKIM
 
-PyKIM 0.3.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
+PyKIM 0.4.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
 [Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
 bewegt sich durch eine 160 × 120 Pixel große Welt, liest und verändert Farben,
 zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
@@ -56,6 +56,7 @@ müssen.
 - einzelne Farbpixel und durchgehende Malspuren
 - Farbsensor am aktuellen Feld, an Nachbarfeldern oder beliebigen Koordinaten
 - schrittweise Animation mit einer Geschwindigkeit von 1 bis 100
+- Kamera-Zoom von 1-fach bis 10-fach mit `world.zoom()`
 - Töne, Pausen, Tonlängen, Rhythmen und Melodien
 - imperative Kurzbefehle für Einsteiger
 - objektorientierte Steuerung über `Pixel` und `World`
@@ -79,13 +80,15 @@ müssen.
 - Optimierungsbewertung anhand relevanter Codezeilen
 - lokaler Lernstand und persönliches Dokubuch
 - Beispielgalerie und Pyxel-Beispiele
-- eigene Python-, PyKIM- und Pyxel-Projekte
+- eigene Python-, PyKIM- und Pyxel-Projekte mit integriertem Codeeditor
+- projektbezogene Markdown-Dokumentation mit Live-Vorschau
 - Start des Pyxel-Ressourceneditors für Sprites, Tilemaps, Sounds und Musik
 - persönliches Modul `erweiterungen.py` für eigene Funktionen und Klassen
 - Erkennung von Thonny, VS Code, PyCharm und benutzerdefinierten IDEs
 - Erkennung und Auswahl geeigneter Python-Interpreter
 - verwaltete lokale Python-Laufzeit mit Offline-Wheelhouse
 - getrennte Updateprüfung für App und Lerninhalte
+- feste, schmale Fußleiste mit Projekt-, Lizenz- und Herkunftshinweis
 
 ## Schnellstart
 
@@ -370,6 +373,7 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `spawn(PixelClass, name, ...)` | eigene Pixel-Unterklasse erzeugen |
 | `animate(delay=0.1)` | Animation einschalten |
 | `speed(value)` | Geschwindigkeit 1 bis 100 |
+| `zoom(value)` | Weltpixel und Kameraansicht 1-fach bis 10-fach vergrößern |
 | `play_tone(...)`, `play_pause(...)` | gemeinsames Audiosystem |
 | `parallel()` | parallelen Befehlsblock starten |
 | `cls(color="black")` | Anzeige bzw. Welt leeren |
@@ -384,6 +388,20 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 
 Pixelnamen müssen eindeutig sein. `KIM` ist für den Standardpixel
 reserviert.
+
+### Fenstergröße
+
+```python
+world.zoom(4)
+world.run()
+```
+
+`world.zoom()` akzeptiert ganze Zahlen von 1 bis 10. Das Fenster behält seine
+Größe, aber jeder logische Weltpixel wird als entsprechend großer Block
+dargestellt. Die Kamera folgt KIM und wird an den Rändern der Welt begrenzt.
+Die logische Welt bleibt immer 160 × 120 Pixel groß: Koordinaten,
+Zeichnungen und Trainerergebnisse ändern sich durch den Zoom nicht. Ohne
+Aufruf gilt Zoomstufe 1.
 
 ## Mehrere Pixel und Parallelität
 
@@ -601,7 +619,7 @@ lokalen Aktionen nicht aufrufen.
 | **Übersicht** | Lernstand und Status der Aufgaben |
 | **Aufgaben** | Aufgabenstellung, Editor, Tests, Optimierung und Dokubuch |
 | **Beispiele** | mitgelieferte Programme starten, kopieren oder übernehmen |
-| **Meine Projekte** | Python-, PyKIM- und Pyxel-Projekte verwalten |
+| **Meine Projekte** | Projekte auswählen, Code bearbeiten, starten und dokumentieren |
 | **Erweiterungen** | eigene Funktionen und Klassen wiederverwenden |
 | **Cheatsheet** | kompakte Befehlsreferenz |
 | **Skript** | Kapitelansicht mit seitlichem Inhaltsverzeichnis |
@@ -766,12 +784,25 @@ Beispiel:
 ```text
 Projekte/mein_spiel/
 ├── main.py
+├── README.md
 ├── projekt.json
 └── ressourcen.pyxres
 ```
 
 `projekt.json` speichert Projektname, Typ, Einstiegspunkt und Ressourcenpfad.
 Pfade werden auf den jeweiligen Projektordner begrenzt.
+
+Die Projektansicht ist als Arbeitsbereich aufgebaut: Links wird das Projekt
+ausgewählt, rechts steht ein breiter Editor zur Verfügung. Der Reiter **Code**
+bietet Syntaxhervorhebung, Speichern, Kopieren sowie **Speichern und starten**.
+Der Reiter **Dokumentation** bearbeitet die zugehörige `README.md` und zeigt
+darunter unmittelbar die gerenderte Markdown-Vorschau. Neue Projekte erhalten
+eine Reflexionsvorlage; ältere Projekte bekommen sie beim ersten Speichern.
+
+Vor dem Speichern vergleicht die Suite den zuletzt geladenen Dateistand. Wurde
+`main.py` oder `README.md` zwischenzeitlich in einer externen IDE verändert,
+bricht sie das Speichern mit einem Konflikthinweis ab, statt die Änderung zu
+überschreiben.
 
 `.pyxres` enthält Pyxel-Sprites, Tilemaps, Sounds und Musik. Die Suite startet
 den offiziellen Editor sinngemäß mit:
@@ -898,6 +929,12 @@ PyKIM-/Pyxel-Paket steht dort nicht automatisch zur Verfügung. Ein vollständig
 browserfähiges PyKIM benötigt ein eigenes Canvas-Backend oder die offizielle
 Pyxel-WASM-Laufzeit.
 
+Der eingebettete Python-Editor hebt Schlüsselwörter, eingebaute Funktionen,
+Zeichenketten, Zahlen und Kommentare hervor. `Tab` fügt vier Leerzeichen ein,
+`Shift+Tab` rückt aus; das funktioniert auch für mehrere markierte Zeilen. Die
+Ausführung findet in einem Web Worker statt und kann über **Stoppen** beendet
+werden, ohne die Suite einzufrieren.
+
 ## Installation und Entwicklung
 
 Voraussetzung: Python 3.10 oder neuer.
@@ -997,7 +1034,7 @@ python tools/build_macos_dmg.py --rebuild-app
 Der Dateiname enthält Version und Architektur, beispielsweise:
 
 ```text
-PyKIM-Suite-0.3.0-macos-x86_64.dmg
+PyKIM-Suite-0.4.0-macos-x86_64.dmg
 ```
 
 Der Build muss auf derselben macOS-Architektur wie das Ziel erzeugt werden.
@@ -1010,7 +1047,7 @@ notarisiert.
 - Die Setupdatei ist noch nicht signiert oder kryptografisch authentifiziert.
 - Der verschlüsselte Moodle-Dateiexport ist experimentell und ausgeblendet.
 - Der alte Zertifikats-/Schlüsselcode ist technische Vorarbeit, nicht Teil des
-  stabilen 0.3-Workflows.
+  stabilen 0.4-Workflows.
 - Die automatische Übernahme einer bestandenen Aufgabenfunktion nach
   `erweiterungen.py` ist noch nicht implementiert; Erweiterungen werden derzeit
   manuell hinzugefügt.

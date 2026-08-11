@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -25,6 +26,24 @@ class StudentProject:
     directory: Path
     entrypoint: Path
     resources: Path | None
+    documentation: Path
+
+
+DOCUMENTATION_TEMPLATE = """\
+# Mein Projekt
+
+## Was macht mein Programm?
+
+Beschreibe hier kurz deine Idee.
+
+## Wie funktioniert es?
+
+## Welche Probleme hatte ich?
+
+## Wie habe ich sie gelöst?
+
+## Was möchte ich noch verbessern?
+"""
 
 
 TEMPLATES = {
@@ -128,6 +147,7 @@ def create_project(
         raise FileExistsError(f"Das Projekt „{name}“ existiert bereits.") from None
     entrypoint = directory / "main.py"
     entrypoint.write_text(source if source is not None else TEMPLATES[kind], encoding="utf-8")
+    (directory / "README.md").write_text(DOCUMENTATION_TEMPLATE, encoding="utf-8")
     if with_resources is None:
         with_resources = kind == "pyxel"
     resource_name = "ressourcen.pyxres" if with_resources else ""
@@ -160,7 +180,53 @@ def load_project(directory: str | Path) -> StudentProject:
         raise ValueError("Unvollständige Projektdatei.")
     entrypoint = _safe_child(root, entrypoint_name, "Programmeinstieg")
     resources = _safe_child(root, resource_name, "Ressourcenpfad") if resource_name else None
-    return StudentProject(root.name, name, kind, root, entrypoint, resources)
+    return StudentProject(
+        root.name, name, kind, root, entrypoint, resources, root / "README.md"
+    )
+
+
+def project_text(project: StudentProject, path: Path) -> str:
+    """Lese eine bearbeitbare Projektdatei oder die Vorlage einer alten README."""
+    target = path.resolve()
+    allowed = {project.entrypoint.resolve(), project.documentation.resolve()}
+    if target not in allowed:
+        raise ValueError("Diese Datei gehört nicht zum bearbeitbaren Projektbereich.")
+    if target == project.documentation.resolve() and not target.exists():
+        return DOCUMENTATION_TEMPLATE
+    return target.read_text(encoding="utf-8")
+
+
+def project_text_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def save_project_text(
+    project: StudentProject,
+    path: Path,
+    value: str,
+    *,
+    expected_hash: str,
+) -> Path:
+    """Speichere Code oder Dokumentation atomar mit Konflikterkennung."""
+    target = path.resolve()
+    current = project_text(project, target)
+    if project_text_hash(current) != expected_hash:
+        raise RuntimeError(
+            "Die Datei wurde außerhalb der Suite verändert. Lade das Projekt neu."
+        )
+    temporary_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w", encoding="utf-8", dir=target.parent,
+            prefix=f".{target.name}.", suffix=".tmp", delete=False,
+        ) as temporary:
+            temporary.write(value)
+            temporary_path = Path(temporary.name)
+        os.replace(temporary_path, target)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return target
 
 
 def student_projects(course: str | Path) -> tuple[StudentProject, ...]:

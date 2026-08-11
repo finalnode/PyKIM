@@ -3,7 +3,7 @@
 import re
 from collections import deque
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 WIDTH = 160
 HEIGHT = 120
@@ -465,7 +465,37 @@ def _draw_world(pyxel: object) -> None:
     for y, row in enumerate(pixels):
         for x, color in enumerate(row):
             if color != 0:
-                pyxel.pset(x, y, color)
+                _draw_cell(pyxel, x, y, color)
+
+
+def _camera_origin() -> tuple[int, int]:
+    """Liefere den an den Welträndern begrenzten Kameraausschnitt um KIM."""
+    zoom = world._zoom
+    if zoom == 1:
+        return 0, 0
+    visible_width = (WIDTH + zoom - 1) // zoom
+    visible_height = (HEIGHT + zoom - 1) // zoom
+    center_x, center_y = _animation_position(kim)
+    left = min(max(0, center_x - visible_width // 2), WIDTH - visible_width)
+    top = min(max(0, center_y - visible_height // 2), HEIGHT - visible_height)
+    return left, top
+
+
+def _screen_position(x: int, y: int) -> tuple[int, int]:
+    left, top = _camera_origin()
+    return (x - left) * world._zoom, (y - top) * world._zoom
+
+
+def _draw_cell(pyxel: object, x: int, y: int, color: int) -> None:
+    """Zeichne einen logischen Weltpixel in der aktuellen Zoomstufe."""
+    screen_x, screen_y = _screen_position(x, y)
+    zoom = world._zoom
+    if screen_x >= WIDTH or screen_y >= HEIGHT or screen_x + zoom <= 0 or screen_y + zoom <= 0:
+        return
+    if zoom == 1:
+        pyxel.pset(screen_x, screen_y, color)
+    else:
+        pyxel.rect(screen_x, screen_y, zoom, zoom, color)
 
 
 def _animation_position(pixel: object | None = None) -> tuple[int, int]:
@@ -506,7 +536,7 @@ def _draw_actor(pyxel: object, x: int, y: int, offset: int = 0) -> None:
     pixels = _animation_pixels if _animation_delay_frames is not None else _pixels
     if color == pixels[y][x]:
         color = color % 15 + 1
-    pyxel.pset(x, y, color)
+    _draw_cell(pyxel, x, y, color)
 
 
 def _draw_kim(pyxel: object) -> None:
@@ -531,13 +561,17 @@ def _draw_sensor(pyxel: object) -> None:
     if target is not None:
         x, y = target
         color = 7 if _animation_pixels[y][x] == 12 else 12
-        pyxel.pset(x, y, color)
+        _draw_cell(pyxel, x, y, color)
 
 
 def _draw_axes(pyxel: object, x: int, y: int, scale: float, color: int) -> None:
     """Ziehe bildschirmfüllende Achsen bis auf ihren Schnittpunkt zusammen."""
+    x, y = _screen_position(x, y)
     if scale <= 0:
-        pyxel.pset(x, y, color)
+        if world._zoom == 1:
+            pyxel.pset(x, y, color)
+        else:
+            pyxel.rect(x, y, world._zoom, world._zoom, color)
         return
 
     left = round(x * (1 - scale))
@@ -703,6 +737,7 @@ def _reset() -> None:
     if "world" in globals():
         world.extra_pixels.clear()
         world._backend = None
+        world._zoom = 1
         kim.visible = True
 
 

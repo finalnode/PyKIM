@@ -19,6 +19,7 @@ class World:
         self.extra_pixels: list[Pixel] = []
         self._parallel_events: dict[Pixel, list[dict[str, object]]] | None = None
         self._backend: object | None = None
+        self._zoom = 1
 
     @property
     def cells(self) -> list[list[int]]:
@@ -76,7 +77,7 @@ class World:
         x, y = api._position(x, y)
         color_index = api._color(color)
         if self._backend is not None:
-            self._backend.pset(x, y, color_index)
+            api._draw_cell(self._backend, x, y, color_index)
         else:
             self.cells[y][x] = color_index
 
@@ -90,7 +91,11 @@ class World:
         api._position(x + width - 1, y + height - 1)
         color_index = api._color(color)
         if self._backend is not None:
-            self._backend.rect(x, y, width, height, color_index)
+            screen_x, screen_y = api._screen_position(x, y)
+            zoom = self._zoom
+            self._backend.rect(
+                screen_x, screen_y, width * zoom, height * zoom, color_index
+            )
         else:
             for row in self.cells[y:y + height]:
                 row[x:x + width] = [color_index] * width
@@ -100,7 +105,8 @@ class World:
         x, y = api._position(x, y)
         if self._backend is None:
             raise RuntimeError("world.text() kann nur innerhalb von draw() verwendet werden.")
-        self._backend.text(x, y, str(value), api._color(color))
+        screen_x, screen_y = api._screen_position(x, y)
+        self._backend.text(screen_x, screen_y, str(value), api._color(color))
 
     def btn(self, key: str) -> bool:
         return self._key_query("btn", key)
@@ -132,6 +138,13 @@ class World:
 
     def speed(self, value: int) -> None:
         api.speed(value)
+
+    def zoom(self, value: int) -> None:
+        """Vergrößere Weltpixel bei gleichbleibender Fenstergröße."""
+        value = api._integer(value, "zoom")
+        if not 1 <= value <= 10:
+            raise ValueError("zoom muss zwischen 1 und 10 liegen.")
+        self._zoom = value
 
     def play_tone(self, note: str | int, beats: int = 1) -> None:
         """Spiele einen Ton über das gemeinsame Audiosystem."""

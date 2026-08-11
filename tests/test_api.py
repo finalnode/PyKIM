@@ -176,6 +176,18 @@ def test_invalid_speed(bad):
         speed(bad)
 
 
+def test_world_zoom_sets_display_scale():
+    pykim.world.zoom(6)
+
+    assert pykim.world._zoom == 6
+
+
+@pytest.mark.parametrize("bad", [0, 11, -1, 1.5, "4", True])
+def test_invalid_world_zoom(bad):
+    with pytest.raises((TypeError, ValueError), match="zoom"):
+        pykim.world.zoom(bad)
+
+
 @pytest.mark.parametrize("bad", [-1, 160, 1.5, "1", True])
 def test_invalid_x(bad):
     with pytest.raises((TypeError, ValueError), match="x|Position"):

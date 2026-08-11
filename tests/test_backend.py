@@ -41,8 +41,8 @@ class FakePyxel:
         self.calls = []
         self.frame_count = 0
 
-    def init(self, width, height, *, title):
-        self.calls.append(("init", width, height, title))
+    def init(self, width, height, *, title, display_scale=None):
+        self.calls.append(("init", width, height, title, display_scale))
 
     def run(self, update, draw):
         for _ in range(47):
@@ -142,13 +142,42 @@ def test_run_connects_world_and_audio_to_pyxel(monkeypatch):
 
     run()
 
-    assert ("init", 160, 120, "PyKIM") in fake.calls
+    assert ("init", 160, 120, "PyKIM", None) in fake.calls
     assert ("pset", 10, 20, 2) in fake.calls
     assert ("pset", 10, 20, 1) in fake.calls
     assert not any(call[0] in ("circ", "line") for call in fake.calls)
     assert ("play", 0, 0) in fake.calls
     assert fake.sounds[0].notes == [24]
     assert fake.sounds[0].speed == 60
+
+
+def test_world_zoom_magnifies_pixels_without_resizing_window(monkeypatch):
+    fake = FakePyxel()
+    monkeypatch.setitem(sys.modules, "pyxel", fake)
+
+    pykim.world.zoom(7)
+    set_x(80)
+    set_y(60)
+    run()
+
+    assert ("init", 160, 120, "PyKIM", None) in fake.calls
+    assert any(call[0] == "rect" and call[3:5] == (7, 7) for call in fake.calls)
+
+
+def test_world_zoom_camera_centers_on_kim_and_clamps_at_edges():
+    pykim.world.zoom(4)
+
+    set_x(80)
+    set_y(60)
+    assert pykim._screen_position(80, 60) == (80, 60)
+
+    set_x(0)
+    set_y(0)
+    assert pykim._screen_position(0, 0) == (0, 0)
+
+    set_x(159)
+    set_y(119)
+    assert pykim._screen_position(159, 119) == (156, 116)
 
 
 def test_kim_rotates_through_all_visible_colors():

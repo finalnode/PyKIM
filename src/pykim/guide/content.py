@@ -183,8 +183,15 @@ Die vollständige, jeweils aktuelle Referenz steht in der
 PYODIDE_PLAYGROUND = r"""
 <div class="pykim-playground">
   <p id="pyodide-status"><strong>Python wird erst beim Ausführen geladen.</strong></p>
-  <textarea id="pyodide-code" spellcheck="false">for zahl in range(1, 6):
+  <div class="pykim-playground-editor">
+    <pre id="pyodide-highlight" aria-hidden="true"><code></code></pre>
+    <textarea id="pyodide-code" aria-label="Python-Code" spellcheck="false"
+      autocapitalize="off" autocomplete="off"
+      oninput="window.syncPyKIMBrowserEditor()"
+      onscroll="window.syncPyKIMBrowserEditorScroll()"
+      onkeydown="return window.handlePyKIMBrowserEditorKey(event)">for zahl in range(1, 6):
     print(zahl, zahl * zahl)</textarea>
+  </div>
   <div style="margin: .75rem 0">
     <button class="pykim-run-button" onclick="window.runPyKIMPython()">▶ Ausführen</button>
     <button class="pykim-clear-button" onclick="window.stopPyKIMBrowserPython()">■ Stoppen</button>

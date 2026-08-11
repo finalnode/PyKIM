@@ -1,5 +1,21 @@
 # Änderungen
 
+## 0.4.0
+
+- `world.zoom()` als Kamera-Zoom umgesetzt: größere Weltpixel bei unveränderter
+  Fenster- und Weltgröße
+- Projektansicht zu einem Arbeitsbereich mit seitlicher Projektauswahl und
+  breitem Python-Editor umgebaut
+- `README.md` pro Schülerprojekt samt Markdown-Editor, Live-Vorschau und
+  Reflexionsvorlage ergänzt
+- atomare Speicherung und Konflikterkennung für Projektcode und Dokumentation
+  eingebaut
+- übernommene Pyxel-Beispiele sofort mit „Meine Projekte“ synchronisiert
+- Python-Spielwiese um Syntaxhervorhebung sowie Ein- und Ausrücken mit
+  `Tab`/`Shift+Tab` erweitert
+- festen, kompakten Suite-Footer mit Repository-, Lizenz- und Herkunftshinweis
+  ergänzt
+
 ## 0.3.0
 
 - PyKIM Suite als lokale Desktop-Lernumgebung ausgebaut

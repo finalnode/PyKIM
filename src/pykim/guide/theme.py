@@ -42,6 +42,59 @@ def configure_theme(ui) -> None:
                 font-weight: 700;
             }
             #pykim-main { scroll-margin-top: 7rem; }
+            .pykim-footer {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 2000;
+                min-height: 1.8rem;
+                padding: .25rem 1rem;
+                color: #f4f4f4;
+                background: #4f5154;
+                border-top: 2px solid #f36b2b;
+                box-shadow: 0 -2px 7px rgba(38, 38, 38, .14);
+            }
+            .pykim-footer-claim {
+                color: #f4f4f4;
+                font-size: .72rem;
+                letter-spacing: .01em;
+            }
+            .pykim-footer-version {
+                color: #d7d8d9;
+                font-size: .7rem;
+            }
+            .pykim-footer-link {
+                color: white !important;
+                font-size: .72rem;
+                font-weight: 600;
+                text-decoration: underline;
+                text-underline-offset: .2rem;
+            }
+            .pykim-footer-link:hover { color: #ffc3a6 !important; }
+            .q-page-container { padding-bottom: 2.4rem; }
+            .pykim-project-workspace {
+                min-height: 48rem;
+                border: 1px solid #d7d8d9;
+                border-radius: .5rem;
+                overflow: hidden;
+                background: white;
+            }
+            .pykim-project-workspace .q-splitter__before {
+                background: #f5f5f4;
+                border-right: 1px solid #d7d8d9;
+            }
+            .pykim-project-selector .q-tab {
+                justify-content: flex-start;
+                min-height: 2.8rem;
+                padding: .35rem .75rem;
+                text-align: left;
+            }
+            .pykim-project-selector .q-tab--active {
+                color: #d95316;
+                background: #fff0e8;
+                font-weight: 700;
+            }
             pre.pykim-copy-ready {
                 position: relative;
                 padding: 1rem 1.1rem !important;
@@ -84,11 +137,51 @@ def configure_theme(ui) -> None:
                 font: .85rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
             }
             .pykim-code-options { display: none !important; }
-            .pykim-playground textarea {
-                width: 100%; min-height: 15rem; padding: 1rem;
+            .pykim-playground-editor {
+                position: relative;
+                width: 100%;
+                min-height: 15rem;
+                overflow: hidden;
                 border: 1px solid #cfd0d1; border-left: 4px solid #f36b2b;
                 border-radius: .45rem; background: #f5f5f4;
+            }
+            .pykim-playground-editor textarea,
+            .pykim-playground-editor pre {
+                box-sizing: border-box;
+                width: 100%; min-height: 15rem; margin: 0; padding: 1rem;
+                border: 0; background: transparent;
+                tab-size: 4;
+                white-space: pre;
+                overflow: auto;
                 font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+            }
+            .pykim-playground-editor pre {
+                position: absolute; inset: 0;
+                pointer-events: none;
+                color: #262626;
+            }
+            .pykim-playground-editor pre code {
+                font: inherit;
+                white-space: inherit;
+            }
+            .pykim-playground-editor textarea {
+                position: relative;
+                resize: vertical;
+                color: transparent;
+                caret-color: #262626;
+                -webkit-text-fill-color: transparent;
+            }
+            .pykim-playground-editor textarea::selection {
+                background: rgba(31, 111, 235, .25);
+            }
+            .pykim-python-keyword { color: #1565c0; font-weight: 650; }
+            .pykim-python-builtin { color: #7b1fa2; }
+            .pykim-python-string { color: #c62828; }
+            .pykim-python-comment { color: #397b7b; font-style: italic; }
+            .pykim-python-number { color: #8a4f08; }
+            .pykim-playground-editor:focus-within {
+                outline: 3px solid #1f6feb;
+                outline-offset: 2px;
             }
             .pykim-run-button, .pykim-clear-button {
                 border: 0; border-radius: .4rem; padding: .55rem .9rem;
@@ -268,8 +361,123 @@ def configure_theme(ui) -> None:
                 const editor = document.getElementById('pyodide-code');
                 const output = document.getElementById('pyodide-output');
                 if (editor) editor.value = 'for zahl in range(1, 6):\n    print(zahl, zahl * zahl)';
+                window.syncPyKIMBrowserEditor();
                 if (output) output.textContent = 'Bereit.';
             };
+            const escapePyKIMCode = value => value
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;');
+            window.highlightPyKIMPython = source => {
+                const keywords = new Set([
+                    'and', 'as', 'assert', 'async', 'await', 'break', 'case',
+                    'class', 'continue', 'def', 'del', 'elif', 'else', 'except',
+                    'False', 'finally', 'for', 'from', 'global', 'if', 'import',
+                    'in', 'is', 'lambda', 'match', 'None', 'nonlocal', 'not',
+                    'or', 'pass', 'raise', 'return', 'True', 'try', 'while',
+                    'with', 'yield'
+                ]);
+                const builtins = new Set([
+                    'bool', 'dict', 'enumerate', 'float', 'input', 'int', 'len',
+                    'list', 'max', 'min', 'print', 'range', 'set', 'str', 'sum',
+                    'tuple', 'type', 'zip'
+                ]);
+                let result = '';
+                let index = 0;
+                const span = (kind, value) =>
+                    `<span class="pykim-python-${kind}">${escapePyKIMCode(value)}</span>`;
+                while (index < source.length) {
+                    const character = source[index];
+                    if (character === '#') {
+                        let end = source.indexOf('\n', index);
+                        if (end < 0) end = source.length;
+                        result += span('comment', source.slice(index, end));
+                        index = end;
+                    } else if (character === '"' || character === "'") {
+                        const quote = character;
+                        const triple = source.slice(index, index + 3) === quote.repeat(3);
+                        let end = index + (triple ? 3 : 1);
+                        while (end < source.length) {
+                            if (source[end] === '\\') {
+                                end += 2;
+                            } else if (triple && source.slice(end, end + 3) === quote.repeat(3)) {
+                                end += 3;
+                                break;
+                            } else if (!triple && source[end] === quote) {
+                                end += 1;
+                                break;
+                            } else {
+                                end += 1;
+                            }
+                        }
+                        result += span('string', source.slice(index, end));
+                        index = end;
+                    } else if (/[A-Za-z_]/.test(character)) {
+                        let end = index + 1;
+                        while (end < source.length && /[A-Za-z0-9_]/.test(source[end])) end += 1;
+                        const word = source.slice(index, end);
+                        result += keywords.has(word) ? span('keyword', word)
+                            : builtins.has(word) ? span('builtin', word)
+                            : escapePyKIMCode(word);
+                        index = end;
+                    } else if (/\d/.test(character)) {
+                        let end = index + 1;
+                        while (end < source.length && /[\d._]/.test(source[end])) end += 1;
+                        result += span('number', source.slice(index, end));
+                        index = end;
+                    } else {
+                        result += escapePyKIMCode(character);
+                        index += 1;
+                    }
+                }
+                return result + (source.endsWith('\n') ? ' ' : '');
+            };
+            window.syncPyKIMBrowserEditor = () => {
+                const editor = document.getElementById('pyodide-code');
+                const code = document.querySelector('#pyodide-highlight code');
+                if (!editor || !code) return;
+                code.innerHTML = window.highlightPyKIMPython(editor.value);
+                window.syncPyKIMBrowserEditorScroll();
+            };
+            window.syncPyKIMBrowserEditorScroll = () => {
+                const editor = document.getElementById('pyodide-code');
+                const highlight = document.getElementById('pyodide-highlight');
+                if (!editor || !highlight) return;
+                highlight.scrollTop = editor.scrollTop;
+                highlight.scrollLeft = editor.scrollLeft;
+            };
+            window.handlePyKIMBrowserEditorKey = event => {
+                if (event.key !== 'Tab') return true;
+                event.preventDefault();
+                const editor = event.currentTarget;
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const lineStart = editor.value.lastIndexOf('\n', start - 1) + 1;
+                if (!event.shiftKey && start === end) {
+                    editor.setRangeText('    ', start, end, 'end');
+                } else {
+                    const selectedEnd = editor.value.indexOf('\n', end);
+                    const blockEnd = selectedEnd < 0 ? editor.value.length : selectedEnd;
+                    const block = editor.value.slice(lineStart, blockEnd);
+                    const lines = block.split('\n');
+                    const changed = event.shiftKey
+                        ? lines.map(line => line.startsWith('    ') ? line.slice(4)
+                            : line.startsWith('\t') ? line.slice(1) : line.replace(/^ {1,3}/, ''))
+                        : lines.map(line => `    ${line}`);
+                    editor.setRangeText(changed.join('\n'), lineStart, blockEnd, 'select');
+                }
+                window.syncPyKIMBrowserEditor();
+                return false;
+            };
+            const initializePyKIMBrowserEditor = () => {
+                const editor = document.getElementById('pyodide-code');
+                if (!editor || editor.dataset.highlightReady) return;
+                editor.dataset.highlightReady = 'true';
+                window.syncPyKIMBrowserEditor();
+            };
+            new MutationObserver(initializePyKIMBrowserEditor).observe(
+                document.documentElement, {childList: true, subtree: true}
+            );
             window.runPyKIMPython = async () => {
                 const output = document.getElementById('pyodide-output');
                 const code = document.getElementById('pyodide-code').value;

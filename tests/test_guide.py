@@ -69,7 +69,10 @@ from pykim.guide.projects import (
     create_project,
     launch_project,
     load_project,
+    project_text,
+    project_text_hash,
     project_slug,
+    save_project_text,
     student_projects,
 )
 from pykim.guide.library import (
@@ -126,6 +129,8 @@ def test_browser_playground_starts_with_plain_python_and_has_reset_action():
     assert "resetPyKIMBrowserExample" in PYODIDE_PLAYGROUND
     assert "stopPyKIMBrowserPython" in PYODIDE_PLAYGROUND
     assert "erst beim Ausführen geladen" in PYODIDE_PLAYGROUND
+    assert "pyodide-highlight" in PYODIDE_PLAYGROUND
+    assert "handlePyKIMBrowserEditorKey" in PYODIDE_PLAYGROUND
 
 
 def test_every_exercise_has_a_complete_assignment():
@@ -419,11 +424,35 @@ def test_create_and_load_pyxel_project_with_relative_resources(tmp_path):
     assert project.slug == "mein_ratsel"
     assert project.entrypoint == tmp_path / "Projekte" / "mein_ratsel" / "main.py"
     assert project.resources == project.directory / "ressourcen.pyxres"
+    assert project.documentation == project.directory / "README.md"
+    assert "# Mein Projekt" in project.documentation.read_text(encoding="utf-8")
     assert 'pyxel.load("ressourcen.pyxres")' in project.entrypoint.read_text(encoding="utf-8")
     assert load_project(project.directory) == project
     assert student_projects(tmp_path) == (project,)
     with pytest.raises(FileExistsError, match="existiert bereits"):
         create_project(tmp_path, "Mein Rätsel!", "pyxel")
+
+
+def test_project_code_and_documentation_detect_external_changes(tmp_path):
+    project = create_project(tmp_path, "Dokumentiertes Spiel", "pykim")
+    documentation = project_text(project, project.documentation)
+
+    save_project_text(
+        project,
+        project.documentation,
+        "# Meine Erklärung\n",
+        expected_hash=project_text_hash(documentation),
+    )
+    assert project.documentation.read_text(encoding="utf-8") == "# Meine Erklärung\n"
+
+    project.documentation.write_text("# Extern geändert\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="außerhalb"):
+        save_project_text(
+            project,
+            project.documentation,
+            "# Überschreiben\n",
+            expected_hash=project_text_hash("# Meine Erklärung\n"),
+        )
 
 
 def test_project_metadata_cannot_escape_its_directory(tmp_path):
