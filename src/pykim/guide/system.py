@@ -220,7 +220,14 @@ def run_student_program(path: str | Path, course: str | Path) -> Path:
     from .runtime import selected_runtime
 
     python = selected_runtime(course).executable
-    subprocess.Popen([*command_for(python), str(target)], cwd=target.parent)
+    environment = os.environ.copy()
+    existing_pythonpath = environment.get("PYTHONPATH", "")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(Path(course).expanduser().resolve()), existing_pythonpath) if part
+    )
+    subprocess.Popen(
+        [*command_for(python), str(target)], cwd=target.parent, env=environment
+    )
     return target
 
 
@@ -233,6 +240,10 @@ def execute_student_program(path: str | Path, course: str | Path) -> ProgramResu
 
     environment = os.environ.copy()
     environment["PYTHONUNBUFFERED"] = "1"
+    existing_pythonpath = environment.get("PYTHONPATH", "")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(Path(course).expanduser().resolve()), existing_pythonpath) if part
+    )
     completed = subprocess.run(
         [*command_for(selected_runtime(course).executable), str(target)],
         cwd=target.parent,

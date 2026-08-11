@@ -46,6 +46,12 @@ class ExecutionManager:
         target = self._target(path, course)
         environment = os.environ.copy()
         environment["PYTHONUNBUFFERED"] = "1"
+        existing_pythonpath = environment.get("PYTHONPATH", "")
+        environment["PYTHONPATH"] = os.pathsep.join(
+            part
+            for part in (str(Path(course).expanduser().resolve()), existing_pythonpath)
+            if part
+        )
         with self._lock:
             previous = self._processes.get(target)
             if previous is not None and previous.poll() is None:

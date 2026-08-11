@@ -5,6 +5,7 @@ import getpass
 import json
 from pathlib import Path
 
+from pykim.guide.course_setup import generate_course_setup
 from .crypto import generate_course_credentials
 from .teacher import create_teacher_report, decrypt_submission
 
@@ -21,6 +22,16 @@ def _password(value: str | None, *, confirm: bool = False) -> str:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="PyKIM-Abgaben für Lehrkräfte")
     commands = result.add_subparsers(dest="command", required=True)
+    setup = commands.add_parser("setup", help="schlanke Kurs-Setupdatei erzeugen")
+    setup.add_argument("--teacher", required=True)
+    setup.add_argument("--school", required=True)
+    setup.add_argument("--course", required=True)
+    setup.add_argument("--output", type=Path, required=True)
+    setup.add_argument("--repository", required=True)
+    setup.add_argument("--branch", default="main")
+    setup.add_argument("--scripts-path", default="Skripte")
+    setup.add_argument("--assignments-path", default="Aufgaben")
+    setup.add_argument("--trainers-path", default="Trainer")
     keygen = commands.add_parser("keygen", help="Kurszertifikat und privaten Schlüssel erzeugen")
     keygen.add_argument("--teacher", required=True)
     keygen.add_argument("--school", required=True)
@@ -50,6 +61,20 @@ def parser() -> argparse.ArgumentParser:
 
 def main(arguments: list[str] | None = None) -> None:
     options = parser().parse_args(arguments)
+    if options.command == "setup":
+        setup_file = generate_course_setup(
+            options.output,
+            teacher=options.teacher,
+            school=options.school,
+            course=options.course,
+            repository=options.repository,
+            branch=options.branch,
+            scripts_path=options.scripts_path,
+            assignments_path=options.assignments_path,
+            trainers_path=options.trainers_path,
+        )
+        print(f"Setupdatei für Schüler: {setup_file}")
+        return
     if options.command == "keygen":
         certificate, private_key = generate_course_credentials(
             options.output,

@@ -168,30 +168,16 @@ def create_course(path: str | Path, student_name: str = "") -> dict[str, object]
     created: list[str] = []
     existing: list[str] = []
 
-    for section, exercises in SECTIONS.items():
+    for section in SECTIONS:
         section_directory = course / section
         section_directory.mkdir(parents=True, exist_ok=True)
-        for exercise in exercises:
-            target = section_directory / f"{exercise.replace('-', '_')}.py"
-            if target.exists():
-                existing.append(str(target.relative_to(course)))
-                continue
-            legacy = next(
-                (candidate for candidate in course.rglob(target.name) if candidate != target),
-                None,
-            )
-            if legacy is not None:
-                # Alte nummerierte Kursordner bleiben unangetastet; die Lösung
-                # wird in die neue Paradigmenstruktur übernommen.
-                shutil.copy2(legacy, target)
-            else:
-                target.write_text(starter_source(exercise), encoding="utf-8")
-            created.append(str(target.relative_to(course)))
-
+    # Aufgaben werden erst nach dem Import einer Kurs-Setupdatei provisioniert.
     # Der alte Ordner bleibt für bereits angelegte Kopien erhalten. Neue
     # Projekte werden strukturiert unter ``Projekte`` gespeichert.
     (course / "eigene_projekte").mkdir(exist_ok=True)
     (course / "Projekte").mkdir(exist_ok=True)
+    from .extensions import ensure_extension_module
+    ensure_extension_module(course)
     metadata = course / ".pykim-course.json"
     if not metadata.exists():
         metadata_data = {"format": 1, "student_name": student_name, "course": "PyKIM"}
@@ -213,3 +199,31 @@ def create_course(path: str | Path, student_name: str = "") -> dict[str, object]
 
     set_course_directory(course)
     return {"path": str(course), "created": created, "existing": existing}
+
+
+def provision_course_exercises(path: str | Path) -> dict[str, list[str]]:
+    """Lege Starterdateien ausschließlich aus dem aktivierten Kursinhalt an."""
+    from .library import PARADIGMS, task_documents
+
+    course = Path(path).expanduser().resolve()
+    created: list[str] = []
+    existing: list[str] = []
+    for paradigm in PARADIGMS:
+        section_directory = course / "Aufgaben" / paradigm
+        section_directory.mkdir(parents=True, exist_ok=True)
+        for document in task_documents(paradigm):
+            exercise = document.name
+            target = section_directory / f"{exercise.replace('-', '_')}.py"
+            if target.exists():
+                existing.append(str(target.relative_to(course)))
+                continue
+            legacy = next(
+                (candidate for candidate in course.rglob(target.name) if candidate != target),
+                None,
+            )
+            if legacy is not None:
+                shutil.copy2(legacy, target)
+            else:
+                target.write_text(starter_source(exercise), encoding="utf-8")
+            created.append(str(target.relative_to(course)))
+    return {"created": created, "existing": existing}

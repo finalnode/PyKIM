@@ -8,27 +8,25 @@ from .models import CheckReport
 
 
 def _refresh_remote_trainers() -> None:
-    """Prüfe vor der Bewertung die vom Kurszertifikat festgelegten Trainer."""
+    """Prüfe vor der Bewertung die von der Kurs-Setupdatei festgelegten Trainer."""
     try:
         from pykim.guide.course import get_course_directory
         from pykim.guide.updates import verify_certificate_trainers
-        from pykim.submission.export import (
-            course_certificate_info,
-            verify_installed_course_certificate,
+        from pykim.guide.course_setup import (
+            course_setup_info,
+            verify_installed_course_setup,
         )
 
         course = get_course_directory()
         if course is None:
             return
-        certificate = course_certificate_info(course)
-        if certificate is None or certificate.content is None:
+        setup = course_setup_info(course)
+        if setup is None:
             return
-        certificate, authorization = verify_installed_course_certificate(
+        setup, _authorization = verify_installed_course_setup(
             course, allow_offline=True
         )
-        if not authorization.checked_online:
-            print("\nHinweis: Zertifikatsprüfung offline; verwende das zuletzt zugelassene Zertifikat.")
-        result = verify_certificate_trainers(certificate.content)
+        result = verify_certificate_trainers(setup)
         if not result.checked_online:
             print("\nHinweis: Repository nicht erreichbar; verwende zuletzt geprüfte Trainerdaten.")
         elif result.updated:

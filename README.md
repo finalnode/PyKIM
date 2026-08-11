@@ -1,9 +1,50 @@
 # PyKIM
 
-PyKIM 0.2.0 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
+PyKIM 0.3.0 ist eine kleine Python-Lernumgebung auf Basis von Pyxel. Kim, eine
 kleine Drohne, bewegt sich pixelweise durch eine 160 × 120 Pixel große Welt,
 liest und verändert Farben und kann einfache Töne spielen. Die gesamte Logik
 funktioniert auch ohne ein geöffnetes Grafikfenster und ist daher gut testbar.
+
+## Was PyKIM 0.3 kann
+
+### Programmieren mit KIM
+
+- Pixelweise Bewegungen in einer 160 × 120 Pixel großen Welt
+- Farben lesen, einzelne Punkte malen und farbige Spuren zeichnen
+- Geschwindigkeit und schrittweise Animationen steuern
+- Töne, Pausen, Rhythmen und Melodien abspielen
+- Imperative Kurzbefehle sowie einen objektorientierten Zugang verwenden
+- Mehrere benannte Pixel sequenziell oder parallel bewegen
+- Pixel ein- und ausblenden sowie eigene Pixelklassen ableiten
+- Interaktive Programme mit Tastaturabfragen und einer Spielschleife schreiben
+- Schrittweise von PyKIM zu den entsprechenden Pyxel-Befehlen wechseln
+
+### Lernen und Testen in der Suite
+
+- Aufgaben direkt bearbeiten, speichern und ausführen
+- Automatische Testfälle mit deutschsprachigen Hinweisen anzeigen
+- Kontrollstrukturen und Codeumfang als Optimierungshinweise auswerten
+- Lernstand und persönliche Dokubuch-Einträge lokal speichern
+- Skriptkapitel, Cheatsheet, Beispiele und Pyxel-Beispiele anzeigen
+- Code aus der Suite in Thonny, VS Code oder einer eigenen IDE öffnen
+- Geeignete lokale Python-Interpreter erkennen und eine verwaltete Laufzeit nutzen
+- Eigene Pyxel-Projekte mit `.pyxres`-Ressourcen anlegen
+
+### Kurse und eigene Erweiterungen
+
+- Einen portablen Kursordner auf lokalen, USB- oder WebDAV-Laufwerken verwenden
+- Kurs, Repository, Branch und Inhaltspfade über eine schlanke
+  `.pykim-setup`-Datei konfigurieren
+- Skripte, Aufgaben und YAML-Trainer aus einem öffentlichen Git-Repository
+  synchronisieren
+- Trainerdaten vor einer Bewertung anhand der Repository-Hashes prüfen
+- Ohne Kurs-Setupdatei mit einer bewusst rudimentären Suite starten
+- Eigene Funktionen und Klassen in `erweiterungen.py` sammeln
+- Alle Erweiterungen oder einzelne Funktionen per kopierbarem Import verwenden
+- Doppelte Funktions- und Klassennamen vor dem Speichern erkennen
+
+Die Suite arbeitet lokal. Der derzeit ausgeblendete verschlüsselte
+Abgabe-Workflow ist technische Vorarbeit und noch nicht Bestandteil von 0.3.
 
 ## Installation
 

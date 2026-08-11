@@ -207,7 +207,7 @@ def main() -> int:
         "format": 1,
         "id": "pykim-standardkurs",
         "title": "PyKIM-Standardkurs",
-        "minimum_app_version": "0.2.0",
+        "minimum_app_version": "0.3.0",
         "chapters": chapters,
         "exercises": exercises,
     }

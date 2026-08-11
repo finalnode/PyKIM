@@ -74,10 +74,8 @@ def verify_certificate_authorization(
     timeout: float = 3.0,
     allow_offline: bool = False,
 ) -> TrainerVerification:
-    """Vergleiche das Zertifikat mit seiner gleichnamigen Repository-Hashdatei."""
+    """Kompatibilitätsprüfung für den ausgeblendeten alten Abgabeweg."""
     name = configuration.certificate_name
-    if not name:
-        raise ValueError("Das Zertifikat enthält keinen signierten Zertifikatsnamen.")
     repository = _repository_name(configuration.repository)
     branch = quote(configuration.branch, safe="")
     url = (
@@ -86,21 +84,12 @@ def verify_certificate_authorization(
     )
     try:
         remote = _download(url, timeout).decode("ascii").strip()
-    except HTTPError as error:
-        raise ValueError(
-            f"Das Zertifikat ist im Kurs-Repository nicht zugelassen (HTTP {error.code})."
-        ) from error
     except (URLError, TimeoutError, ConnectionError) as error:
         if allow_offline:
             return TrainerVerification(False, False, f"Zertifikatsprüfung offline: {error}")
-        raise ConnectionError("Das Kurs-Repository ist für die Zertifikatsprüfung nicht erreichbar.") from error
-    except UnicodeDecodeError as error:
-        raise ValueError("Der Zertifikatshash im Repository ist ungültig.") from error
+        raise
     expected = remote.removeprefix("sha256:").strip().casefold()
-    if len(expected) != 64 or any(character not in "0123456789abcdef" for character in expected):
-        raise ValueError("Der Zertifikatshash im Repository ist ungültig.")
-    actual = hashlib.sha256(certificate_data).hexdigest()
-    if actual != expected:
+    if hashlib.sha256(certificate_data).hexdigest() != expected:
         raise ValueError("Das Kurszertifikat ist im angegebenen Repository nicht zugelassen.")
     return TrainerVerification(True, False)
 

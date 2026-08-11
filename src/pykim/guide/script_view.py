@@ -5,6 +5,17 @@ from .library import PARADIGMS, render_script_markdown, script_chapters
 
 def render_script_reader(ui) -> None:
     """Zeige ein dauerhaftes Inhaltsmenü und genau ein Kapitel gleichzeitig."""
+    from .course import get_course_directory
+    from .course_setup import course_setup_info
+
+    course = get_course_directory()
+    if course is None or course_setup_info(course) is None:
+        ui.label("PyKIM-Skript").classes("text-2xl font-bold")
+        ui.label(
+            "Noch kein Kurs eingerichtet. Importiere im Setup die "
+            ".pykim-setup-Datei deiner Lehrkraft."
+        ).classes("text-grey-7")
+        return
     chapters = tuple(
         chapter
         for paradigm in PARADIGMS

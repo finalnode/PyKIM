@@ -10,6 +10,7 @@ def create_navigation(ui):
         tasks = ui.tab("Aufgaben", icon="checklist")
         examples = ui.tab("Beispiele", icon="lightbulb")
         projects = ui.tab("Meine Projekte", icon="folder_special")
+        extensions = ui.tab("Erweiterungen", icon="extension")
         submission = ui.tab("Abgabe", icon="upload_file")
         # Technische Vorarbeit bleibt erhalten, bis der Lernworkflow stabil ist.
         submission.set_visibility(False)
@@ -18,7 +19,7 @@ def create_navigation(ui):
         pyxel = ui.tab("Pyxel", icon="sports_esports")
         browser = ui.tab("Python-Spielwiese", icon="code")
     return tabs, (
-        setup, tools, overview, tasks, examples, projects, submission,
+        setup, tools, overview, tasks, examples, projects, extensions, submission,
         sheet, script, pyxel, browser,
     )
 

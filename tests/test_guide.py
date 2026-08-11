@@ -14,6 +14,7 @@ from pykim.guide.app import parse_arguments
 from pykim.guide.content import PYODIDE_PLAYGROUND
 from pykim.guide.course import (
     create_course,
+    provision_course_exercises,
     exercise_file,
     get_course_directory,
     get_ide_preference,
@@ -389,6 +390,7 @@ def test_course_setup_copies_legacy_solution_into_new_structure(tmp_path, monkey
     legacy.write_text("# meine alte Lösung\nright(5)\n", encoding="utf-8")
 
     create_course(course)
+    provision_course_exercises(course)
 
     migrated = course / "Aufgaben" / "imperativ" / "quadrat_5.py"
     assert migrated.read_text(encoding="utf-8") == legacy.read_text(encoding="utf-8")
@@ -527,11 +529,13 @@ def test_course_setup_creates_all_starters_and_preserves_student_work(
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(config))
 
     first = create_course(course, "Ada")
+    provisioned = provision_course_exercises(course)
     square = course / "Aufgaben" / "imperativ" / "quadrat_5.py"
     square.write_text("# meine Lösung", encoding="utf-8")
-    second = create_course(course, "Ada")
+    second = provision_course_exercises(course)
 
-    assert len(first["created"]) == 12
+    assert first["created"] == [".pykim-course.json"]
+    assert len(provisioned["created"]) == 11
     assert square.read_text(encoding="utf-8") == "# meine Lösung"
     assert "Aufgaben/imperativ/quadrat_5.py" in second["existing"]
     assert get_course_directory() == course.resolve()
@@ -842,24 +846,24 @@ def test_trainer_records_an_attempt_when_course_is_configured(
     assert progress["attempts"][0]["successful"]
 
 
-def test_trainer_check_verifies_certificate_repository_first(tmp_path, monkeypatch):
+def test_trainer_check_verifies_setup_repository_first(tmp_path, monkeypatch):
     from types import SimpleNamespace
     from pykim.guide.updates import TrainerVerification
     from pykim.trainer import runner
 
     course = tmp_path / "course"
     course.mkdir()
-    content = SimpleNamespace(repository="https://github.com/example/course.git")
+    setup = SimpleNamespace(repository="https://github.com/example/course.git")
     calls = []
     monkeypatch.setenv("PYKIM_COURSE_DIR", str(course))
     monkeypatch.setattr(
-        "pykim.submission.export.course_certificate_info",
-        lambda _course: SimpleNamespace(content=content),
+        "pykim.guide.course_setup.course_setup_info",
+        lambda _course: setup,
     )
     monkeypatch.setattr(
-        "pykim.submission.export.verify_installed_course_certificate",
+        "pykim.guide.course_setup.verify_installed_course_setup",
         lambda _course, allow_offline: (
-            SimpleNamespace(content=content),
+            setup,
             TrainerVerification(True, False),
         ),
     )
@@ -870,7 +874,7 @@ def test_trainer_check_verifies_certificate_repository_first(tmp_path, monkeypat
 
     runner._refresh_remote_trainers()
 
-    assert calls == [content]
+    assert calls == [setup]
 
 
 def test_record_attempt_is_disabled_without_a_configured_course(
@@ -900,6 +904,7 @@ def test_exercise_file_finds_the_generated_starter(tmp_path, monkeypatch):
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     course = tmp_path / "course"
     create_course(course)
+    provision_course_exercises(course)
 
     assert exercise_file("treppe-5") == course / "Aufgaben" / "imperativ" / "treppe_5.py"
     assert exercise_file("gibt-es-nicht") is None
@@ -1344,7 +1349,7 @@ def test_run_student_program_is_limited_to_python_files_in_course(
     calls = []
     monkeypatch.setattr(
         "pykim.guide.system.subprocess.Popen",
-        lambda command, cwd=None: calls.append((command, cwd)),
+        lambda command, cwd=None, env=None: calls.append((command, cwd, env)),
     )
     monkeypatch.setattr(
         "pykim.guide.runtime.selected_runtime",
@@ -1356,6 +1361,7 @@ def test_run_student_program_is_limited_to_python_files_in_course(
     assert run_student_program(task, course) == task
     assert calls[0][0][1] == str(task)
     assert calls[0][1] == task.parent
+    assert str(course.resolve()) in calls[0][2]["PYTHONPATH"].split(__import__("os").pathsep)
 
     outside = tmp_path / "outside.py"
     outside.write_text("print('no')", encoding="utf-8")
@@ -1438,6 +1444,7 @@ def test_reset_exercise_creates_backups_for_source_and_progress(tmp_path, monkey
     course = tmp_path / "course"
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     create_course(course)
+    provision_course_exercises(course)
     task = exercise_file("quadrat-5", course)
     assert task is not None
     task.write_text("right(5)\n", encoding="utf-8")

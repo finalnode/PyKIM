@@ -40,7 +40,7 @@ def main(arguments: list[str] | None = None) -> int:
     manifest = {
         "format": 1,
         "content_version": options.version,
-        "minimum_app_version": "0.2.0",
+        "minimum_app_version": "0.3.0",
         "package_url": (
             "https://github.com/finalnode/PyKIM/releases/download/"
             f"content-{options.version}/{archive.name}"

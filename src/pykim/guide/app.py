@@ -5,6 +5,9 @@ from pathlib import Path
 
 from pykim.trainer.exercises import get_exercise
 from pykim.trainer.assignments import get_assignment
+from .course_setup import course_setup_info, install_course_setup
+# Der verschlüsselte Abgabeexport ist vorerst ausgeblendet und bleibt als
+# getrennte technische Vorarbeit erhalten; er ist kein Teil der Kurs-Setupdatei.
 from pykim.submission.export import (
     course_certificate_info,
     create_encrypted_submission,
@@ -46,6 +49,7 @@ from .runtime import (
 from .examples_view import render_examples_view
 from .pyxel_examples_view import render_pyxel_examples_view
 from .projects_view import render_projects_view
+from .extensions_view import render_extensions_view
 from .execution import execution_manager, script_example_manager
 from .progress import clear_exercise_progress, load_progress, save_journal_entry
 from .script_view import render_script_reader
@@ -121,17 +125,18 @@ def main(
         ui.link("Zum Hauptinhalt springen", "#pykim-main").classes("pykim-skip-link")
         with ui.header().classes("pykim-header"):
             with ui.row().classes("pykim-header-top w-full items-center no-wrap"):
-                ui.label("PyKIM Suite").classes("text-xl font-bold")
                 configured = get_course_directory()
+                header_setup = None
                 if configured is not None:
                     try:
-                        header_certificate = course_certificate_info(configured)
+                        header_setup = course_setup_info(configured)
                     except (OSError, ValueError):
-                        header_certificate = None
-                    if header_certificate is not None:
-                        ui.badge(
-                            f"Kurs: {header_certificate.course}", color="primary"
-                        ).props("outline")
+                        header_setup = None
+                ui.label("PyKIM Suite").classes("text-xl font-bold")
+                if header_setup is not None:
+                    ui.label(f"· {header_setup.course}").classes(
+                        "text-lg font-medium text-white"
+                    )
                 ui.space()
                 current_student = get_student_name(configured) or system_user_name()
                 ui.label(f"Hallo, {current_student}").classes("text-sm")
@@ -147,6 +152,7 @@ def main(
                 tasks_tab,
                 examples_tab,
                 projects_tab,
+                extensions_tab,
                 submission_tab,
                 sheet_tab,
                 script_tab,
@@ -521,11 +527,11 @@ def main(
                 ui.button("Kursordner anlegen oder ergänzen", on_click=setup, icon="create_new_folder")
 
                 ui.separator()
-                ui.label("Kurszertifikat und Lerninhalte").classes("text-xl font-bold")
+                ui.label("Kurs-Setupdatei und Lerninhalte").classes("text-xl font-bold")
                 ui.label(
-                    "Das Zertifikat legt Repository, Branch und Inhaltspfade fest. "
+                    "Die Setupdatei legt Kurs, Repository, Branch und Inhaltspfade fest. "
                     "Beim Import lädt die Suite den geprüften Kursinhalt und aktiviert "
-                    "ihn nach einem Neustart."
+                    "ihn direkt. Sie enthält keine Schlüssel oder Verschlüsselungsdaten."
                 ).classes("text-sm text-grey-7")
                 setup_certificate_status = ui.column().classes("w-full gap-1")
 
@@ -534,21 +540,15 @@ def main(
                     course = Path(path.value).expanduser().resolve()
                     with setup_certificate_status:
                         try:
-                            info = course_certificate_info(course)
+                            info = course_setup_info(course)
                         except (OSError, ValueError) as error:
-                            ui.label(f"Zertifikat ungültig: {error}").classes("text-negative")
+                            ui.label(f"Setupdatei ungültig: {error}").classes("text-negative")
                             return
                         if info is None:
-                            ui.label("Noch kein Kurszertifikat importiert.").classes("text-grey-7")
-                        elif info.content is None:
-                            ui.label(f"Zertifikat für {info.course} – ohne Inhaltsquelle.")
+                            ui.label("Noch keine Kurs-Setupdatei importiert.").classes("text-grey-7")
                         else:
-                            ui.label(f"Zertifikat für {info.course}").classes("font-bold")
-                            ui.label(f"{info.content.repository} · {info.content.branch}")
-                            if info.content.certificate_name:
-                                ui.label(f"Zulassung: {info.content.certificate_name}").classes(
-                                    "text-sm text-grey-7"
-                                )
+                            ui.label(f"Kurs: {info.course}").classes("font-bold")
+                            ui.label(f"{info.repository} · {info.branch}")
 
                 async def import_setup_certificate(data: bytes) -> None:
                     course = Path(path.value).expanduser().resolve()
@@ -559,13 +559,16 @@ def main(
                     certificate_button.disable()
                     try:
                         info = await nicegui_run.io_bound(
-                            install_course_certificate, data, course
+                            install_course_setup, data, course
                         )
                         render_setup_certificate()
-                        message = f"Zertifikat für {info.course} importiert."
-                        if info.content is not None:
-                            message += " Lerninhalte wurden synchronisiert; bitte Suite neu starten."
-                        ui.notify(message, type="positive", timeout=8000)
+                        from pykim.trainer.exercises import refresh_exercises
+                        refresh_exercises()
+                        ui.notify(
+                            f"Setupdatei für {info.course} importiert; Lerninhalte wurden aktiviert.",
+                            type="positive", timeout=5000,
+                        )
+                        ui.navigate.reload()
                     except Exception as error:
                         ui.notify(f"Import oder Synchronisierung fehlgeschlagen: {error}", type="negative")
                     finally:
@@ -583,8 +586,8 @@ def main(
                     )
                     if selected:
                         certificate_path = Path(selected[0])
-                        if certificate_path.suffix != ".pykim-cert":
-                            ui.notify("Wähle eine .pykim-cert-Datei.", type="negative")
+                        if certificate_path.suffix != ".pykim-setup":
+                            ui.notify("Wähle eine .pykim-setup-Datei.", type="negative")
                             return
                         await import_setup_certificate(certificate_path.read_bytes())
 
@@ -594,17 +597,17 @@ def main(
                 with ui.row().classes("items-center gap-2"):
                     if desktop:
                         certificate_button = ui.button(
-                            "Kurszertifikat auswählen",
+                            "Kurs-Setupdatei auswählen",
                             on_click=choose_setup_certificate,
-                            icon="workspace_premium",
+                            icon="settings_suggest",
                         ).props("outline")
                     else:
                         certificate_button = ui.upload(
-                            label="Kurszertifikat auswählen",
+                            label="Kurs-Setupdatei auswählen",
                             on_upload=upload_setup_certificate,
                             auto_upload=True,
                             max_file_size=1_000_000,
-                        ).props("accept=.pykim-cert")
+                        ).props("accept=.pykim-setup")
                     certificate_activity = ui.spinner(size="lg", color="primary")
                     certificate_activity.set_visibility(False)
                 render_setup_certificate()
@@ -853,7 +856,9 @@ def main(
                 refresh_button.on("click", refresh_updates)
                 ui.timer(0.2, refresh_updates, once=True)
 
-                render_authoring_view(ui)
+                author_course = get_course_directory()
+                if author_course is not None and course_setup_info(author_course) is not None:
+                    render_authoring_view(ui)
 
             with ui.tab_panel(overview_tab):
                 overview_container = ui.column().classes("w-full")
@@ -861,7 +866,19 @@ def main(
                 def refresh_overview() -> None:
                     overview_container.clear()
                     with overview_container:
-                        render_overview(ui)
+                        overview_course = get_course_directory()
+                        if (
+                            overview_course is not None
+                            and course_setup_info(overview_course) is not None
+                        ):
+                            render_overview(ui)
+                        else:
+                            ui.label("PyKIM Suite").classes("text-2xl font-bold")
+                            ui.label(
+                                "Lege zuerst einen Kursordner an und importiere die "
+                                ".pykim-setup-Datei deiner Lehrkraft. Danach erscheinen "
+                                "hier Skript, Aufgaben und Lernstand."
+                            ).classes("text-grey-7")
 
                 refresh_overview()
 
@@ -870,11 +887,22 @@ def main(
                 journal = progress.get("journal", {})
                 ui.label("Aufgaben und Testfälle").classes("text-2xl font-bold")
                 current_paradigm = None
-                for task_document in (
+                tasks_course = get_course_directory()
+                has_course_setup = (
+                    tasks_course is not None
+                    and course_setup_info(tasks_course) is not None
+                )
+                visible_tasks = tuple(
                     document
                     for paradigm in PARADIGMS
                     for document in task_documents(paradigm)
-                ):
+                ) if has_course_setup else ()
+                if not visible_tasks:
+                    ui.label(
+                        "Noch kein Kurs eingerichtet. Importiere im Setup die "
+                        ".pykim-setup-Datei deiner Lehrkraft."
+                    ).classes("text-grey-7")
+                for task_document in visible_tasks:
                     name = task_document.name
                     if task_document.paradigm != current_paradigm:
                         current_paradigm = task_document.paradigm
@@ -1183,6 +1211,9 @@ def main(
 
             with ui.tab_panel(projects_tab):
                 render_projects_view(ui, _preferred_ide_label(), ide_open_buttons)
+
+            with ui.tab_panel(extensions_tab):
+                render_extensions_view(ui)
 
             with ui.tab_panel(submission_tab):
                 ui.label("Verschlüsselte Moodle-Abgabe").classes("text-2xl font-bold")
