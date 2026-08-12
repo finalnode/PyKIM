@@ -17,6 +17,13 @@ def test_test_extra_contains_collection_time_dependencies():
     assert any(dependency.startswith("Send2Trash") for dependency in dependencies)
 
 
+def test_windows_build_pins_compatible_pythonnet():
+    with (PROJECT / "pyproject.toml").open("rb") as source:
+        dependencies = tomllib.load(source)["project"]["optional-dependencies"]["build"]
+
+    assert "pythonnet==3.0.5; sys_platform == 'win32'" in dependencies
+
+
 def test_desktop_workflow_covers_all_release_targets():
     workflow = (PROJECT / ".github/workflows/build-desktop.yml").read_text(
         encoding="utf-8"

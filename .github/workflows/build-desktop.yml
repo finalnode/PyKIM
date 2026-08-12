@@ -42,7 +42,7 @@ jobs:
       - run: python tools/build_desktop_app.py
       - name: Eingebettetes Python prüfen
         shell: pwsh
-        run: '& "dist/windows/PyKIM Suite/PyKIM Python.exe" --pykim-python -c "import pykim; print(pykim.__version__)"'
+        run: '& "dist/windows/PyKIM Suite/PyKIM Python.exe" --pykim-python -c "import importlib.metadata, pykim; print(pykim.__version__); assert importlib.metadata.version(''pythonnet'') == ''3.0.5''"'
       - name: Echtes Windows-Fenster prüfen
         shell: pwsh
         run: ./tools/check_windows_desktop.ps1
