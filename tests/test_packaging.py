@@ -1,7 +1,20 @@
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 
 PROJECT = Path(__file__).parents[1]
+
+
+def test_test_extra_contains_collection_time_dependencies():
+    with (PROJECT / "pyproject.toml").open("rb") as source:
+        dependencies = tomllib.load(source)["project"]["optional-dependencies"]["test"]
+
+    assert any(dependency.startswith("cryptography") for dependency in dependencies)
+    assert any(dependency.startswith("Send2Trash") for dependency in dependencies)
 
 
 def test_desktop_workflow_covers_all_release_targets():
