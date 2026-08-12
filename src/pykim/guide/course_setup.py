@@ -142,9 +142,11 @@ def install_new_course_setup(
 
     create_course(course)
     from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.activities import refresh_activities
     from pykim.trainer.exercises import refresh_exercises
 
     refresh_exercises()
+    refresh_activities()
     refresh_assignments()
     provision_course_exercises(course)
     return info, course
@@ -173,9 +175,11 @@ def sync_installed_course_content(
     # Beide Registrys werden beim Modulimport aufgebaut und müssen deshalb nach
     # einem Startabgleich ausdrücklich auf den neuen Inhaltsstand zeigen.
     from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.activities import refresh_activities
     from pykim.trainer.exercises import refresh_exercises
 
     refresh_exercises()
+    refresh_activities()
     refresh_assignments()
     provision_course_exercises(selected)
     updated = previous.resolve() != target.resolve()

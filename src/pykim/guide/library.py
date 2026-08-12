@@ -13,6 +13,11 @@ _ANNOTATED_CODE = re.compile(
     r"(?P<fence>```python[ \t]*\n(?P<source>.*?)```)",
     flags=re.MULTILINE | re.DOTALL,
 )
+_ANNOTATED_TASK_BLOCK = re.compile(
+    r"^@block:[a-z0-9]+(?:-[a-z0-9]+)*[ \t]*\n"
+    r"```python[ \t]*\n.*?```[ \t]*(?:\n|$)",
+    flags=re.MULTILINE | re.DOTALL,
+)
 
 
 @dataclass(frozen=True)
@@ -140,6 +145,7 @@ def task_assignment(name: str) -> TaskAssignment:
 
 def render_task_markdown(content: str) -> str:
     """Blende Autorenmetadaten und die bereits angezeigte Überschrift aus."""
+    content = _ANNOTATED_TASK_BLOCK.sub("", content)
     lines = content.splitlines()
     heading_hidden = False
     visible = []
@@ -154,10 +160,11 @@ def render_task_markdown(content: str) -> str:
 
 
 def task_names() -> tuple[str, ...]:
-    """Liefere nur automatisch prüfbare Aufgabenkennungen."""
+    """Liefere automatisch und interaktiv prüfbare Aufgabenkennungen."""
+    from pykim.trainer.activities import activity_names
     from pykim.trainer.exercises import exercise_names
 
-    trainable = set(exercise_names())
+    trainable = set(exercise_names()) | set(activity_names())
     return tuple(
         document.name
         for paradigm in PARADIGMS

@@ -3,6 +3,7 @@
 import re
 
 from pykim.trainer.exercises import get_exercise
+from pykim.trainer.activities import get_activity
 
 from .library import task_names
 from .progress import load_progress
@@ -72,10 +73,11 @@ def render_overview(ui) -> None:
     ui.label(f"{completed} von {len(task_names())} Aufgaben vollständig gelöst")
     with ui.grid(columns=2).classes("w-full gap-4"):
         for name in task_names():
-            exercise = get_exercise(name)
+            activity = get_activity(name)
+            exercise = None if activity is not None and activity.mode == "matching" else get_exercise(name)
             attempt = latest.get(name)
             with ui.card().classes("w-full"):
-                ui.label(exercise.title).classes("font-bold")
+                ui.label(activity.title if exercise is None else exercise.title).classes("font-bold")
                 if attempt is None:
                     ui.label("Noch nicht begonnen").classes("text-grey")
                 else:

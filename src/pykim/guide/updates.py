@@ -512,8 +512,13 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
                     destination.write_bytes(data)
             _validate_content(staging, manifest)
             from pykim.trainer.definitions import load_exercises
+            from pykim.trainer.activities import load_activities
 
             load_exercises(staging / configuration.trainers_path)
+            load_activities(
+                staging / configuration.trainers_path,
+                staging / configuration.assignments_path,
+            )
             (staging / "content-manifest.json").write_text(
                 json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
             )
@@ -537,9 +542,17 @@ def install_content_update(manifest: dict[str, object], timeout: float = 30.0) -
     if not version or not package_url or len(package_hash) != 64:
         raise ValueError("Das Inhaltsmanifest ist unvollständig.")
     request = Request(package_url, headers={"User-Agent": f"PyKIM/{pykim.__version__}"})
-    with urlopen(request, timeout=timeout) as response:
-        archive = response.read()
-    if hashlib.sha256(archive).hexdigest() != package_hash:
+    archive: bytes | None = None
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            archive = response.read()
+    except (URLError, TimeoutError, ConnectionError, OSError):
+        # Manche Schulnetze lassen raw.githubusercontent.com passieren, beenden
+        # aber GitHubs Release-Asset-Verbindung. Die Einzeldateien bleiben durch
+        # das bereits über HTTPS geladene Manifest und dessen SHA-256-Werte
+        # genauso streng abgesichert wie das ZIP.
+        archive = None
+    if archive is not None and hashlib.sha256(archive).hexdigest() != package_hash:
         raise ValueError("Die Prüfsumme des Inhaltspakets stimmt nicht.")
 
     base = content_directory()
@@ -549,23 +562,49 @@ def install_content_update(manifest: dict[str, object], timeout: float = 30.0) -
     with tempfile.TemporaryDirectory(prefix="pykim-content-", dir=base) as temporary:
         extracted = Path(temporary) / "content"
         extracted.mkdir()
-        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
-            members = bundle.infolist()
-            if len(members) > MAX_CONTENT_FILES:
-                raise ValueError("Das Inhaltspaket enthält zu viele Dateien.")
-            if sum(item.file_size for item in members) > MAX_CONTENT_SIZE:
-                raise ValueError("Das Inhaltspaket ist entpackt zu groß.")
-            for item in members:
-                mode = item.external_attr >> 16
-                if not _safe_member(item.filename) or stat.S_ISLNK(mode):
-                    raise ValueError("Das Inhaltspaket enthält unsichere Pfade.")
-                destination = extracted / PurePosixPath(item.filename)
-                if item.is_dir():
-                    destination.mkdir(parents=True, exist_ok=True)
-                    continue
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                with bundle.open(item) as source, destination.open("wb") as output:
-                    shutil.copyfileobj(source, output)
+        if archive is not None:
+            with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+                members = bundle.infolist()
+                if len(members) > MAX_CONTENT_FILES:
+                    raise ValueError("Das Inhaltspaket enthält zu viele Dateien.")
+                if sum(item.file_size for item in members) > MAX_CONTENT_SIZE:
+                    raise ValueError("Das Inhaltspaket ist entpackt zu groß.")
+                for item in members:
+                    mode = item.external_attr >> 16
+                    if not _safe_member(item.filename) or stat.S_ISLNK(mode):
+                        raise ValueError("Das Inhaltspaket enthält unsichere Pfade.")
+                    destination = extracted / PurePosixPath(item.filename)
+                    if item.is_dir():
+                        destination.mkdir(parents=True, exist_ok=True)
+                        continue
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with bundle.open(item) as source, destination.open("wb") as output:
+                        shutil.copyfileobj(source, output)
+        else:
+            expected = manifest.get("files")
+            if not isinstance(expected, dict) or not expected:
+                raise ValueError("Das Inhaltsmanifest enthält keine Dateien.")
+            if len(expected) > MAX_CONTENT_FILES:
+                raise ValueError("Das Inhaltsmanifest enthält zu viele Dateien.")
+            raw = f"https://raw.githubusercontent.com/{REPOSITORY}/main"
+
+            def download_file(name: str) -> tuple[str, bytes]:
+                if not _safe_member(name):
+                    raise ValueError(f"Unsicherer Inhaltspfad: {name!r}")
+                return name, _download(f"{raw}/{quote(name, safe='/')}", timeout)
+
+            total_size = 0
+            names = sorted(name for name in expected if isinstance(name, str))
+            if len(names) != len(expected):
+                raise ValueError("Das Inhaltsmanifest enthält ungültige Dateinamen.")
+            with ThreadPoolExecutor(max_workers=min(8, len(names))) as executor:
+                for name, data in executor.map(download_file, names):
+                    total_size += len(data)
+                    if total_size > MAX_CONTENT_SIZE:
+                        raise ValueError("Die Lerninhalte sind zu groß.")
+                    destination = extracted / PurePosixPath(name)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(data)
         _validate_content(extracted, manifest)
         (extracted / "content-manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"

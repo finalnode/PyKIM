@@ -1,6 +1,7 @@
 """NiceGUI-Prototyp für Setup, Aufgabenübersicht und Dokubuch."""
 
 import argparse
+import json
 import platform
 import threading
 import webbrowser
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pykim
 from pykim.trainer.exercises import exercise_names, get_exercise
+from pykim.trainer.activities import get_activity
 from pykim.trainer.assignments import get_assignment
 from .course_setup import (
     course_setup_info,
@@ -25,6 +27,12 @@ from pykim.submission.export import (
 
 from .content import CHEATSHEET, PYODIDE_PLAYGROUND, PYXEL_REFERENCE
 from .author_view import render_authoring_view
+from .activity_view import (
+    current_parsons_order,
+    parsons_html,
+    render_matching_activity,
+    saved_activity_value,
+)
 from .library import (
     PACKAGED_CONTENT_ROOT,
     PARADIGMS,
@@ -188,9 +196,11 @@ def main(
                     # Ein bereits für diesen Kurs gespeicherter Stand bleibt
                     # offline nutzbar und muss in die Registrys geladen werden.
                     from pykim.trainer.assignments import refresh_assignments
+                    from pykim.trainer.activities import refresh_activities
                     from pykim.trainer.exercises import refresh_exercises
 
                     refresh_exercises()
+                    refresh_activities()
                     refresh_assignments()
                 course_selection_state["confirmed"] = True
                 ui.navigate.reload()
@@ -402,6 +412,9 @@ def main(
                 current_student = get_student_name(configured) or system_user_name()
                 ui.label(f"Hallo, {current_student}").classes("text-sm")
                 update_badge = ui.badge("Updates werden geprüft …", color="grey")
+                update_badge.classes("cursor-pointer").props(
+                    "title='Verfügbare Updates anzeigen' role=button tabindex=0"
+                )
                 ui.button(
                     "Kurs wechseln",
                     on_click=lambda: (
@@ -831,8 +844,10 @@ def main(
                             install_course_setup, data, course
                         )
                         render_setup_certificate()
+                        from pykim.trainer.activities import refresh_activities
                         from pykim.trainer.exercises import refresh_exercises
                         refresh_exercises()
+                        refresh_activities()
                         ui.notify(
                             f"Setupdatei für {info.course} importiert; Lerninhalte wurden aktiviert.",
                             type="positive", timeout=5000,
@@ -1019,7 +1034,7 @@ def main(
                     )
 
                 ui.separator()
-                ui.label("Updates").classes("text-xl font-bold")
+                ui.label("Updates").classes("text-xl font-bold").props("id=pykim-updates")
                 ui.label(
                     "App und Lerninhalte werden getrennt geprüft. Schülerlösungen und "
                     "Lernstand werden dabei niemals verändert."
@@ -1079,6 +1094,7 @@ def main(
                         )
                     finally:
                         course_sync_button.enable()
+                        refresh_update_dialog()
 
                 def open_app_download() -> None:
                     status = update_state["status"]
@@ -1087,6 +1103,7 @@ def main(
                     target = status.app.download_url or status.app.release_url
                     if target:
                         ui.navigate.to(target, new_tab=True)
+                        update_dialog.close()
 
                 async def activate_content_update() -> None:
                     status = update_state["status"]
@@ -1100,6 +1117,12 @@ def main(
                             f"Inhalte {status.content.available} wurden aktiviert."
                         )
                         content_button.disable()
+                        dialog_content_button.disable()
+                        dialog_content_button.set_visibility(False)
+                        dialog_content_label.text = (
+                            f"Inhalte {format_content_version(status.content.available)} "
+                            "wurden aktiviert."
+                        )
                         ui.notify(
                             "Neue Lerninhalte aktiviert. Bitte die Suite neu starten.",
                             type="positive",
@@ -1127,6 +1150,149 @@ def main(
                 app_button.disable()
                 content_button.disable()
 
+                async def update_dialog_content() -> None:
+                    if header_setup is not None:
+                        await refresh_course_content()
+                    else:
+                        await activate_content_update()
+
+                with ui.dialog() as update_dialog, ui.card().classes(
+                    "w-[38rem] max-w-[95vw] gap-4"
+                ):
+                    with ui.row().classes("w-full items-center gap-2"):
+                        ui.icon("system_update", size="md").classes("text-primary")
+                        ui.label("PyKIM aktualisieren").classes("text-xl font-bold")
+                        ui.space()
+                        ui.button(icon="close", on_click=update_dialog.close).props(
+                            "flat round dense aria-label='Dialog schließen'"
+                        )
+                    ui.label(
+                        "Prüfe getrennt, ob eine neue Suite oder neue Lerninhalte "
+                        "bereitstehen. Du entscheidest, was installiert wird."
+                    ).classes("text-grey-7")
+                    with ui.card().classes("w-full shadow-none border"):
+                        ui.label("Desktop-App").classes("font-bold")
+                        dialog_app_label = ui.label("App-Version wird geprüft …")
+                        dialog_app_button = ui.button(
+                            "App herunterladen",
+                            on_click=open_app_download,
+                            icon="download",
+                        )
+                    with ui.card().classes("w-full shadow-none border"):
+                        dialog_content_title = ui.label("Lerninhalte").classes("font-bold")
+                        dialog_content_label = ui.label(
+                            "Inhaltsversion wird geprüft …"
+                        )
+                        dialog_content_button = ui.button(
+                            "Lerninhalte aktualisieren",
+                            on_click=update_dialog_content,
+                            icon="library_books",
+                        )
+                    dialog_update_hint = ui.label().classes("text-grey-7")
+                    with ui.row().classes("w-full justify-end"):
+                        ui.button("Später", on_click=update_dialog.close).props("flat")
+                dialog_app_button.disable()
+                dialog_content_button.disable()
+                dialog_app_button.set_visibility(False)
+                dialog_content_button.set_visibility(False)
+
+                def refresh_update_dialog() -> None:
+                    status = update_state["status"]
+                    if status is None:
+                        dialog_app_label.text = "App-Version wird geprüft …"
+                        dialog_content_label.text = "Inhaltsversion wird geprüft …"
+                        dialog_update_hint.text = "Die Updateprüfung läuft."
+                        dialog_app_button.disable()
+                        dialog_content_button.disable()
+                        dialog_app_button.set_visibility(False)
+                        dialog_content_button.set_visibility(False)
+                        return
+
+                    app_newer = status.app is not None and status.app.newer
+                    content_newer = (
+                        header_setup is None
+                        and status.content is not None
+                        and status.content.newer
+                    )
+                    if status.app is None:
+                        dialog_app_label.text = "App-Prüfung ist momentan nicht verfügbar."
+                        dialog_app_button.disable()
+                        dialog_app_button.set_visibility(False)
+                    elif app_newer:
+                        dialog_app_label.text = (
+                            f"Version {status.app.available} ist verfügbar; installiert "
+                            f"ist {status.app.installed}."
+                        )
+                        dialog_app_button.enable()
+                        dialog_app_button.set_visibility(True)
+                    else:
+                        dialog_app_label.text = (
+                            f"Version {status.app.installed} ist bereits aktuell."
+                        )
+                        dialog_app_button.disable()
+                        dialog_app_button.set_visibility(False)
+
+                    if header_setup is not None:
+                        dialog_content_title.text = "Kursinhalte"
+                        dialog_content_button.text = "Kurs jetzt abgleichen"
+                        dialog_content_button.set_visibility(True)
+                        dialog_content_button.enable()
+                        sync_result = course_sync_state["result"]
+                        sync_error = str(course_sync_state["error"])
+                        if sync_error:
+                            dialog_content_label.text = (
+                                f"Der letzte Abgleich ist fehlgeschlagen: {sync_error}"
+                            )
+                        elif sync_result is not None and sync_result.checked_online:
+                            dialog_content_label.text = (
+                                f"{header_setup.course}: {sync_result.message}"
+                            )
+                        else:
+                            dialog_content_label.text = (
+                                f"{header_setup.course} kann jetzt mit dem Kursrepository "
+                                "abgeglichen werden."
+                            )
+                    elif status.content is None:
+                        dialog_content_title.text = "Lerninhalte"
+                        dialog_content_button.text = "Lerninhalte aktualisieren"
+                        dialog_content_label.text = (
+                            "Die Inhaltsprüfung ist momentan nicht verfügbar."
+                        )
+                        dialog_content_button.disable()
+                        dialog_content_button.set_visibility(False)
+                    elif content_newer and status.content.compatible:
+                        dialog_content_label.text = (
+                            f"Inhalte {format_content_version(status.content.available)} "
+                            "sind verfügbar; aktiv ist "
+                            f"{format_content_version(status.content.installed)}."
+                        )
+                        dialog_content_button.enable()
+                        dialog_content_button.set_visibility(True)
+                    elif not status.content.compatible:
+                        dialog_content_label.text = (
+                            "Die neuen Lerninhalte benötigen zuerst das App-Update."
+                        )
+                        dialog_content_button.disable()
+                        dialog_content_button.set_visibility(False)
+                    else:
+                        dialog_content_label.text = (
+                            "Die Lerninhalte "
+                            f"{format_content_version(status.content.installed)} sind aktuell."
+                        )
+                        dialog_content_button.disable()
+                        dialog_content_button.set_visibility(False)
+
+                    if header_setup is not None:
+                        dialog_update_hint.text = (
+                            "App und ausgewählter Kurs werden unabhängig aktualisiert."
+                        )
+                    elif app_newer or content_newer:
+                        dialog_update_hint.text = (
+                            "Wähle die gewünschte Aktualisierung oder verschiebe sie mit „Später“."
+                        )
+                    else:
+                        dialog_update_hint.text = "Es ist keine Aktualisierung erforderlich."
+
                 async def refresh_updates() -> None:
                     refresh_button.disable()
                     update_badge.text = "Updates werden geprüft …"
@@ -1149,7 +1315,13 @@ def main(
                                 f"App {status.app.installed} ist aktuell."
                             )
                             app_button.disable()
-                        if status.content is None:
+                        if header_setup is not None:
+                            content_update_label.text = (
+                                "Kursinhalte werden über das Repository des ausgewählten "
+                                "Kurses aktualisiert."
+                            )
+                            content_button.disable()
+                        elif status.content is None:
                             content_update_label.text = "Inhaltsprüfung nicht verfügbar."
                             content_button.disable()
                         elif status.content.newer and status.content.compatible:
@@ -1175,17 +1347,29 @@ def main(
                             update_badge.props("color=warning")
                         elif (
                             (status.app is not None and status.app.newer)
-                            or (status.content is not None and status.content.newer)
+                            or (
+                                header_setup is None
+                                and status.content is not None
+                                and status.content.newer
+                            )
                         ):
                             update_badge.text = "Update verfügbar"
                             update_badge.props("color=orange")
                         else:
                             update_badge.text = "Aktuell"
                             update_badge.props("color=positive")
+                        refresh_update_dialog()
                     finally:
                         refresh_button.enable()
 
+                async def open_update_dialog() -> None:
+                    refresh_update_dialog()
+                    update_dialog.open()
+                    if update_state["status"] is None:
+                        await refresh_updates()
+
                 refresh_button.on("click", refresh_updates)
+                update_badge.on("click", open_update_dialog)
                 ui.timer(0.2, refresh_updates, once=True)
 
                 author_course = get_course_directory()
@@ -1246,7 +1430,7 @@ def main(
                         "text-xl font-bold text-primary"
                     )
                     ui.label(
-                        "Diese Aufgaben besitzen keine automatische Prüfung."
+                        "Freie Antworten und interaktive Zuordnungsaufgaben."
                     ).classes("text-grey-7")
                     for material in material_tasks:
                         with ui.expansion(material.title, icon="description").classes(
@@ -1255,6 +1439,12 @@ def main(
                             ui.markdown(
                                 render_task_markdown(material.content)
                             ).classes("prose max-w-none")
+                            activity = get_activity(material.name)
+                            if activity is not None and activity.mode == "matching":
+                                render_matching_activity(
+                                    ui, activity, paradigm=material.paradigm
+                                )
+                                continue
                             answer_key = f"{material.paradigm}/{material.name}"
                             old_answer = (
                                 answers.get(answer_key, {})
@@ -1305,6 +1495,120 @@ def main(
                                 "prose max-w-none"
                             )
                         target = exercise_file(name)
+                        activity = get_activity(name)
+                        if (
+                            activity is not None
+                            and activity.mode == "parsons"
+                            and target is not None
+                        ):
+                            answer_key = f"{task_document.paradigm}/{name}"
+                            saved_order = saved_activity_value(answer_key)
+                            order = (
+                                saved_order
+                                if isinstance(saved_order, list)
+                                and set(saved_order) == {block.id for block in activity.blocks}
+                                else [block.id for block in reversed(activity.blocks)]
+                            )
+                            ui.label(
+                                "Ziehe die Blöcke in die richtige Reihenfolge. Mit den "
+                                "Pfeiltasten an jedem Block geht es auch ohne Drag-and-drop."
+                            ).classes("text-grey-7")
+                            ui.html(parsons_html(activity, order), sanitize=False).classes("w-full")
+                            parsons_order_status = ui.label(
+                                "Ordne zuerst alle Blöcke und prüfe dann den Code."
+                            ).classes("text-grey-7")
+                            parsons_output = ui.code(
+                                "Noch nicht ausgeführt.", language="text"
+                            ).classes("w-full pykim-no-code-actions")
+                            parsons_output.set_visibility(False)
+                            parsons_tests = ui.column().classes("w-full gap-2")
+                            with parsons_tests:
+                                ui.label(
+                                    "Die automatischen Tests starten erst, wenn die "
+                                    "Blockreihenfolge stimmt."
+                                ).classes("text-grey-7")
+
+                            def refresh_parsons_tests(
+                                exercise_name=name, container=parsons_tests,
+                            ) -> None:
+                                container.clear()
+                                with container:
+                                    render_exercise_test_results(ui, exercise_name)
+
+                            async def run_parsons(
+                                puzzle=activity,
+                                path=target,
+                                output=parsons_output,
+                                order_status=parsons_order_status,
+                                key=answer_key,
+                                refresh=refresh_parsons_tests,
+                            ) -> None:
+                                selected_course = get_course_directory()
+                                if selected_course is None:
+                                    ui.notify("Richte zuerst einen Kursordner ein.", type="warning")
+                                    return
+                                current_order = await current_parsons_order(ui, puzzle)
+                                try:
+                                    source = puzzle.assemble(current_order)
+                                    save_task_answer(
+                                        key, json.dumps(current_order, ensure_ascii=False)
+                                    )
+                                except (OSError, ValueError, SourceConflictError) as error:
+                                    ui.notify(f"Puzzle konnte nicht gespeichert werden: {error}", type="negative")
+                                    return
+                                if not puzzle.order_is_correct(current_order):
+                                    order_status.text = (
+                                        "Die Reihenfolge stimmt noch nicht. Verschiebe mindestens "
+                                        "einen Block und prüfe erneut."
+                                    )
+                                    order_status.classes(
+                                        add="text-negative", remove="text-grey-7 text-positive"
+                                    )
+                                    ui.notify(
+                                        "Blockreihenfolge noch nicht korrekt – das Programm wurde "
+                                        "noch nicht ausgeführt.",
+                                        type="warning",
+                                    )
+                                    return
+                                order_status.text = (
+                                    "Reihenfolge korrekt. Programm und Tests werden ausgeführt …"
+                                )
+                                order_status.classes(
+                                    add="text-positive", remove="text-grey-7 text-negative"
+                                )
+                                try:
+                                    old_source = read_student_source(path, selected_course)
+                                    save_student_source(
+                                        path,
+                                        source,
+                                        selected_course,
+                                        expected_hash=source_hash(old_source),
+                                    )
+                                except (OSError, ValueError, SourceConflictError) as error:
+                                    ui.notify(f"Puzzle konnte nicht gespeichert werden: {error}", type="negative")
+                                    return
+                                output.set_visibility(True)
+                                output.set_content("Programm läuft …")
+                                result = await nicegui_run.io_bound(
+                                    execution_manager.execute, path, selected_course
+                                )
+                                rendered = result.stdout
+                                if result.stderr:
+                                    rendered += ("\n" if rendered else "") + result.stderr
+                                output.set_content(
+                                    rendered.strip()
+                                    or f"Programm beendet (Code {result.returncode}), ohne Ausgabe."
+                                )
+                                refresh()
+                                refresh_overview()
+
+                            with ui.row().classes("items-center gap-2"):
+                                ui.button(
+                                    "Reihenfolge prüfen und Code ausführen",
+                                    on_click=run_parsons,
+                                    icon="play_arrow",
+                                ).props("color=primary")
+                            continue
                         if target is not None:
                             course = get_course_directory()
                             try:

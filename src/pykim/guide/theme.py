@@ -3,6 +3,25 @@
 
 def configure_theme(ui) -> None:
     ui.colors(primary="#f36b2b", secondary="#9b9da0", accent="#5f6164")
+    ui.add_body_html(r"""
+        <script>
+            window.pykimDropParsons = function(target) {
+                const list = target.parentElement;
+                const source = [...list.children].find(
+                    item => item.dataset.blockId === list.dataset.drag
+                );
+                if (source && source !== target) list.insertBefore(source, target);
+            };
+            window.pykimMoveParsons = function(button, direction) {
+                const card = button.closest('.pykim-parsons-block');
+                const sibling = direction < 0
+                    ? card.previousElementSibling : card.nextElementSibling;
+                if (!sibling) return;
+                if (direction < 0) card.parentElement.insertBefore(card, sibling);
+                else card.parentElement.insertBefore(sibling, card);
+            };
+        </script>
+    """)
     ui.add_head_html(r"""
         <style>
             .pykim-skip-link {
@@ -72,6 +91,28 @@ def configure_theme(ui) -> None:
                 text-underline-offset: .2rem;
             }
             .pykim-footer-link:hover { color: #ffc3a6 !important; }
+            .pykim-parsons-list {
+                display: grid; gap: .75rem; width: 100%; max-width: 100%;
+                box-sizing: border-box;
+            }
+            .pykim-parsons-block {
+                display: flex; align-items: stretch; gap: .5rem;
+                width: 100%; min-width: 0; box-sizing: border-box;
+                border: 1px solid #c9cacc; border-left: 5px solid #f36b2b;
+                border-radius: .45rem; background: #f7f7f6; cursor: grab;
+                box-shadow: 0 1px 3px rgba(38,38,38,.12);
+            }
+            .pykim-parsons-block:active { cursor: grabbing; }
+            .pykim-parsons-block pre {
+                flex: 1 1 auto; min-width: 0; margin: 0; padding: .85rem 1rem;
+                overflow-x: auto; white-space: pre-wrap;
+                font: .9rem ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+            .pykim-parsons-controls { display: flex; align-items: center; gap: .2rem; padding: .35rem; }
+            .pykim-parsons-controls button {
+                border: 1px solid #b8b9bb; border-radius: .3rem; background: white;
+                min-width: 2.2rem; min-height: 2.2rem; cursor: pointer;
+            }
             .q-page-container { padding-bottom: 2.4rem; }
             .pykim-project-workspace {
                 min-height: 48rem;
@@ -507,6 +548,10 @@ def configure_theme(ui) -> None:
             (() => {
                 const addCopyButtons = root => {
                     root.querySelectorAll('pre:not(.pykim-copy-ready)').forEach(pre => {
+                        // Parsons-Blöcke sind selbst interaktive Karten. Das allgemeine
+                        // Codeblock-Styling würde dort einen zweiten Rahmen und einen
+                        // sinnlosen Kopieren-Button ergänzen.
+                        if (pre.closest('.pykim-parsons-block, .pykim-no-code-actions')) return;
                         pre.classList.add('pykim-copy-ready');
                         const pythonCode = pre.querySelector('code');
                         const inScript = Boolean(pre.closest('.pykim-chapter-markdown'));

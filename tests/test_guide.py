@@ -437,6 +437,14 @@ def test_assignment_metadata_is_optional_for_repository_markdown(
     assert parsed.difficulty == "mittel"
 
 
+def test_task_block_annotations_are_hidden_from_assignment_text():
+    rendered = render_task_markdown(
+        "# Puzzle\n\nOrdne den Code.\n\n@block:start\n```python\nx = 1\n```\n"
+    )
+
+    assert rendered == "Ordne den Code."
+
+
 def test_markdown_library_covers_all_trainers_and_both_learning_paths():
     from pykim.trainer.exercises import exercise_names
 
@@ -540,6 +548,40 @@ def test_content_update_rejects_changed_archive(tmp_path, monkeypatch):
                 "files": {"Skripte/imperativ/x.md": "0" * 64},
             }
         )
+
+
+def test_content_update_falls_back_to_hash_checked_raw_files(tmp_path, monkeypatch):
+    content = b"# Fallback-Kapitel\n"
+    name = "Skripte/imperativ/01_fallback.md"
+    manifest = {
+        "content_version": "2099.3",
+        "package_url": "https://example.invalid/content.zip",
+        "package_sha256": "0" * 64,
+        "files": {name: hashlib.sha256(content).hexdigest()},
+    }
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self):
+            return content
+
+    def open_with_failed_archive(request, timeout):
+        if request.full_url == manifest["package_url"]:
+            raise ConnectionResetError("release server closed the connection")
+        assert request.full_url.endswith(name)
+        return Response()
+
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setattr("pykim.guide.updates.urlopen", open_with_failed_archive)
+
+    installed = install_content_update(manifest)
+
+    assert (installed / name).read_bytes() == content
 
 
 def test_damaged_active_content_falls_back_to_packaged_files(tmp_path, monkeypatch):

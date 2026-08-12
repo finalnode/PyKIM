@@ -242,8 +242,12 @@ def load_exercises(path: str | Path) -> dict[str, Exercise]:
     result = {}
     seen_names: set[str] = set()
     for definition in definitions:
-        if isinstance(definition, dict) and definition.get("mode") == "answer":
-            unknown = set(definition) - {"id", "title", "mode"}
+        if isinstance(definition, dict) and definition.get("mode") in {"answer", "matching"}:
+            mode = definition.get("mode")
+            unknown = set(definition) - (
+                {"id", "title", "mode", "pairs"}
+                if mode == "matching" else {"id", "title", "mode"}
+            )
             if unknown:
                 raise ValueError(
                     "Unbekannte Felder für Antwortaufgabe: "
@@ -259,8 +263,17 @@ def load_exercises(path: str | Path) -> dict[str, Exercise]:
                 raise ValueError(f"Für die Antwortaufgabe {name!r} fehlt der Titel.")
             if name in seen_names:
                 raise ValueError(f"Die Aufgabenkennung {name!r} ist doppelt.")
+            if mode == "matching":
+                from .activities import activity_from_data
+
+                activity_from_data(definition)
             seen_names.add(name)
             continue
+        if isinstance(definition, dict) and definition.get("mode") == "parsons":
+            definition = {
+                key: value for key, value in definition.items()
+                if key in {"id", "title", "tests", "optimization"}
+            }
         exercise = exercise_from_data(definition)
         if exercise.name in seen_names:
             raise ValueError(f"Die Aufgabenkennung {exercise.name!r} ist doppelt.")

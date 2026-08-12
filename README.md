@@ -589,6 +589,66 @@ title: Schleifen vergleichen
 mode: answer
 ```
 
+### Zuordnungsaufgaben und Code-Scrambles
+
+Mit `mode: matching` werden Begriffspaare als interaktive Zuordnung dargestellt:
+
+```yaml
+format: 1
+id: operatoren-zuordnen
+title: Operatoren zuordnen
+mode: matching
+pairs:
+  - id: modulo
+    left: "%"
+    right: Rest einer Division
+  - id: gleich
+    left: "=="
+    right: Vergleich auf Gleichheit
+```
+
+`mode: parsons` erzeugt ein Parsons-Puzzle beziehungsweise Code-Scramble. Die
+Codeblöcke stehen in Lösungsreihenfolge als `@block:kennung`-Annotationen im
+Aufgaben-Markdown. Die Suite blendet diese Quelle in der Aufgabenbeschreibung
+aus und mischt die Blöcke für Lernende. Mit `step=N` können mehrere Blöcke
+derselben Stufe in beliebiger Reihenfolge stehen:
+
+````markdown
+# Programm zusammensetzen
+
+Ordne die beiden Codeblöcke.
+
+@block:import step=1
+```python
+from pykim import *
+```
+
+@block:output step=2
+```python
+print("Hallo")
+```
+````
+
+Beispielsweise dürfen `@block:position step=2` und `@block:paint step=2`
+untereinander vertauscht werden. Sobald eine `step`-Angabe verwendet wird,
+benötigt jeder Block der Aufgabe eine Stufe.
+
+Die gleichnamige Trainerdatei enthält nur Modus und fachliche Tests:
+
+```yaml
+format: 1
+id: hallo-scramble
+title: Programm zusammensetzen
+mode: parsons
+tests:
+  - type: calls
+    names: [print]
+```
+
+Die Blöcke lassen sich per Drag-and-drop oder ↑/↓ anordnen. Der daraus
+zusammengesetzte Code kann direkt ausgeführt werden; ein zusätzlicher
+Codeeditor wird dafür nicht angezeigt.
+
 ### Unterstützte Prüftypen
 
 | Typ | Prüft |
