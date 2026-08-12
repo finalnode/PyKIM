@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.5.2
+
+- Beispielgalerie um sichtbaren Laufstatus, Programmausgabe und Stop-Funktion ergänzt.
+- Grafische Beispiele weisen während der Ausführung auf ihr separates Fenster hin.
+- Kursimport zeigt Spinner, Fortschrittsbalken und einen verständlichen Arbeitshinweis.
+- paralleler Download kleiner Kursdateien verkürzt den ersten Import deutlich.
+
 ## 0.5.1
 
 - Kurslöschung reagiert ohne zusätzliches Zeichen auf den exakt eingegebenen Kursnamen.

@@ -11,6 +11,7 @@ import shutil
 import stat
 import tempfile
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError
@@ -483,22 +484,32 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
         with tempfile.TemporaryDirectory(prefix="pykim-git-", dir=base) as temporary:
             staging = Path(temporary) / "content"
             staging.mkdir()
-            total_size = 0
-            for name in sorted(content_paths):
-                data = _download(f"{raw}/{quote(name, safe='/')}", timeout)
-                total_size += len(data)
-                if total_size > MAX_CONTENT_SIZE:
-                    raise ValueError("Der Remote-Inhalt ist zu groß.")
-                digest = hashlib.sha256(data).hexdigest()
-                if name in trainer_entries and (
-                    digest != trainer_entries[name]["sha256"]
-                    or len(data) != trainer_entries[name]["size"]
-                ):
-                    raise ValueError(f"Trainer-Prüfsumme stimmt nicht: {name}")
-                manifest_files[name] = digest
-                destination = staging / PurePosixPath(name)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes(data)
+            names = sorted(content_paths)
+
+            def download_content(name: str) -> tuple[str, bytes]:
+                return name, _download(f"{raw}/{quote(name, safe='/')}", timeout)
+
+            # Ein Kurs besteht aus vielen kleinen Markdown-/YAML-Dateien. Ein
+            # begrenzter paralleler Abruf verkürzt den ersten Import deutlich,
+            # ohne GitHub mit einer Verbindung pro Datei zu überlasten.
+            with ThreadPoolExecutor(max_workers=min(8, len(names))) as executor:
+                downloaded = executor.map(download_content, names)
+
+                total_size = 0
+                for name, data in downloaded:
+                    total_size += len(data)
+                    if total_size > MAX_CONTENT_SIZE:
+                        raise ValueError("Der Remote-Inhalt ist zu groß.")
+                    digest = hashlib.sha256(data).hexdigest()
+                    if name in trainer_entries and (
+                        digest != trainer_entries[name]["sha256"]
+                        or len(data) != trainer_entries[name]["size"]
+                    ):
+                        raise ValueError(f"Trainer-Prüfsumme stimmt nicht: {name}")
+                    manifest_files[name] = digest
+                    destination = staging / PurePosixPath(name)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(data)
             _validate_content(staging, manifest)
             from pykim.trainer.definitions import load_exercises
 

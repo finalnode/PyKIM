@@ -293,6 +293,7 @@ def main(
                         ).classes("text-sm text-grey-7")
 
                     async def upload_new_course(event) -> None:
+                        course_import_activity.set_visibility(True)
                         course_upload.disable()
                         try:
                             info, course = await nicegui_run.io_bound(
@@ -313,14 +314,42 @@ def main(
                             course_upload.reset()
                         finally:
                             course_upload.enable()
+                            course_import_activity.set_visibility(False)
 
-                    course_upload = ui.upload(
-                        label="Setupdatei auswählen",
-                        on_upload=upload_new_course,
-                        auto_upload=True,
-                        max_files=1,
-                        max_file_size=1_000_000,
-                    ).props("accept=.pykim-setup flat bordered").classes("w-64")
+                    def begin_course_import() -> None:
+                        course_import_activity.set_visibility(True)
+
+                    def reject_course_import() -> None:
+                        course_import_activity.set_visibility(False)
+                        ui.notify(
+                            "Die Setupdatei konnte nicht hochgeladen werden.",
+                            type="negative",
+                        )
+
+                    with ui.column().classes("w-72 items-stretch gap-2"):
+                        course_upload = ui.upload(
+                            label="Setupdatei auswählen",
+                            on_begin_upload=begin_course_import,
+                            on_upload=upload_new_course,
+                            on_rejected=reject_course_import,
+                            auto_upload=True,
+                            max_files=1,
+                            max_file_size=1_000_000,
+                        ).props("accept=.pykim-setup flat bordered").classes("w-full")
+                        with ui.column().classes(
+                            "w-full gap-1 rounded border p-3 bg-orange-1"
+                        ) as course_import_activity:
+                            with ui.row().classes("items-center gap-2"):
+                                ui.spinner(size="sm", color="primary")
+                                ui.label("Kurs wird eingerichtet …").classes("font-bold")
+                            ui.linear_progress(value=None, color="primary").props(
+                                "indeterminate rounded"
+                            )
+                            ui.label(
+                                "Setupdatei und Kursinhalt werden geprüft und von "
+                                "GitHub geladen. Der erste Import kann etwas dauern."
+                            ).classes("text-xs text-grey-7")
+                        course_import_activity.set_visibility(False)
             return
 
         ui.link("Zum Hauptinhalt springen", "#pykim-main").classes("pykim-skip-link")
@@ -817,7 +846,13 @@ def main(
                             auto_upload=True,
                             max_file_size=1_000_000,
                         ).props("accept=.pykim-setup")
-                    certificate_activity = ui.spinner(size="lg", color="primary")
+                    with ui.column().classes("gap-1") as certificate_activity:
+                        with ui.row().classes("items-center gap-2"):
+                            ui.spinner(size="sm", color="primary")
+                            ui.label("Kursinhalt wird von GitHub geladen …")
+                        ui.linear_progress(value=None, color="primary").props(
+                            "indeterminate rounded"
+                        ).classes("w-72")
                     certificate_activity.set_visibility(False)
                 render_setup_certificate()
 
