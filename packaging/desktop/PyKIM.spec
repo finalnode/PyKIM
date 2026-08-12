@@ -14,6 +14,7 @@ hiddenimports = []
 
 datas += collect_data_files("nicegui")
 datas += collect_data_files("webview")
+datas += collect_data_files("certifi")
 pyxel_datas, pyxel_binaries, pyxel_hidden = collect_all("pyxel")
 datas += pyxel_datas
 binaries += pyxel_binaries

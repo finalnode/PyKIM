@@ -12,9 +12,10 @@ from pathlib import Path
 
 from .interpreter import command_for, python_command
 from tempfile import NamedTemporaryFile
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 import pykim
+from .network import urlopen
 
 GITHUB_REPOSITORY = "finalnode/PyKIM"
 

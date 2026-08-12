@@ -1,6 +1,6 @@
-# PyKIM
+# <img src="packaging/macos/assets/app-icon-master.png" alt="PyKIM-Logo" width="72" align="center"> PyKIM
 
-PyKIM 0.5.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
+PyKIM 0.5.1 ist eine deutschsprachige Python-Lernumgebung auf Basis von
 [Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
 bewegt sich durch eine 160 × 120 Pixel große Welt, liest und verändert Farben,
 zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
@@ -9,17 +9,22 @@ verwenden.
 
 ## PyKIM Suite herunterladen
 
-> **Desktop-Version 0.5.0 – fertige Builds für alle unterstützten Systeme**
+> **Desktop-Version 0.5.1 – fertige Builds für alle unterstützten Systeme**
 
 | Betriebssystem | Architektur | Download |
 |---|---|---|
-| Windows | x86_64 | **[Windows-App herunterladen (.zip)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-windows-x86_64.zip)** |
-| macOS | Apple Silicon (`arm64`) | **[macOS-App für M1/M2/M3/M4 herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-macos-arm64.dmg)** |
-| macOS | Intel (`x86_64`) | **[macOS-App für Intel herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-macos-x86_64.dmg)** |
-| Linux | x86_64 | **[Linux-App herunterladen (.tar.gz)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz)** |
+| Windows | x86_64 | **[Windows-App herunterladen (.zip)](https://github.com/finalnode/PyKIM/releases/download/v0.5.1/PyKIM-Suite-0.5.1-windows-x86_64.zip)** |
+| macOS | Apple Silicon (`arm64`) | **[macOS-App für M1/M2/M3/M4 herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.1/PyKIM-Suite-0.5.1-macos-arm64.dmg)** |
+| macOS | Intel (`x86_64`) | **[macOS-App für Intel herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.1/PyKIM-Suite-0.5.1-macos-x86_64.dmg)** |
+| Linux | x86_64 | **[Linux-App herunterladen (.tar.gz)](https://github.com/finalnode/PyKIM/releases/download/v0.5.1/PyKIM-Suite-0.5.1-linux-x86_64.tar.gz)** |
+
+**Direkt mit dem Beispielkurs starten:**
+
+- **[PyKIM-Standardkurs herunterladen (.pykim-setup)](https://raw.githubusercontent.com/finalnode/PyKIM/main/examples/course-setups/pykim-standardkurs.pykim-setup)** – nach dem App-Start in der Kursauswahl hochladen
+- **[Inhalte des Beispielkurses ansehen](https://github.com/finalnode/PyKIM_Kurs)** – Skripte, Aufgaben und automatische Trainer
 
 Die Builds werden durch GitHub Actions geprüft und anschließend dauerhaft im
-[GitHub Release v0.5.0](https://github.com/finalnode/PyKIM/releases/tag/v0.5.0)
+[GitHub Release v0.5.1](https://github.com/finalnode/PyKIM/releases/tag/v0.5.1)
 bereitgestellt. Die Apps sind derzeit noch nicht signiert oder notarisiert.
 
 Zum Projekt gehören zwei eng verbundene Teile:
@@ -1087,7 +1092,7 @@ Das ZIP enthält den vollständigen Ordner `PyKIM Suite`. Nach dem Entpacken wir
 `PyKIM Suite.exe` gestartet. Beispiel:
 
 ```text
-dist/releases/windows/PyKIM-Suite-0.5.0-windows-x86_64.zip
+dist/releases/windows/PyKIM-Suite-0.5.1-windows-x86_64.zip
 ```
 
 ### Linux
@@ -1113,7 +1118,7 @@ Nach dem Entpacken wird die Suite gestartet mit:
 Das Release-Archiv heißt beispielsweise:
 
 ```text
-dist/releases/linux/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz
+dist/releases/linux/PyKIM-Suite-0.5.1-linux-x86_64.tar.gz
 ```
 
 ### macOS
@@ -1146,7 +1151,7 @@ python tools/build_macos_dmg.py --rebuild-app
 Der Dateiname enthält Version und Architektur, beispielsweise:
 
 ```text
-PyKIM-Suite-0.5.0-macos-x86_64.dmg
+PyKIM-Suite-0.5.1-macos-x86_64.dmg
 ```
 
 Der Build muss auf derselben macOS-Architektur wie das Ziel erzeugt werden.
@@ -1197,13 +1202,13 @@ in das zugehörige GitHub Release. Die Binärdateien werden nicht in die
 Git-Historie committed.
 
 Jeder Build prüft den enthaltenen Python-Runner, bevor das Artefakt hochgeladen
-wird. Ein Tag nach dem Schema `v0.5.0` startet dieselbe Matrix und erstellt
+wird. Ein Tag nach dem Schema `v0.5.1` startet dieselbe Matrix und erstellt
 anschließend ein GitHub Release beziehungsweise ergänzt ein bereits vorhandenes
 Release um alle vier Dateien:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.5.1
+git push origin v0.5.1
 ```
 
 Die Versionsnummer im Tag muss der Version in `pyproject.toml` und
