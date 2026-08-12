@@ -12,7 +12,11 @@ from types import SimpleNamespace
 
 import pykim
 import pytest
-from pykim.guide.app import course_name_confirmation_matches, parse_arguments
+from pykim.guide.app import (
+    course_name_confirmation_matches,
+    parse_arguments,
+    prepare_windows_browser_fallback,
+)
 from pykim.guide.content import PYODIDE_PLAYGROUND
 from pykim.guide.course import (
     clear_course_selection,
@@ -139,6 +143,34 @@ from pykim.trainer.authoring import generate_exercise_source
 def test_guide_starts_as_desktop_by_default_and_supports_browser_fallback():
     assert not parse_arguments([]).browser
     assert parse_arguments(["--browser"]).browser
+
+
+def test_windows_browser_fallback_opens_only_without_native_window():
+    class Events:
+        def on(self, event_type, handler):
+            assert event_type == "shown"
+            self.handler = handler
+
+    opened = threading.Event()
+    events = Events()
+    prepare_windows_browser_fallback(
+        events,
+        "http://127.0.0.1:8765/",
+        delay=0,
+        opener=lambda url: opened.set(),
+    )
+    assert opened.wait(1)
+
+    opened.clear()
+    events = Events()
+    prepare_windows_browser_fallback(
+        events,
+        "http://127.0.0.1:8765/",
+        delay=0.05,
+        opener=lambda url: opened.set(),
+    )
+    events.handler(None)
+    assert not opened.wait(0.1)
 
 
 def test_course_deletion_confirmation_uses_current_exact_input():

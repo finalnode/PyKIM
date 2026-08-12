@@ -13,12 +13,32 @@ from datetime import datetime
 from pathlib import Path
 
 
+_DESKTOP_LOG = None
+
+
 def restore_standard_streams() -> None:
     """Verbinde einen fensterlosen PyInstaller-Prozess wieder mit seinen Pipes."""
     if sys.stdout is None:
         sys.stdout = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
     if sys.stderr is None:
         sys.stderr = os.fdopen(os.dup(2), "w", encoding="utf-8", buffering=1)
+
+
+def configure_desktop_logging() -> Path:
+    """Aktiviere das Log auch im gespawnten nativen Fensterprozess."""
+    global _DESKTOP_LOG
+    log_directory = Path.home() / ".pykim" / "logs"
+    log_directory.mkdir(parents=True, exist_ok=True)
+    log_file = log_directory / f"desktop-app-{platform.system().lower()}.log"
+    _DESKTOP_LOG = log_file.open("a", encoding="utf-8", buffering=1)
+    sys.stdout = _DESKTOP_LOG
+    sys.stderr = _DESKTOP_LOG
+    faulthandler.enable(_DESKTOP_LOG)
+    print(
+        f"\n[{datetime.now().isoformat()}] PyKIM-Prozess startet "
+        f"(PID {os.getpid()}, Argumente: {sys.argv!r})"
+    )
+    return log_file
 
 
 def run_python(arguments: list[str]) -> int:
@@ -49,24 +69,21 @@ def run_app() -> None:
     """Starte die Suite und schreibe Absturzdetails in ein lokales Log."""
     from pykim.guide.app import main
 
-    log_directory = Path.home() / ".pykim" / "logs"
-    log_directory.mkdir(parents=True, exist_ok=True)
-    log_file = log_directory / f"desktop-app-{platform.system().lower()}.log"
-    with log_file.open("a", encoding="utf-8", buffering=1) as log:
-        sys.stdout = log
-        sys.stderr = log
-        faulthandler.enable(log)
-        print(f"\n[{datetime.now().isoformat()}] PyKIM Suite startet")
-        try:
-            # Desktop-Starter können eigene Argumente ergänzen. Die App startet
-            # deshalb bewusst im nativen Modus ohne Auswertung dieser Argumente.
-            main(arguments=[], native=True)
-        except BaseException:
-            traceback.print_exc(file=log)
-            raise
+    print(f"[{datetime.now().isoformat()}] PyKIM Suite startet")
+    try:
+        # Desktop-Starter können eigene Argumente ergänzen. Die App startet
+        # deshalb bewusst im nativen Modus ohne Auswertung dieser Argumente.
+        main(arguments=[], native=True)
+    except BaseException:
+        traceback.print_exc(file=_DESKTOP_LOG)
+        raise
 
 
 if __name__ == "__main__":
+    # multiprocessing.freeze_support() übernimmt den nativen Fensterprozess,
+    # bevor run_app() erreicht wird. Das Log muss deshalb bereits hier stehen.
+    if "--pykim-python" not in sys.argv:
+        configure_desktop_logging()
     multiprocessing.freeze_support()
     if len(sys.argv) > 1 and sys.argv[1] == "--pykim-python":
         restore_standard_streams()

@@ -43,6 +43,16 @@ jobs:
       - name: Eingebettetes Python prüfen
         shell: pwsh
         run: '& "dist/windows/PyKIM Suite/PyKIM Python.exe" --pykim-python -c "import pykim; print(pykim.__version__)"'
+      - name: Echtes Windows-Fenster prüfen
+        shell: pwsh
+        run: ./tools/check_windows_desktop.ps1
+      - name: Windows-Startdiagnose hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pykim-windows-startup-logs
+          path: dist/windows-startup-logs/**
+          if-no-files-found: warn
       - run: python tools/package_desktop_app.py
       - uses: actions/upload-artifact@v4
         with:
