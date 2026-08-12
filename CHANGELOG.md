@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.5.1
+
+- Kurslöschung reagiert ohne zusätzliches Zeichen auf den exakt eingegebenen Kursnamen.
+- Desktop-Builds enthalten ein verlässliches CA-Bündel für den HTTPS-Abruf von Kursinhalten.
+- Beispielkurs und Setupdatei sind direkt im Downloadbereich der README verlinkt.
+
 ## 0.5.0
 
 - mehrere Kurse pro Installation samt kompakter Auswahl beim App-Start ergänzt
