@@ -42,8 +42,9 @@ Zum Projekt gehören zwei eng verbundene Teile:
 
 Langfristig werden diese Verantwortlichkeiten deutlicher getrennt:
 
-- **CS Suite:** themenübergreifende Desktop-Plattform, Kursverwaltung,
-  Aufgabenansichten, Hinweise, Lernstand, Tests und Kurskatalog.
+- **CS Suite:** komfortable Desktop-Lernumgebung für einen breiten Einstieg in
+  die Informatik. Sie unterstützt unterschiedliche Themen, Programmiersprachen
+  und Werkzeuge, ohne auf Python oder PyKIM festgelegt zu sein.
 - **PyKIM:** eigenständiges und erweiterbares Pythonmodul für den Einstieg in
   Programmierung mit Pixelwelt, Bewegung, Farbe, Audio und Pyxel.
 - **Kurse:** separat veröffentlichte Inhaltspakete, die PyKIM verwenden können,
