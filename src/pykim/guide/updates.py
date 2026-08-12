@@ -15,11 +15,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError
 from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from urllib.parse import quote
 
 import pykim
 from .course import _config_directory
+from .network import urlopen
 
 
 REPOSITORY = "finalnode/PyKIM"

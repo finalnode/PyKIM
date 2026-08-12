@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pykim
 import pytest
-from pykim.guide.app import parse_arguments
+from pykim.guide.app import course_name_confirmation_matches, parse_arguments
 from pykim.guide.content import PYODIDE_PLAYGROUND
 from pykim.guide.course import (
     clear_course_selection,
@@ -134,6 +134,14 @@ from pykim.trainer.authoring import generate_exercise_source
 def test_guide_starts_as_desktop_by_default_and_supports_browser_fallback():
     assert not parse_arguments([]).browser
     assert parse_arguments(["--browser"]).browser
+
+
+def test_course_deletion_confirmation_uses_current_exact_input():
+    expected = "PyKIM Standardkurs"
+
+    assert course_name_confirmation_matches(expected, expected)
+    assert not course_name_confirmation_matches(f"'{expected}", expected)
+    assert not course_name_confirmation_matches(expected[:-1], expected)
 
 
 def test_runtime_version_matches_project_metadata():

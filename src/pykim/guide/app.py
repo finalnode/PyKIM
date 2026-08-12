@@ -101,6 +101,11 @@ def _preferred_ide_label() -> str:
     return IDE_LABELS.get(preference["ide"], "IDE")
 
 
+def course_name_confirmation_matches(value: object, expected: str) -> bool:
+    """Prüfe den aktuellen Eingabewert ohne verzögerten UI-Zustand."""
+    return isinstance(value, str) and value == expected
+
+
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     """Lese die bewusst kleine Kommandozeile der Suite."""
     parser = argparse.ArgumentParser(description="PyKIM Suite starten")
@@ -219,7 +224,7 @@ def main(
                                     "über den Systempapierkorb rückgängig gemacht werden."
                                 )
                                 ui.label(
-                                    f"Gib zur Bestätigung exakt {expected_name!r} ein."
+                                    f"Gib zur Bestätigung exakt „{expected_name}“ ein."
                                 ).classes("text-negative")
                                 delete_name = ui.input("Kursname").classes("w-full")
 
@@ -259,13 +264,14 @@ def main(
                                         lambda _, action=delete_selected_course,
                                         button=confirm_delete: action(button),
                                     )
-                                delete_name.on(
-                                    "update:model-value",
-                                    lambda _, field=delete_name,
+                                delete_name.on_value_change(
+                                    lambda event,
                                     button=confirm_delete,
                                     expected=expected_name: (
                                         button.enable()
-                                        if field.value == expected
+                                        if course_name_confirmation_matches(
+                                            event.value, expected
+                                        )
                                         else button.disable()
                                     ),
                                 )
