@@ -1,6 +1,6 @@
 # PyKIM
 
-PyKIM 0.4.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
+PyKIM 0.5.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
 [Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
 bewegt sich durch eine 160 × 120 Pixel große Welt, liest und verändert Farben,
 zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
@@ -17,9 +17,9 @@ Die fachliche Weltlogik liegt nicht nur im Grafikfenster. Aufgaben können
 deshalb deterministisch geprüft werden, ohne Bildschirminhalte vergleichen zu
 müssen.
 
-> Entwicklungsstand: Alpha. Der aktuelle Releaseweg konzentriert sich auf
-> macOS. Die Python-Bibliothek selbst ist plattformunabhängig; vollständige
-> Desktop-Bundles für Windows und Linux sind noch nicht fertiggestellt.
+> Entwicklungsstand: Alpha. Die Python-Bibliothek ist plattformunabhängig.
+> GitHub Actions baut Desktop-Pakete für Windows, Linux sowie macOS auf Intel
+> und Apple Silicon. Diese Pakete sind noch nicht signiert oder notarisiert.
 
 ## Inhalt
 
@@ -42,7 +42,8 @@ müssen.
 - [IDE und Python-Laufzeit](#ide-und-python-laufzeit)
 - [Speicherorte und Datenschutz](#speicherorte-und-datenschutz)
 - [Installation und Entwicklung](#installation-und-entwicklung)
-- [macOS-App und DMG](#macos-app-und-dmg)
+- [Desktop-Apps bauen](#desktop-apps-bauen)
+- [GitHub Actions und Releases](#github-actions-und-releases)
 - [Grenzen und zurückgestellte Funktionen](#grenzen-und-zurückgestellte-funktionen)
 - [Lizenzierung](#lizenzierung)
 
@@ -68,12 +69,15 @@ müssen.
 
 ### Lernen mit der Suite
 
-- lokaler Kursordner, der auch auf USB- oder WebDAV-Laufwerken liegen kann
-- Kursauswahl durch eine kleine `.pykim-setup`-Datei
+- mehrere lokale Kursordner, die auch auf USB- oder WebDAV-Laufwerken liegen können
+- kompakte Kursauswahl bei jedem Start und Kurswechsel im laufenden Betrieb
+- direkte Kurseinrichtung durch Upload einer kleinen `.pykim-setup`-Datei
 - Skripte, Aufgaben und Trainer aus einem externen GitHub-Repository
+- automatischer Repo-Abgleich beim Kursstart und manueller Inhalts-Refresh
 - eingebautes Skript mit Inhaltsnavigation
 - ausführbare und kopierbare Codebeispiele
 - Aufgabenbearbeitung in einem Codeeditor
+- freie Aufgaben ohne Trainer mit dauerhaft gespeichertem Antwortfeld
 - Speichern, Starten, Stoppen, Kopieren und Öffnen in einer externen IDE
 - deutschsprachige automatische Testfälle mit ausklappbaren Details
 - Analyse von Schleifen, Funktionen, Bedingungen, Klassen und Parallelität
@@ -88,6 +92,7 @@ müssen.
 - Erkennung und Auswahl geeigneter Python-Interpreter
 - verwaltete lokale Python-Laufzeit mit Offline-Wheelhouse
 - getrennte Updateprüfung für App und Lerninhalte
+- direkter Zugriff auf Kursordner und sicheres Löschen über den Systempapierkorb
 - feste, schmale Fußleiste mit Projekt-, Lizenz- und Herkunftshinweis
 
 ## Schnellstart
@@ -162,6 +167,7 @@ from pykim import *
 |---|---|
 | `get_x()` | aktuelle x-Koordinate lesen |
 | `get_y()` | aktuelle y-Koordinate lesen |
+| `get_position()` | beide Koordinaten als `(x, y)` lesen |
 | `set_position(x, y)` | beide Koordinaten setzen |
 | `set_x(x)` | nur x setzen |
 | `set_y(y)` | nur y setzen |
@@ -170,6 +176,7 @@ from pykim import *
 set_position(20, 30)
 print(get_x())  # 20
 print(get_y())  # 30
+print(get_position())  # (20, 30)
 ```
 
 ### Relativ bewegen
@@ -322,7 +329,7 @@ Standardpixel zu:
 ```python
 from pykim import kim, world
 
-kim.position = (20, 20)
+kim.set_position(20, 20)
 kim.paint("purple")
 kim.right(10)
 kim.paint_stop()
@@ -347,7 +354,9 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `name` | eindeutiger Anzeigename |
 | `world` | zugehörige Welt |
 | `x`, `y` | les- und schreibbare Koordinaten |
-| `position` | Tupel `(x, y)`, les- und schreibbar |
+| `get_x()`, `get_y()` | einzelne Koordinate lesen |
+| `get_position()` | Position als Tupel `(x, y)` lesen |
+| `position` | kompatible les- und schreibbare Eigenschaft |
 | `visible` | aktueller Sichtbarkeitszustand |
 | `set_position(x, y)` | Position setzen |
 | `set_x(x)`, `set_y(y)` | einzelne Koordinate setzen |
@@ -410,7 +419,7 @@ from pykim import kim, world
 
 world.speed(25)
 
-kim.position = (20, 20)
+kim.set_position(20, 20)
 kim.paint("purple")
 
 mia = world.new_pixel("MIA", x=60, y=20)
@@ -643,6 +652,18 @@ print("Hallo")
 
 ## Kursordner und Setupdatei
 
+Die Suite kann mehrere Kurse verwalten. Beim Start erscheint eine kompakte
+Kursauswahl. Ein bestehender Kurs wird geöffnet oder eine Setupdatei direkt
+hochgeladen. Neue Kurse aus einem Upload liegen standardmäßig unter
+`~/PyKIM-Kurse/<setup-name>`; bereits bekannte Kursordner bleiben an ihrem
+bisherigen Speicherort.
+
+Der erneute Import derselben Setupdatei ist nicht destruktiv: Repository-Inhalte
+und Konfiguration werden aktualisiert, während Schülerlösungen, freie Antworten,
+Projekte und Lernstand erhalten bleiben. Aus der Kursauswahl kann der Ordner im
+Dateimanager geöffnet werden. Das Löschen erfordert die exakte Eingabe des
+Kursnamens und verschiebt den gesamten Kursordner in den Systempapierkorb.
+
 Der Kursordner enthält Schülerdateien und bleibt von Inhaltsupdates getrennt:
 
 ```text
@@ -681,8 +702,23 @@ gesichert.
 ```
 
 Die Datei enthält bewusst keine Schlüssel, Zertifikate oder
-Verschlüsselungsdaten. Sie ist in Version 0.3 eine Konfigurationsdatei und
-nicht kryptografisch authentifiziert.
+Verschlüsselungsdaten. Sie ist eine Konfigurationsdatei und derzeit nicht
+kryptografisch authentifiziert.
+
+### Beispielkurs direkt verwenden
+
+Das öffentliche Repository
+[finalnode/PyKIM_Kurs](https://github.com/finalnode/PyKIM_Kurs) dient als
+vollständiger Beispiel- und Standardkurs. Die passende Konfiguration kann ohne
+manuelles Kopieren direkt heruntergeladen und anschließend in der Kursauswahl
+hochgeladen werden:
+
+- [PyKIM Standardkurs – Setupdatei direkt herunterladen](https://raw.githubusercontent.com/finalnode/PyKIM/main/examples/course-setups/pykim-standardkurs.pykim-setup)
+- [Setupdatei im PyKIM-Repository ansehen](https://github.com/finalnode/PyKIM/blob/main/examples/course-setups/pykim-standardkurs.pykim-setup)
+
+Weitere Setupdateien können nach demselben Format unter
+[`examples/course-setups`](https://github.com/finalnode/PyKIM/tree/main/examples/course-setups)
+veröffentlicht und direkt referenziert werden.
 
 Erzeugen:
 
@@ -696,9 +732,9 @@ pykim-teacher setup \
   --output ./setupdatei
 ```
 
-Ohne importierte Setupdatei zeigt die Suite nur den rudimentären lokalen
-Funktionsumfang. Skript, Aufgaben und Lernstand werden erst nach erfolgreicher
-Synchronisation eingeblendet. Der Kursname erscheint danach im Header.
+Ohne importierte Setupdatei kann in der Startansicht ein neuer Kurs eingerichtet
+werden. Skript, Aufgaben und Lernstand werden nach erfolgreicher Synchronisation
+eingeblendet. Der Kursname erscheint danach im Header.
 
 ## Externes Kurs-Repository
 
@@ -706,7 +742,6 @@ Empfohlene Struktur:
 
 ```text
 PyKIM_Kurs/
-├── content.yml
 ├── .pykim/
 │   └── trainer-hashes.json
 ├── Skripte/
@@ -719,10 +754,19 @@ PyKIM_Kurs/
     └── *.yml
 ```
 
-`content.yml` listet explizit alle freigegebenen Kapitel, Aufgaben und
-Trainerdateien. Die Suite lädt nicht beliebige Repository-Dateien. Sie ermittelt
-zuerst den Commit des konfigurierten Branches und speichert den vollständigen
-Stand danach versionsweise und atomar unter `~/.pykim/content/versions`.
+Die Suite übernimmt automatisch alle Markdown-Dateien unter `Skripte/` und
+`Aufgaben/` sowie alle YAML-Dateien unter `Trainer/`. Dateien und komplette
+Ordnerbäume werden ignoriert, sobald ein Pfadteil mit `_` beginnt. Die
+alphabetische Pfadreihenfolge bestimmt die Anzeige. Eine Aufgabenstellung wird
+automatisch prüfbar, wenn unter `Trainer/` eine Definition mit demselben
+Dateistamm liegt. Ohne passenden Trainer erscheint sie als freie Aufgabe mit
+einem mehrzeiligen, lokal gespeicherten Antwortfeld.
+
+Die Suite ermittelt zuerst den Commit des konfigurierten Branches und speichert
+den vollständigen sichtbaren Stand danach versionsweise und atomar unter
+`~/.pykim/content/versions`. Ein eigener aktiver Marker pro Repository und
+Branch verhindert, dass zwei Kurse offline versehentlich dieselben Inhalte
+verwenden.
 
 Für Vorabstände kann eine Setupdatei beispielsweise auf den Branch `beta`
 verweisen. Ein Wechsel des Branches erfolgt durch eine andere Setupdatei.
@@ -877,7 +921,7 @@ blockiert den Start nicht.
 
 - liest das neueste GitHub-Release
 - vergleicht die semantische Versionsnummer
-- wählt ein zur macOS-Architektur passendes DMG
+- wählt unter macOS ein zur Architektur passendes DMG
 - öffnet die Downloadseite
 - ersetzt eine installierte App niemals ungefragt selbst
 
@@ -902,6 +946,7 @@ aktuelle Kursworkflow verwendet jedoch die direkte GitHub-Synchronisation.
 - Projekte
 - `erweiterungen.py`
 - Lernstand und Dokubuch in `.pykim/progress.json`
+- freie Aufgaben-Antworten in `.pykim/progress.json`
 - Sicherungen unter `.pykim/backups`
 - installierte Kurs-Setupdatei
 
@@ -909,6 +954,7 @@ aktuelle Kursworkflow verwendet jedoch die direkte GitHub-Synchronisation.
 
 - Suite-Konfiguration: `~/.pykim/config.json`
 - synchronisierte Inhaltsversionen: `~/.pykim/content/versions`
+- kursgebundene Inhaltsmarker: `~/.pykim/content/active-courses`
 - verwaltete Python-Laufzeiten: `~/.pykim/runtimes`
 - eigenes Thonny-Profil: `~/.pykim/thonny`
 
@@ -1004,7 +1050,57 @@ installiert oder repariert sie PyKIM und Pyxel ohne Zugriff auf PyPI. Wheels
 sind betriebssystem- und architekturabhängig und müssen auf passenden Runnern
 gebaut werden.
 
-## macOS-App und DMG
+## Desktop-Apps bauen
+
+Die Builds sind plattformspezifisch: Ein Windows-Paket muss unter Windows,
+ein Linux-Paket unter Linux und ein macOS-Paket auf der jeweiligen
+Mac-Architektur erzeugt werden. Alle Buildskripte erstellen eine isolierte
+Umgebung unter `build/`, bündeln die Suite mit PyInstaller und legen Ergebnisse
+unter `dist/` ab.
+
+### Windows
+
+Unter Windows (PowerShell):
+
+```powershell
+python tools/build_desktop_app.py
+python tools/package_desktop_app.py
+```
+
+Das ZIP enthält den vollständigen Ordner `PyKIM Suite`. Nach dem Entpacken wird
+`PyKIM Suite.exe` gestartet. Beispiel:
+
+```text
+dist/releases/PyKIM-Suite-0.5.0-windows-x86_64.zip
+```
+
+### Linux
+
+Für den nativen Fenstermodus werden GTK 3 und WebKitGTK benötigt. Unter Ubuntu
+24.04 lassen sich die Build-Abhängigkeiten so installieren:
+
+```bash
+sudo apt-get update
+sudo apt-get install gcc libcairo2-dev libgirepository-2.0-dev pkg-config \
+  python3-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
+  libgtk-3-dev libwebkit2gtk-4.1-dev
+python tools/build_desktop_app.py
+python tools/package_desktop_app.py
+```
+
+Nach dem Entpacken wird die Suite gestartet mit:
+
+```bash
+'PyKIM Suite/PyKIM Suite'
+```
+
+Das Release-Archiv heißt beispielsweise:
+
+```text
+dist/releases/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz
+```
+
+### macOS
 
 Eigenständige App inklusive Python, PyKIM, Pyxel, NiceGUI und Wheelhouse:
 
@@ -1034,7 +1130,7 @@ python tools/build_macos_dmg.py --rebuild-app
 Der Dateiname enthält Version und Architektur, beispielsweise:
 
 ```text
-PyKIM-Suite-0.4.0-macos-x86_64.dmg
+PyKIM-Suite-0.5.0-macos-x86_64.dmg
 ```
 
 Der Build muss auf derselben macOS-Architektur wie das Ziel erzeugt werden.
@@ -1042,34 +1138,73 @@ Intel (`x86_64`) und Apple Silicon (`arm64`) benötigen getrennte Builds. Ohne
 Apple-Developer-Zertifikat wird die App nur ad hoc signiert und nicht
 notarisiert.
 
+### Schnelle Wiederholungs-Builds
+
+`--skip-wheelhouse` verwendet das vorhandene plattformspezifische Wheelhouse.
+`--skip-clean` behält PyInstallers Arbeitsverzeichnis:
+
+```bash
+python tools/build_desktop_app.py --skip-wheelhouse --skip-clean
+python tools/build_macos_app.py --skip-wheelhouse --skip-clean
+```
+
+Wheelhouses und Desktop-Builds sind nicht zwischen Betriebssystemen oder
+Prozessorarchitekturen austauschbar.
+
+## GitHub Actions und Releases
+
+Der Workflow [`.github/workflows/build-desktop.yml`](.github/workflows/build-desktop.yml)
+kann in GitHub unter **Actions → Desktop-Builds → Run workflow** manuell
+gestartet werden. Vor jedem Build läuft die vollständige Testsuite. Anschließend
+entstehen vier getrennte Artefakte:
+
+| Ziel | GitHub-Runner | Releaseformat |
+|---|---|---|
+| Windows x86_64 | `windows-2025` | `.zip` |
+| Linux x86_64 | `ubuntu-24.04` | `.tar.gz` |
+| macOS Intel | `macos-15-intel` | `.dmg` |
+| macOS Apple Silicon | `macos-15` | `.dmg` |
+
+Jeder Build prüft den enthaltenen Python-Runner, bevor das Artefakt hochgeladen
+wird. Ein Tag nach dem Schema `v0.5.0` startet dieselbe Matrix und erstellt
+anschließend ein GitHub Release beziehungsweise ergänzt ein bereits vorhandenes
+Release um alle vier Dateien:
+
+```bash
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+Die Versionsnummer im Tag muss der Version in `pyproject.toml` und
+`pykim.__version__` entsprechen; der Workflow bricht bei einer Abweichung ab.
+Signierung, Apple-Notarisierung und ein
+Windows-Code-Signing-Zertifikat sind bewusst noch nicht automatisiert; dafür
+wären Repository-Secrets und die jeweiligen Herstellerkonten erforderlich.
+
 ## Grenzen und zurückgestellte Funktionen
 
 - Die Setupdatei ist noch nicht signiert oder kryptografisch authentifiziert.
 - Der verschlüsselte Moodle-Dateiexport ist experimentell und ausgeblendet.
 - Der alte Zertifikats-/Schlüsselcode ist technische Vorarbeit, nicht Teil des
-  stabilen 0.4-Workflows.
+  stabilen 0.5-Workflows.
 - Die automatische Übernahme einer bestandenen Aufgabenfunktion nach
   `erweiterungen.py` ist noch nicht implementiert; Erweiterungen werden derzeit
   manuell hinzugefügt.
 - Die Browser-Spielwiese kann normales Python, aber noch kein lokales PyKIM.
-- Windows- und Linux-Desktop-Bundles fehlen noch.
-- macOS-Signierung und Notarisierung sind noch offen.
+- Der Linux-Build ist ein portables PyInstaller-Archiv, kein AppImage oder
+  distributionsübergreifend garantierter Installer; GTK/WebKitGTK müssen auf
+  dem Zielsystem verfügbar sein.
+- Windows-Code-Signing sowie macOS-Signierung und -Notarisierung sind noch offen.
 - Das Projekt befindet sich im Alpha-Stadium und ist noch kein abgesicherter
   flächendeckender Schul-Rollout.
 
 ## Lizenzierung
 
 Der aktuelle Repository-Code steht unter der MIT License; siehe `LICENSE`.
-
-Für die geplante Trennung des Kurs-Repositorys ist vorgesehen:
-
-- Software und wiederverwendbarer Beispielcode: MIT
-- Skript, Aufgabenstellungen und eigene didaktische Medien: CC BY-NC-SA 4.0
-- Schülerlösungen: verbleiben bei den jeweiligen Schülerinnen und Schülern
-- externe Medien: jeweilige Originallizenz
-
-Die Inhaltslizenz ist erst verbindlich, wenn sie im Kurs-Repository mit einer
-eigenen Lizenzdatei veröffentlicht wurde.
+Der öffentliche Beispielkurs besitzt eine eigene Lizenzdatei im
+[PyKIM_Kurs-Repository](https://github.com/finalnode/PyKIM_Kurs/blob/main/LICENSE).
+Schülerlösungen und freie Antworten verbleiben in den jeweiligen lokalen
+Kursordnern und werden nicht in das Inhaltsrepository übertragen.
 
 > **Concept by human. Crafted by human + AI.**  
 > Konzept und pädagogische Verantwortung: Projektverantwortliche von PyKIM  

@@ -13,7 +13,7 @@ from .course import get_course_directory
 
 
 def _empty_progress() -> dict[str, object]:
-    return {"format": 1, "attempts": [], "journal": {}}
+    return {"format": 1, "attempts": [], "journal": {}, "answers": {}}
 
 
 def progress_file(course: Path | None = None) -> Path | None:
@@ -100,6 +100,24 @@ def save_journal_entry(
     if not isinstance(journal, dict):
         journal = data["journal"] = {}
     journal[exercise] = {
+        "text": text,
+        "updated": datetime.now(timezone.utc).isoformat(),
+    }
+    _save(data, course)
+
+
+def save_task_answer(
+    task: str,
+    text: str,
+    *,
+    course: Path | None = None,
+) -> None:
+    """Speichere eine freie Antwort auf eine Aufgabe ohne Trainer."""
+    data = load_progress(course)
+    answers = data.setdefault("answers", {})
+    if not isinstance(answers, dict):
+        answers = data["answers"] = {}
+    answers[task] = {
         "text": text,
         "updated": datetime.now(timezone.utc).isoformat(),
     }

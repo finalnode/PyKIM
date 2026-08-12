@@ -1,5 +1,26 @@
 # Änderungen
 
+## 0.5.0
+
+- mehrere Kurse pro Installation samt kompakter Auswahl beim App-Start ergänzt
+- `.pykim-setup`-Dateien direkt in der Kursauswahl importierbar gemacht
+- Repository-Inhalte automatisch aus `Skripte/`, `Aufgaben/` und `Trainer/`
+  entdeckt; Dateien und Ordner mit führendem `_` werden ignoriert
+- getrennte, offline nutzbare Inhaltsstände pro Kurs eingerichtet
+- automatischen Repo-Abgleich beim Kursstart und manuellen Refresh ergänzt
+- freie Aufgaben ohne Trainer samt lokal gespeichertem Antwortfeld unterstützt
+- Kursordner direkt aus der Auswahl im plattformspezifischen Dateimanager öffnen
+- Kurse nach exakter Namensbestätigung sicher in den Systempapierkorb verschieben
+- Versionsangabe des macOS-Bundles an `pyproject.toml` gekoppelt
+- `get_position()` für imperative und objektorientierte Positionsabfragen ergänzt
+- reproduzierbare PyInstaller-Builds für Windows und Linux ergänzt
+- GitHub-Actions-Matrix für Windows, Linux, macOS Intel und Apple Silicon samt
+  Release-Artefakten eingerichtet
+- gemeinsamen Desktop-Einstieg und plattformgerechten eingebetteten
+  Python-Runner eingeführt
+- veralteten lokalen Kurs-Snapshot und betriebssystemgenerierte Dateien aus dem
+  Repository entfernt
+
 ## 0.4.0
 
 - `world.zoom()` als Kamera-Zoom umgesetzt: größere Weltpixel bei unveränderter

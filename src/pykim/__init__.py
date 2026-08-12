@@ -3,7 +3,7 @@
 import re
 from collections import deque
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 WIDTH = 160
 HEIGHT = 120
@@ -106,6 +106,11 @@ def get_x() -> int:
 def get_y() -> int:
     """Gib Kims aktuelle y-Koordinate zurück."""
     return _y
+
+
+def get_position() -> tuple[int, int]:
+    """Gib Kims aktuelle Position als Tupel ``(x, y)`` zurück."""
+    return _x, _y
 
 
 def set_x(x: int) -> None:
@@ -762,6 +767,7 @@ __all__ = [
     "animate",
     "down",
     "get_color",
+    "get_position",
     "get_x",
     "get_y",
     "hide",

@@ -19,8 +19,6 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 import pykim
-import yaml
-
 from .course import _config_directory
 
 
@@ -125,6 +123,21 @@ def content_directory() -> Path:
     return _config_directory() / "content"
 
 
+def _course_content_key(configuration) -> str:
+    values = (
+        configuration.repository,
+        configuration.branch,
+        configuration.scripts_path,
+        configuration.assignments_path,
+        configuration.trainers_path,
+    )
+    return hashlib.sha256("\0".join(values).encode("utf-8")).hexdigest()
+
+
+def _course_active_marker(configuration) -> Path:
+    return content_directory() / "active-courses" / f"{_course_content_key(configuration)}.json"
+
+
 def _bundled_content_version(packaged_root: Path) -> str:
     manifest = packaged_root / "content-manifest.json"
     try:
@@ -141,6 +154,18 @@ def active_content_root(packaged_root: Path) -> Path:
         root = Path(configured).expanduser().resolve()
         return root if root.is_dir() else packaged_root
     marker = content_directory() / "active.json"
+    course_specific = False
+    try:
+        from .course import get_course_directory
+        from .course_setup import course_setup_info
+
+        course = get_course_directory()
+        setup = course_setup_info(course) if course is not None else None
+        if setup is not None:
+            marker = _course_active_marker(setup)
+            course_specific = True
+    except (OSError, ValueError):
+        pass
     try:
         data = json.loads(marker.read_text(encoding="utf-8"))
         version = str(data["content_version"])
@@ -153,6 +178,8 @@ def active_content_root(packaged_root: Path) -> Path:
             return root
     except (OSError, ValueError, KeyError, TypeError):
         pass
+    if course_specific:
+        return packaged_root
     return packaged_root
 
 
@@ -291,39 +318,43 @@ def _hash_entries(data: object) -> dict[str, dict[str, object]]:
     return result
 
 
-def _course_content_paths(catalog: object, configuration) -> set[str]:
-    """Lese die von content.yml explizit freigegebenen Kursdateien."""
-    if not isinstance(catalog, dict) or catalog.get("format") != 1:
-        raise ValueError("content.yml benötigt format: 1.")
-    paths = {"content.yml"}
-    chapters = catalog.get("chapters")
-    if not isinstance(chapters, dict):
-        raise ValueError("content.yml benötigt Kapitel.")
-    for entries in chapters.values():
-        if not isinstance(entries, list):
-            raise ValueError("Die Kapitelliste in content.yml ist ungültig.")
-        paths.update(entries)
-    exercises = catalog.get("exercises")
-    if not isinstance(exercises, list):
-        raise ValueError("content.yml benötigt Aufgaben.")
-    for exercise in exercises:
-        if not isinstance(exercise, dict):
-            raise ValueError("Ein Aufgabeneintrag in content.yml ist ungültig.")
-        paths.add(exercise.get("assignment"))
-        paths.add(exercise.get("trainer"))
+def _course_content_paths(tree: object, configuration) -> set[str]:
+    """Entdecke sichtbare Kursdateien direkt im Git-Baum.
 
-    allowed_roots = (
-        configuration.scripts_path.rstrip("/") + "/",
-        configuration.assignments_path.rstrip("/") + "/",
-        configuration.trainers_path.rstrip("/") + "/",
-    )
+    Ein Pfad bleibt unsichtbar, sobald ein Datei- oder Ordnername mit ``_``
+    beginnt. Dadurch genügt es, neue Inhalte ins Repository zu legen; ein
+    zusätzlicher Inhaltskatalog ist nicht erforderlich.
+    """
+    if not isinstance(tree, dict) or tree.get("truncated") is True:
+        raise ValueError("Der Repository-Dateibaum ist unvollständig.")
+    entries = tree.get("tree")
+    if not isinstance(entries, list):
+        raise ValueError("Der Repository-Dateibaum ist ungültig.")
+    roots = {
+        configuration.scripts_path.rstrip("/"): ".md",
+        configuration.assignments_path.rstrip("/"): ".md",
+        configuration.trainers_path.rstrip("/"): ".yml",
+    }
     result: set[str] = set()
-    for name in paths:
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("type") != "blob":
+            continue
+        name = entry.get("path")
         if not isinstance(name, str) or not _safe_member(name):
-            raise ValueError(f"Unsicherer Inhaltspfad: {name!r}")
-        if name != "content.yml" and not name.startswith(allowed_roots):
-            raise ValueError(f"Nicht freigegebener Inhaltspfad: {name}")
-        result.add(name)
+            continue
+        path = PurePosixPath(name)
+        if any(part.startswith("_") for part in path.parts):
+            continue
+        for root, suffix in roots.items():
+            if name.startswith(root + "/") and name.endswith(suffix):
+                result.add(name)
+                break
+    if not any(name.startswith(configuration.scripts_path.rstrip("/") + "/") for name in result):
+        raise ValueError("Das Repository enthält keine sichtbaren Skripte.")
+    if not any(name.startswith(configuration.assignments_path.rstrip("/") + "/") for name in result):
+        raise ValueError("Das Repository enthält keine sichtbaren Aufgaben.")
+    if not any(name.startswith(configuration.trainers_path.rstrip("/") + "/") for name in result):
+        raise ValueError("Das Repository enthält keine sichtbaren Trainer.")
     return result
 
 
@@ -401,6 +432,10 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
     revision = str(commit.get("sha", ""))
     if len(revision) != 40:
         raise ValueError("Der Remote-Commit konnte nicht bestimmt werden.")
+    tree = _json_url(
+        f"https://api.github.com/repos/{repository}/git/trees/{revision}?recursive=1",
+        timeout,
+    )
     raw = f"https://raw.githubusercontent.com/{repository}/{revision}"
     trainer_hashes = json.loads(
         _download(f"{raw}/.pykim/trainer-hashes.json", timeout).decode("utf-8")
@@ -411,15 +446,12 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
         name for name in trainer_entries if name.startswith(trainer_prefix)
     }:
         raise ValueError("Die Trainer-Hashliste enthält fremde Dateien.")
-    content_data = _download(f"{raw}/content.yml", timeout)
-    try:
-        catalog = yaml.safe_load(content_data.decode("utf-8"))
-    except (UnicodeDecodeError, yaml.YAMLError) as error:
-        raise ValueError("content.yml ist ungültig.") from error
-    content_paths = _course_content_paths(catalog, configuration)
-    catalog_trainers = {name for name in content_paths if name.startswith(trainer_prefix)}
-    if set(trainer_entries) != catalog_trainers:
-        raise ValueError("Trainer-Hashliste und content.yml passen nicht zusammen.")
+    content_paths = _course_content_paths(tree, configuration)
+    discovered_trainers = {
+        name for name in content_paths if name.startswith(trainer_prefix)
+    }
+    if set(trainer_entries) != discovered_trainers:
+        raise ValueError("Trainer-Hashliste und sichtbare Trainerdateien passen nicht zusammen.")
     if len(content_paths) > MAX_CONTENT_FILES:
         raise ValueError("Der Remote-Inhalt enthält zu viele Dateien.")
 
@@ -452,9 +484,7 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
             staging.mkdir()
             total_size = 0
             for name in sorted(content_paths):
-                data = content_data if name == "content.yml" else _download(
-                    f"{raw}/{quote(name, safe='/')}", timeout
-                )
+                data = _download(f"{raw}/{quote(name, safe='/')}", timeout)
                 total_size += len(data)
                 if total_size > MAX_CONTENT_SIZE:
                     raise ValueError("Der Remote-Inhalt ist zu groß.")
@@ -478,12 +508,12 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
             if target.exists():
                 shutil.rmtree(target)
             os.replace(staging, target)
-    marker = base / "active.json"
-    temporary_marker = base / "active.json.tmp"
-    temporary_marker.write_text(
-        json.dumps({"content_version": revision}, indent=2), encoding="utf-8"
-    )
-    os.replace(temporary_marker, marker)
+    marker_data = json.dumps({"content_version": revision}, indent=2)
+    for marker in (base / "active.json", _course_active_marker(configuration)):
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        temporary_marker = marker.with_suffix(marker.suffix + ".tmp")
+        temporary_marker.write_text(marker_data, encoding="utf-8")
+        os.replace(temporary_marker, marker)
     return target
 
 

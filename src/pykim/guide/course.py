@@ -57,13 +57,80 @@ def get_course_directory() -> Path | None:
         return None
 
 
+def get_course_directories() -> tuple[Path, ...]:
+    """Liefere alle lokal bekannten Kursordner, inklusive alter Konfiguration."""
+    environment = os.environ.get(COURSE_ENV)
+    if environment:
+        return (Path(environment).expanduser().resolve(),)
+    data = _load_config()
+    values = data.get("course_directories", [])
+    candidates = list(values) if isinstance(values, list) else []
+    legacy = data.get("course_directory")
+    if isinstance(legacy, str) and legacy:
+        candidates.insert(0, legacy)
+    result: list[Path] = []
+    for value in candidates:
+        if not isinstance(value, str) or not value:
+            continue
+        path = Path(value).expanduser().resolve()
+        if path not in result:
+            result.append(path)
+    return tuple(result)
+
+
 def set_course_directory(path: str | Path) -> Path:
     """Merke lokal, wo der portable Kursordner liegt."""
     course = Path(path).expanduser().resolve()
     data = _load_config()
     data["course_directory"] = str(course)
+    known = [str(item) for item in get_course_directories() if item != course]
+    data["course_directories"] = [str(course), *known]
     _save_config(data)
     return course
+
+
+def clear_course_selection() -> None:
+    """Löse die aktuelle Auswahl, ohne bekannte Kurse zu vergessen."""
+    if os.environ.get(COURSE_ENV):
+        return
+    data = _load_config()
+    data.pop("course_directory", None)
+    _save_config(data)
+
+
+def forget_course_directory(path: str | Path) -> None:
+    """Entferne einen Kurs aus der lokalen Auswahl, ohne Dateien anzufassen."""
+    if os.environ.get(COURSE_ENV):
+        raise RuntimeError("Ein per Umgebungsvariable gesetzter Kurs kann nicht entfernt werden.")
+    course = Path(path).expanduser().resolve()
+    data = _load_config()
+    known = [
+        str(item) for item in get_course_directories()
+        if item != course
+    ]
+    data["course_directories"] = known
+    if data.get("course_directory") == str(course):
+        data.pop("course_directory", None)
+    _save_config(data)
+
+
+def trash_course(path: str | Path) -> None:
+    """Verschiebe einen eindeutig erkannten PyKIM-Kurs in den Systempapierkorb."""
+    course = Path(path).expanduser().resolve()
+    if course not in get_course_directories():
+        raise ValueError("Der Ordner ist kein lokal registrierter PyKIM-Kurs.")
+    if course in {Path.home().resolve(), Path(course.anchor)}:
+        raise ValueError("Dieser Ordner darf nicht gelöscht werden.")
+    if not (course / ".pykim-course.json").is_file():
+        raise ValueError("Im Ordner fehlt die PyKIM-Kurskennung.")
+    if not (course / ".pykim" / "course.pykim-setup").is_file():
+        raise ValueError("Im Ordner fehlt die PyKIM-Setupdatei.")
+    try:
+        from send2trash import send2trash
+    except ImportError as error:
+        raise RuntimeError("Die Papierkorb-Unterstützung ist nicht installiert.") from error
+    send2trash(str(course))
+    forget_course_directory(course)
 
 
 def get_ide_preference() -> dict[str, str]:
@@ -204,8 +271,10 @@ def create_course(path: str | Path, student_name: str = "") -> dict[str, object]
 def provision_course_exercises(path: str | Path) -> dict[str, list[str]]:
     """Lege Starterdateien ausschließlich aus dem aktivierten Kursinhalt an."""
     from .library import PARADIGMS, task_documents
+    from pykim.trainer.exercises import exercise_names
 
     course = Path(path).expanduser().resolve()
+    trainable = set(exercise_names())
     created: list[str] = []
     existing: list[str] = []
     for paradigm in PARADIGMS:
@@ -213,6 +282,8 @@ def provision_course_exercises(path: str | Path) -> dict[str, list[str]]:
         section_directory.mkdir(parents=True, exist_ok=True)
         for document in task_documents(paradigm):
             exercise = document.name
+            if exercise not in trainable:
+                continue
             target = section_directory / f"{exercise.replace('-', '_')}.py"
             if target.exists():
                 existing.append(str(target.relative_to(course)))

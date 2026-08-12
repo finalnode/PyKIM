@@ -127,6 +127,7 @@ def build_submission_payload(
     }
     if include_journal:
         payload["journal"] = progress.get("journal", {})
+        payload["answers"] = progress.get("answers", {})
     return payload
 
 

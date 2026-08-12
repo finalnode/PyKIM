@@ -12,7 +12,7 @@ from .interpreter import python_command
 from .library import PARADIGMS, script_chapters
 
 PYKIM_CALLS = {
-    "animate", "down", "get_color", "get_x", "get_y", "hide", "left",
+    "animate", "down", "get_color", "get_position", "get_x", "get_y", "hide", "left",
     "paint", "paint_stop", "play_pause", "play_tone", "right",
     "run", "set_color", "set_position", "set_x", "set_y", "show", "speed", "up",
 }

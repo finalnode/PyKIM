@@ -1,17 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import platform
 from pathlib import Path
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 project = Path(SPEC).resolve().parents[2]
-with (project / "pyproject.toml").open("rb") as source:
-    app_version = str(tomllib.load(source)["project"]["version"])
+system = platform.system()
 
 datas = []
 binaries = []
@@ -24,22 +19,25 @@ datas += pyxel_datas
 binaries += pyxel_binaries
 hiddenimports += pyxel_hidden
 hiddenimports += collect_submodules("pykim.trainer.exercises")
-
-datas += collect_data_files("pykim", include_py_files=False)
-datas += collect_data_files("pykim.examples", include_py_files=True)
-hiddenimports += ["pykim.examples"]
 hiddenimports += [
     "engineio.async_drivers.aiohttp",
     "engineio.async_drivers.asgi",
+    "nicegui.elements.codemirror",
+    "nicegui.native.native_mode",
+    "pykim.examples",
+    "uvicorn.lifespan.on",
     "uvicorn.logging",
     "uvicorn.loops.auto",
     "uvicorn.protocols.http.auto",
     "uvicorn.protocols.websockets.auto",
-    "uvicorn.lifespan.on",
-    "webview.platforms.cocoa",
-    "nicegui.native.native_mode",
-    "nicegui.elements.codemirror",
 ]
+if system == "Windows":
+    hiddenimports += ["webview.platforms.winforms"]
+elif system == "Linux":
+    hiddenimports += ["webview.platforms.gtk"]
+
+datas += collect_data_files("pykim", include_py_files=False)
+datas += collect_data_files("pykim.examples", include_py_files=True)
 
 wheelhouse = project / "dist" / "wheelhouse"
 if wheelhouse.is_dir():
@@ -58,6 +56,7 @@ analysis = Analysis(
 )
 
 pyz = PYZ(analysis.pure, analysis.zipped_data)
+icon = str(project / "packaging" / "macos" / "assets" / "app-icon-master.png")
 
 executable = EXE(
     pyz,
@@ -65,15 +64,12 @@ executable = EXE(
     [],
     exclude_binaries=True,
     name="PyKIM Suite",
+    icon=icon if system == "Windows" else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     console=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
 )
 
 python_runner = EXE(
@@ -82,15 +78,12 @@ python_runner = EXE(
     [],
     exclude_binaries=True,
     name="PyKIM Python",
+    icon=icon if system == "Windows" else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     console=True,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
 )
 
 collection = COLLECT(
@@ -102,19 +95,4 @@ collection = COLLECT(
     strip=False,
     upx=False,
     name="PyKIM Suite",
-)
-
-app = BUNDLE(
-    collection,
-    name="PyKIM Suite.app",
-    icon=str(project / "packaging" / "macos" / "assets" / "app-icon.icns"),
-    bundle_identifier="de.osz-kim.pykim-suite",
-    version=app_version,
-    info_plist={
-        "CFBundleDisplayName": "PyKIM Suite",
-        "CFBundleName": "PyKIM Suite",
-        "CFBundleShortVersionString": app_version,
-        "NSHighResolutionCapable": True,
-        "LSMinimumSystemVersion": "10.15",
-    },
 )

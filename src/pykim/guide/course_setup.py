@@ -95,22 +95,95 @@ def course_setup_info(course: str | Path) -> CourseSetup | None:
     return setup_info(path) if path.is_file() else None
 
 
-def install_course_setup(data: bytes, course: str | Path) -> CourseSetup:
-    """Lese, synchronisiere und installiere eine Kurs-Setupdatei."""
-    info = setup_info(data)
-    from .updates import sync_certificate_content
-
-    sync_certificate_content(info)
+def _write_course_setup(data: bytes, course: str | Path) -> None:
     target = course_setup_path(course)
     target.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile("wb", dir=target.parent, delete=False) as temporary:
         temporary.write(data)
         temporary_path = Path(temporary.name)
     os.replace(temporary_path, target)
+
+
+def install_course_setup(data: bytes, course: str | Path) -> CourseSetup:
+    """Lese, synchronisiere und installiere eine Kurs-Setupdatei."""
+    info = setup_info(data)
+    from .updates import sync_certificate_content
+
+    sync_certificate_content(info)
+    _write_course_setup(data, course)
     from .course import provision_course_exercises
 
     provision_course_exercises(course)
     return info
+
+
+def install_new_course_setup(
+    data: bytes,
+    *,
+    base_directory: str | Path | None = None,
+) -> tuple[CourseSetup, Path]:
+    """Lege aus einer hochgeladenen Setupdatei einen lokal bekannten Kurs an."""
+    info = setup_info(data)
+    base = (
+        Path(base_directory).expanduser().resolve()
+        if base_directory is not None
+        else Path.home() / "PyKIM-Kurse"
+    )
+    course = (base / Path(info.name).stem).resolve()
+
+    # Erst vollständig synchronisieren; ein ungültiger oder nicht erreichbarer
+    # Kurs wird dadurch nicht als halbfertiger Eintrag registriert.
+    from .updates import sync_certificate_content
+
+    sync_certificate_content(info)
+    _write_course_setup(data, course)
+
+    from .course import create_course, provision_course_exercises
+
+    create_course(course)
+    from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.exercises import refresh_exercises
+
+    refresh_exercises()
+    refresh_assignments()
+    provision_course_exercises(course)
+    return info, course
+
+
+def sync_installed_course_content(
+    course: str | Path | None = None,
+    *,
+    timeout: float = 20.0,
+):
+    """Gleiche den eingerichteten Kurs beim App-Start mit seinem Repository ab."""
+    from .course import get_course_directory, provision_course_exercises
+    from .library import PACKAGED_CONTENT_ROOT
+    from .updates import TrainerVerification, active_content_root, sync_certificate_content
+
+    selected = get_course_directory() if course is None else Path(course).expanduser().resolve()
+    if selected is None:
+        return TrainerVerification(False, False, "Kein Kursordner eingerichtet.")
+    info = course_setup_info(selected)
+    if info is None:
+        return TrainerVerification(False, False, "Keine Kurs-Setupdatei installiert.")
+
+    previous = active_content_root(PACKAGED_CONTENT_ROOT)
+    target = sync_certificate_content(info, timeout=timeout)
+
+    # Beide Registrys werden beim Modulimport aufgebaut und müssen deshalb nach
+    # einem Startabgleich ausdrücklich auf den neuen Inhaltsstand zeigen.
+    from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.exercises import refresh_exercises
+
+    refresh_exercises()
+    refresh_assignments()
+    provision_course_exercises(selected)
+    updated = previous.resolve() != target.resolve()
+    return TrainerVerification(
+        True,
+        updated,
+        "Kursinhalte wurden aktualisiert." if updated else "Kursinhalte sind aktuell.",
+    )
 
 
 def verify_installed_course_setup(course: str | Path, *, allow_offline: bool = False):

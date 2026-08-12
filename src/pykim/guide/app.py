@@ -4,9 +4,14 @@ import argparse
 from pathlib import Path
 
 import pykim
-from pykim.trainer.exercises import get_exercise
+from pykim.trainer.exercises import exercise_names, get_exercise
 from pykim.trainer.assignments import get_assignment
-from .course_setup import course_setup_info, install_course_setup
+from .course_setup import (
+    course_setup_info,
+    install_course_setup,
+    install_new_course_setup,
+    sync_installed_course_content,
+)
 # Der verschlüsselte Abgabeexport ist vorerst ausgeblendet und bleibt als
 # getrennte technische Vorarbeit erhalten; er ist kein Teil der Kurs-Setupdatei.
 from pykim.submission.export import (
@@ -31,13 +36,16 @@ from .learning_view import (
 from .course import (
     create_course,
     exercise_file,
+    get_course_directories,
     get_course_directory,
     get_ide_preference,
     get_runtime_preference,
     get_student_name,
     reset_exercise_file,
+    set_course_directory,
     set_ide_preference,
     set_runtime_preference,
+    trash_course,
 )
 from .runtime import (
     bundled_wheelhouse,
@@ -52,7 +60,12 @@ from .pyxel_examples_view import render_pyxel_examples_view
 from .projects_view import render_projects_view
 from .extensions_view import render_extensions_view
 from .execution import execution_manager, script_example_manager
-from .progress import clear_exercise_progress, load_progress, save_journal_entry
+from .progress import (
+    clear_exercise_progress,
+    load_progress,
+    save_journal_entry,
+    save_task_answer,
+)
 from .script_view import render_script_reader
 from .script_api import register_script_api
 from .theme import configure_theme
@@ -117,12 +130,193 @@ def main(
 
     register_script_api(nicegui_app)
 
+    course_sync_state: dict[str, object] = {"result": None, "error": ""}
+    course_selection_state = {"confirmed": False}
+
     @ui.page("/")
     def index() -> None:
         ide_open_buttons = []
         dirty_exercises: set[str] = set()
         # Farben des OSZ KIM: kräftiges Orange, technisches Grau und Weiß.
         configure_theme(ui)
+        if not course_selection_state["confirmed"]:
+            async def select_course(course: Path) -> None:
+                set_course_directory(course)
+                course_sync_state.update(result=None, error="")
+                try:
+                    course_sync_state["result"] = await nicegui_run.io_bound(
+                        sync_installed_course_content, course
+                    )
+                except Exception as error:
+                    course_sync_state["error"] = str(error)
+                    # Ein bereits für diesen Kurs gespeicherter Stand bleibt
+                    # offline nutzbar und muss in die Registrys geladen werden.
+                    from pykim.trainer.assignments import refresh_assignments
+                    from pykim.trainer.exercises import refresh_exercises
+
+                    refresh_exercises()
+                    refresh_assignments()
+                course_selection_state["confirmed"] = True
+                ui.navigate.reload()
+
+            with ui.column().classes(
+                "w-full max-w-4xl mx-auto items-stretch gap-3 p-6"
+            ):
+                with ui.row().classes("w-full items-baseline gap-3"):
+                    ui.label("PyKIM Suite").classes("text-2xl font-bold text-primary")
+                    ui.label("Kurs auswählen").classes("text-lg text-grey-7")
+                known_courses = get_course_directories()
+                for course in known_courses:
+                    try:
+                        info = course_setup_info(course)
+                    except (OSError, ValueError):
+                        info = None
+                    with ui.card().classes("w-full py-2 px-3 shadow-none border"):
+                        with ui.row().classes("w-full items-center no-wrap gap-3"):
+                            ui.icon("school", color="primary", size="sm")
+                            with ui.column().classes("grow gap-0 min-w-0"):
+                                ui.label(
+                                    info.course if info is not None else course.name
+                                ).classes("font-bold")
+                                details = (
+                                    f"{info.school} · {info.teacher}"
+                                    if info is not None
+                                    else str(course)
+                                )
+                            ui.label(details).classes(
+                                    "text-sm text-grey-7 ellipsis"
+                                )
+                            def open_course_folder(selected=course) -> None:
+                                try:
+                                    open_path(selected)
+                                except (OSError, RuntimeError) as error:
+                                    ui.notify(
+                                        f"Ordner konnte nicht geöffnet werden: {error}",
+                                        type="negative",
+                                    )
+
+                            ui.button(
+                                icon="folder_open",
+                                on_click=open_course_folder,
+                            ).props("flat round dense").tooltip("Kursordner öffnen")
+                            ui.button(
+                                "Öffnen",
+                                on_click=lambda _, selected=course: select_course(selected),
+                                icon="arrow_forward",
+                            ).props("flat dense")
+                            expected_name = (
+                                info.course if info is not None else course.name
+                            )
+                            with ui.dialog() as delete_dialog, ui.card().classes(
+                                "w-full max-w-lg"
+                            ):
+                                ui.label("Kurs in den Papierkorb verschieben?").classes(
+                                    "text-xl font-bold"
+                                )
+                                ui.label(
+                                    "Schülerlösungen, Antworten und Lernstand in diesem "
+                                    "Kursordner werden ebenfalls verschoben. Der Vorgang kann "
+                                    "über den Systempapierkorb rückgängig gemacht werden."
+                                )
+                                ui.label(
+                                    f"Gib zur Bestätigung exakt {expected_name!r} ein."
+                                ).classes("text-negative")
+                                delete_name = ui.input("Kursname").classes("w-full")
+
+                                async def delete_selected_course(
+                                    button,
+                                    selected=course,
+                                    dialog=delete_dialog,
+                                ) -> None:
+                                    button.disable()
+                                    try:
+                                        await nicegui_run.io_bound(trash_course, selected)
+                                        dialog.close()
+                                        ui.notify(
+                                            "Der Kurs wurde in den Papierkorb verschoben.",
+                                            type="positive",
+                                        )
+                                        ui.navigate.reload()
+                                    except Exception as error:
+                                        ui.notify(
+                                            f"Kurs konnte nicht gelöscht werden: {error}",
+                                            type="negative",
+                                        )
+                                        button.enable()
+
+                                with ui.row().classes("w-full justify-end"):
+                                    ui.button(
+                                        "Abbrechen",
+                                        on_click=delete_dialog.close,
+                                    ).props("flat")
+                                    confirm_delete = ui.button(
+                                        "In Papierkorb",
+                                        icon="delete",
+                                    ).props("color=negative")
+                                    confirm_delete.disable()
+                                    confirm_delete.on(
+                                        "click",
+                                        lambda _, action=delete_selected_course,
+                                        button=confirm_delete: action(button),
+                                    )
+                                delete_name.on(
+                                    "update:model-value",
+                                    lambda _, field=delete_name,
+                                    button=confirm_delete,
+                                    expected=expected_name: (
+                                        button.enable()
+                                        if field.value == expected
+                                        else button.disable()
+                                    ),
+                                )
+                            ui.button(
+                                icon="delete_outline",
+                                on_click=delete_dialog.open,
+                            ).props("flat round dense color=negative").tooltip(
+                                "Kurs löschen"
+                            )
+                if not known_courses:
+                    ui.label("Noch kein Kurs eingerichtet.").classes("text-grey-7")
+
+                ui.separator()
+                with ui.row().classes("w-full items-center gap-3 no-wrap"):
+                    with ui.column().classes("grow gap-0"):
+                        ui.label("Kurs hinzufügen").classes("font-bold")
+                        ui.label(
+                            "Eine .pykim-setup-Datei der Lehrkraft auswählen."
+                        ).classes("text-sm text-grey-7")
+
+                    async def upload_new_course(event) -> None:
+                        course_upload.disable()
+                        try:
+                            info, course = await nicegui_run.io_bound(
+                                install_new_course_setup,
+                                await event.file.read(),
+                            )
+                            course_selection_state["confirmed"] = True
+                            ui.notify(
+                                f"{info.course} wurde eingerichtet.",
+                                type="positive",
+                            )
+                            ui.navigate.reload()
+                        except Exception as error:
+                            ui.notify(
+                                f"Kurs konnte nicht eingerichtet werden: {error}",
+                                type="negative",
+                            )
+                            course_upload.reset()
+                        finally:
+                            course_upload.enable()
+
+                    course_upload = ui.upload(
+                        label="Setupdatei auswählen",
+                        on_upload=upload_new_course,
+                        auto_upload=True,
+                        max_files=1,
+                        max_file_size=1_000_000,
+                    ).props("accept=.pykim-setup flat bordered").classes("w-64")
+            return
+
         ui.link("Zum Hauptinhalt springen", "#pykim-main").classes("pykim-skip-link")
         with ui.header().classes("pykim-header"):
             with ui.row().classes("pykim-header-top w-full items-center no-wrap"):
@@ -142,6 +336,14 @@ def main(
                 current_student = get_student_name(configured) or system_user_name()
                 ui.label(f"Hallo, {current_student}").classes("text-sm")
                 update_badge = ui.badge("Updates werden geprüft …", color="grey")
+                ui.button(
+                    "Kurs wechseln",
+                    on_click=lambda: (
+                        course_selection_state.update(confirmed=False),
+                        ui.navigate.reload(),
+                    ),
+                    icon="swap_horiz",
+                ).props("flat dense color=white")
                 ui.label(
                     "Kein Kursordner" if configured is None else str(configured)
                 ).classes("pykim-course-path text-sm")
@@ -750,9 +952,61 @@ def main(
                     "App und Lerninhalte werden getrennt geprüft. Schülerlösungen und "
                     "Lernstand werden dabei niemals verändert."
                 ).classes("text-grey-7")
+                startup_sync = course_sync_state["result"]
+                startup_sync_error = str(course_sync_state["error"])
+                if startup_sync_error:
+                    course_sync_text = (
+                        "Kursrepository beim Start nicht erreichbar: "
+                        f"{startup_sync_error}"
+                    )
+                    course_sync_class = "text-warning"
+                elif startup_sync is not None and startup_sync.checked_online:
+                    course_sync_text = (
+                        "Kursrepository beim Start abgeglichen: "
+                        + startup_sync.message
+                    )
+                    course_sync_class = "text-positive"
+                else:
+                    course_sync_text = (
+                        startup_sync.message
+                        if startup_sync is not None
+                        else "Kursrepository wurde noch nicht abgeglichen."
+                    )
+                    course_sync_class = "text-grey-7"
+                course_sync_label = ui.label(course_sync_text).classes(course_sync_class)
                 app_update_label = ui.label("App-Version wird geprüft …")
                 content_update_label = ui.label("Inhaltsversion wird geprüft …")
                 update_state: dict[str, object] = {"status": None}
+
+                async def refresh_course_content() -> None:
+                    course_sync_button.disable()
+                    course_sync_label.text = "Kursrepository wird abgeglichen …"
+                    try:
+                        result = await nicegui_run.io_bound(
+                            sync_installed_course_content
+                        )
+                        course_sync_state["result"] = result
+                        course_sync_state["error"] = ""
+                        course_sync_label.text = result.message
+                        if not result.checked_online:
+                            ui.notify(result.message, type="warning")
+                        elif result.updated:
+                            ui.notify(
+                                "Neue Kursinhalte wurden aktiviert.",
+                                type="positive",
+                            )
+                            ui.navigate.reload()
+                        else:
+                            ui.notify("Die Kursinhalte sind aktuell.", type="positive")
+                    except Exception as error:
+                        course_sync_state["error"] = str(error)
+                        course_sync_label.text = f"Kursabgleich fehlgeschlagen: {error}"
+                        ui.notify(
+                            f"Kursabgleich fehlgeschlagen: {error}",
+                            type="negative",
+                        )
+                    finally:
+                        course_sync_button.enable()
 
                 def open_app_download() -> None:
                     status = update_state["status"]
@@ -782,6 +1036,11 @@ def main(
                         ui.notify(f"Inhaltsupdate fehlgeschlagen: {error}", type="negative")
 
                 with ui.row().classes("items-center"):
+                    course_sync_button = ui.button(
+                        "Kursinhalte abgleichen",
+                        on_click=refresh_course_content,
+                        icon="sync",
+                    ).props("outline")
                     app_button = ui.button(
                         "App-Update öffnen", on_click=open_app_download, icon="download"
                     )
@@ -886,6 +1145,7 @@ def main(
             with ui.tab_panel(tasks_tab):
                 progress = load_progress()
                 journal = progress.get("journal", {})
+                answers = progress.get("answers", {})
                 ui.label("Aufgaben und Testfälle").classes("text-2xl font-bold")
                 current_paradigm = None
                 tasks_course = get_course_directory()
@@ -903,7 +1163,55 @@ def main(
                         "Noch kein Kurs eingerichtet. Importiere im Setup die "
                         ".pykim-setup-Datei deiner Lehrkraft."
                     ).classes("text-grey-7")
-                for task_document in visible_tasks:
+                trainable_names = set(exercise_names())
+                material_tasks = tuple(
+                    document for document in visible_tasks
+                    if document.name not in trainable_names
+                )
+                if material_tasks:
+                    ui.separator()
+                    ui.label("Weitere Aufgaben").classes(
+                        "text-xl font-bold text-primary"
+                    )
+                    ui.label(
+                        "Diese Aufgaben besitzen keine automatische Prüfung."
+                    ).classes("text-grey-7")
+                    for material in material_tasks:
+                        with ui.expansion(material.title, icon="description").classes(
+                            "w-full"
+                        ):
+                            ui.markdown(
+                                render_task_markdown(material.content)
+                            ).classes("prose max-w-none")
+                            answer_key = f"{material.paradigm}/{material.name}"
+                            old_answer = (
+                                answers.get(answer_key, {})
+                                if isinstance(answers, dict)
+                                else {}
+                            )
+                            answer = ui.textarea(
+                                "Meine Antwort",
+                                value=(
+                                    old_answer.get("text", "")
+                                    if isinstance(old_answer, dict)
+                                    else ""
+                                ),
+                            ).props("outlined autogrow").classes("w-full")
+                            ui.button(
+                                "Antwort speichern",
+                                on_click=lambda key=answer_key, field=answer: (
+                                    save_task_answer(key, field.value),
+                                    ui.notify(
+                                        "Antwort wurde gespeichert.",
+                                        type="positive",
+                                    ),
+                                ),
+                                icon="save",
+                            )
+                for task_document in (
+                    document for document in visible_tasks
+                    if document.name in trainable_names
+                ):
                     name = task_document.name
                     if task_document.paradigm != current_paradigm:
                         current_paradigm = task_document.paradigm

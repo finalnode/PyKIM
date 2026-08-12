@@ -5,24 +5,30 @@ import io
 import threading
 import time
 import zipfile
+import sys
 from urllib.error import HTTPError
 from pathlib import Path
+from types import SimpleNamespace
 
 import pykim
 import pytest
 from pykim.guide.app import parse_arguments
 from pykim.guide.content import PYODIDE_PLAYGROUND
 from pykim.guide.course import (
+    clear_course_selection,
     create_course,
     provision_course_exercises,
     exercise_file,
     get_course_directory,
+    get_course_directories,
     get_ide_preference,
     get_student_name,
     reset_exercise_file,
+    set_course_directory,
     set_ide_preference,
     get_runtime_preference,
     set_runtime_preference,
+    trash_course,
 )
 from pykim.guide.ide import (
     configure_thonny,
@@ -49,6 +55,7 @@ from pykim.guide.progress import (
     record_attempt,
     remove_packaged_example_attempts,
     save_journal_entry,
+    save_task_answer,
 )
 from pykim.guide.execution import ExecutionManager, ScriptExampleManager
 from pykim.guide.script_quality import (
@@ -86,6 +93,7 @@ from pykim.guide.library import (
     task_names,
 )
 from pykim.guide.updates import (
+    _course_active_marker,
     active_content_root,
     check_app_update,
     check_content_update,
@@ -95,6 +103,11 @@ from pykim.guide.updates import (
     sync_certificate_content,
     verify_certificate_trainers,
     verify_certificate_authorization,
+)
+from pykim.guide.course_setup import (
+    course_setup_info,
+    install_new_course_setup,
+    sync_installed_course_content,
 )
 from pykim.guide.system import (
     execute_student_program,
@@ -123,6 +136,218 @@ def test_guide_starts_as_desktop_by_default_and_supports_browser_fallback():
     assert parse_arguments(["--browser"]).browser
 
 
+def test_runtime_version_matches_project_metadata():
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with (Path(__file__).parents[1] / "pyproject.toml").open("rb") as source:
+        assert pykim.__version__ == tomllib.load(source)["project"]["version"]
+
+
+def test_published_example_course_setup_is_valid():
+    setup = Path(__file__).parents[1] / "examples" / "course-setups" / (
+        "pykim-standardkurs.pykim-setup"
+    )
+    from pykim.guide.course_setup import setup_info
+
+    parsed = setup_info(setup)
+    assert parsed.course == "PyKIM Standardkurs"
+    assert parsed.repository == "https://github.com/finalnode/PyKIM_Kurs.git"
+
+
+def test_multiple_course_directories_are_remembered_and_selectable(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    first = tmp_path / "kurs-a"
+    second = tmp_path / "kurs-b"
+
+    create_course(first, "Ada")
+    create_course(second, "Grace")
+
+    assert get_course_directory() == second.resolve()
+    assert get_course_directories() == (second.resolve(), first.resolve())
+
+    set_course_directory(first)
+    assert get_course_directory() == first.resolve()
+    assert get_course_directories() == (first.resolve(), second.resolve())
+
+    clear_course_selection()
+    assert get_course_directory() is None
+    assert get_course_directories() == (first.resolve(), second.resolve())
+
+
+def test_each_selected_course_uses_its_own_cached_content(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    packaged = tmp_path / "packaged"
+    packaged.mkdir()
+    courses = (tmp_path / "kurs-a", tmp_path / "kurs-b")
+    setups = (
+        SimpleNamespace(
+            repository="https://github.com/example/course.git",
+            branch="main",
+            scripts_path="Skripte",
+            assignments_path="Aufgaben",
+            trainers_path="Trainer",
+        ),
+        SimpleNamespace(
+            repository="https://github.com/example/course.git",
+            branch="beta",
+            scripts_path="Skripte",
+            assignments_path="Aufgaben",
+            trainers_path="Trainer",
+        ),
+    )
+    roots = []
+    for index, setup in enumerate(setups):
+        revision = str(index + 1) * 40
+        root = tmp_path / "config" / "content" / "versions" / revision
+        root.mkdir(parents=True)
+        content = f"Kurs {index}".encode()
+        (root / "test.md").write_bytes(content)
+        (root / "content-manifest.json").write_text(
+            json.dumps({
+                "content_version": revision,
+                "files": {"test.md": hashlib.sha256(content).hexdigest()},
+            }),
+            encoding="utf-8",
+        )
+        marker = _course_active_marker(setup)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(json.dumps({"content_version": revision}), encoding="utf-8")
+        roots.append(root)
+
+    monkeypatch.setattr(
+        "pykim.guide.course_setup.course_setup_info",
+        lambda course: setups[courses.index(Path(course))],
+    )
+    for course, expected in zip(courses, roots):
+        set_course_directory(course)
+        assert active_content_root(packaged) == expected
+
+
+def test_uploaded_setup_creates_and_selects_a_managed_course(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    data = json.dumps({
+        "format": "pykim-course-setup-v1",
+        "name": "python-11a.pykim-setup",
+        "teacher": "Frau Beispiel",
+        "school": "OSZ KIM",
+        "course": "Python 11A",
+        "repository": "https://github.com/example/course.git",
+        "branch": "main",
+        "scripts_path": "Skripte",
+        "assignments_path": "Aufgaben",
+        "trainers_path": "Trainer",
+    }).encode()
+    calls = []
+    monkeypatch.setattr(
+        "pykim.guide.updates.sync_certificate_content",
+        lambda info: calls.append(info.repository),
+    )
+    monkeypatch.setattr(
+        "pykim.trainer.exercises.refresh_exercises", lambda: calls.append("exercises")
+    )
+    monkeypatch.setattr(
+        "pykim.trainer.assignments.refresh_assignments", lambda: calls.append("assignments")
+    )
+    monkeypatch.setattr(
+        "pykim.guide.course.provision_course_exercises",
+        lambda course: calls.append(Path(course)),
+    )
+
+    info, course = install_new_course_setup(
+        data,
+        base_directory=tmp_path / "courses",
+    )
+
+    assert info.course == "Python 11A"
+    assert course == (tmp_path / "courses" / "python-11a").resolve()
+    assert course_setup_info(course) == info
+    assert get_course_directory() == course
+    assert calls == [
+        "https://github.com/example/course.git",
+        "exercises",
+        "assignments",
+        course,
+    ]
+
+
+def test_course_deletion_uses_system_trash_and_forgets_course(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    course = tmp_path / "course"
+    create_course(course)
+    setup = course / ".pykim" / "course.pykim-setup"
+    setup.parent.mkdir(exist_ok=True)
+    setup.write_text("{}", encoding="utf-8")
+    trashed = []
+    monkeypatch.setitem(
+        sys.modules,
+        "send2trash",
+        SimpleNamespace(send2trash=lambda path: trashed.append(path)),
+    )
+
+    trash_course(course)
+
+    assert trashed == [str(course.resolve())]
+    assert get_course_directory() is None
+    assert get_course_directories() == ()
+
+
+def test_course_deletion_rejects_unmarked_directories(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    directory = tmp_path / "ordinary-folder"
+    directory.mkdir()
+    set_course_directory(directory)
+
+    with pytest.raises(ValueError, match="Kurskennung"):
+        trash_course(directory)
+
+
+def test_startup_sync_uses_repository_from_installed_course_setup(tmp_path, monkeypatch):
+    course = tmp_path / "course"
+    target = tmp_path / "config" / "content" / "versions" / ("a" * 40)
+    course.mkdir()
+    target.mkdir(parents=True)
+    setup = object()
+    calls = []
+
+    monkeypatch.setattr(
+        "pykim.guide.course_setup.course_setup_info", lambda selected: setup
+    )
+    monkeypatch.setattr(
+        "pykim.guide.updates.active_content_root", lambda _packaged: tmp_path / "old"
+    )
+    monkeypatch.setattr(
+        "pykim.guide.updates.sync_certificate_content",
+        lambda configuration, timeout=20.0: calls.append(
+            (configuration, timeout)
+        ) or target,
+    )
+    monkeypatch.setattr(
+        "pykim.trainer.exercises.refresh_exercises", lambda: calls.append("exercises")
+    )
+    monkeypatch.setattr(
+        "pykim.trainer.assignments.refresh_assignments", lambda: calls.append("assignments")
+    )
+    monkeypatch.setattr(
+        "pykim.guide.course.provision_course_exercises",
+        lambda selected: calls.append(("provision", selected)),
+    )
+
+    result = sync_installed_course_content(course, timeout=7.0)
+
+    assert result.checked_online and result.updated
+    assert calls == [
+        (setup, 7.0),
+        "exercises",
+        "assignments",
+        ("provision", course.resolve()),
+    ]
+
+
 def test_browser_playground_starts_with_plain_python_and_has_reset_action():
     assert "for zahl in range(1, 6)" in PYODIDE_PLAYGROUND
     assert "from pykim" not in PYODIDE_PLAYGROUND
@@ -137,12 +362,31 @@ def test_every_exercise_has_a_complete_assignment():
     from pykim.trainer.exercises import exercise_names
 
     assert set(ASSIGNMENTS) == set(exercise_names())
-    assert get_assignment("quadrat-5").requirements
+    assert get_assignment("quadrat-5").summary
     assert task_assignment("quadrat-5").difficulty == "einfach"
     assert task_assignment("musik-pixel-klasse").difficulty == "fortgeschritten"
     assert "@difficulty:" not in render_task_markdown(
         task_document("quadrat-5").content
     )
+
+
+def test_assignment_metadata_is_optional_for_repository_markdown(
+    tmp_path, monkeypatch
+):
+    overlay = tmp_path / "overlay"
+    assignment = overlay / "Aufgaben" / "imperativ" / "frei.md"
+    assignment.parent.mkdir(parents=True)
+    assignment.write_text(
+        "# Freie Aufgabe\n\nBearbeite diese Aufgabe ohne Metadaten.\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PYKIM_CONTENT_DIR", str(overlay))
+
+    parsed = task_assignment("frei")
+
+    assert parsed.summary == "Bearbeite diese Aufgabe ohne Metadaten."
+    assert parsed.requirements == ()
+    assert parsed.difficulty == "mittel"
 
 
 def test_markdown_library_covers_all_trainers_and_both_learning_paths():
@@ -160,11 +404,18 @@ def test_content_overlay_can_replace_scripts_without_touching_packaged_files(
     chapter = overlay / "Skripte" / "imperativ" / "00_neu.md"
     chapter.parent.mkdir(parents=True)
     chapter.write_text("# Aktualisiertes Kapitel\n", encoding="utf-8")
+    nested = overlay / "Skripte" / "imperativ" / "unterricht" / "01_mehr.md"
+    nested.parent.mkdir()
+    nested.write_text("# Weiteres Kapitel\n", encoding="utf-8")
+    hidden = overlay / "Skripte" / "imperativ" / "_entwuerfe" / "alt.md"
+    hidden.parent.mkdir()
+    hidden.write_text("# Unsichtbar\n", encoding="utf-8")
     monkeypatch.setenv("PYKIM_CONTENT_DIR", str(overlay))
 
     assert active_content_root(PACKAGED_CONTENT_ROOT) == overlay
     assert [item.title for item in script_chapters("imperativ")] == [
-        "Aktualisiertes Kapitel"
+        "Aktualisiertes Kapitel",
+        "Weiteres Kapitel",
     ]
 
 
@@ -841,6 +1092,11 @@ def test_progress_and_journal_travel_inside_the_course_folder(tmp_path):
 
     assert record_attempt("test", report, "right()", course=course)
     save_journal_entry("test", "Ich brauche noch eine Schleife.", course=course)
+    save_task_answer(
+        "imperativ/erste-schritte",
+        "Meine freie Antwort.",
+        course=course,
+    )
     progress = load_progress(course)
 
     attempt = progress["attempts"][0]
@@ -848,6 +1104,9 @@ def test_progress_and_journal_travel_inside_the_course_folder(tmp_path):
     assert attempt["tests"][1]["hint"] == "Nutze for."
     assert attempt["optimization"]["score"] == 50
     assert progress["journal"]["test"]["text"].startswith("Ich brauche")
+    assert progress["answers"]["imperativ/erste-schritte"]["text"] == (
+        "Meine freie Antwort."
+    )
     assert (course / ".pykim" / "progress.json").exists()
 
 
@@ -1005,6 +1264,18 @@ def test_pyxel_tools_use_bundled_python_without_global_command(tmp_path, monkeyp
     ]
 
 
+def test_frozen_python_runner_keeps_windows_executable_suffix(tmp_path, monkeypatch):
+    from pykim.guide.interpreter import command_for
+
+    suite = tmp_path / "PyKIM Suite.exe"
+    runner = tmp_path / "PyKIM Python.exe"
+    runner.touch()
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(suite))
+
+    assert command_for(str(suite)) == [str(runner), "--pykim-python"]
+
+
 def test_list_and_launch_installed_pyxel_example(tmp_path, monkeypatch):
     import pyxel
 
@@ -1134,17 +1405,30 @@ def test_content_version_is_displayed_as_german_date():
     assert format_content_version("commit-abc") == "commit-abc"
 
 
+def repository_api(revision, files):
+    """Erzeuge Commit- und Git-Baum-Antworten für Synchronisationstests."""
+    def response(url, _timeout):
+        if "/commits/" in url:
+            return {"sha": revision() if callable(revision) else revision}
+        if "/git/trees/" in url:
+            return {
+                "truncated": False,
+                "tree": [
+                    {"path": name, "type": "blob"}
+                    for name in files
+                ],
+            }
+        raise AssertionError(f"Unerwartete API-URL: {url}")
+    return response
+
+
 def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, monkeypatch):
     from pykim.submission.crypto import ContentConfiguration
 
     files = {
-        "content.yml": (
-            b"format: 1\nid: testkurs\nchapters:\n  imperativ:\n"
-            b"    - Skripte/imperativ/01_start.md\nexercises:\n"
-            b"  - id: quadrat-5\n    assignment: Aufgaben/imperativ/quadrat-5.md\n"
-            b"    trainer: Trainer/quadrat-5.yml\n"
-        ),
         "Skripte/imperativ/01_start.md": b"# Start\n",
+        "Skripte/_backup/00_alt.md": b"# Alt\n",
+        "Skripte/imperativ/_entwurf.md": b"# Entwurf\n",
         "Aufgaben/imperativ/quadrat-5.md": b"# Quadrat\n",
         "Trainer/quadrat-5.yml": (
             b"format: 1\nid: quadrat-5\ntitle: Quadrat\ntests:\n"
@@ -1163,7 +1447,7 @@ def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, mo
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
         "pykim.guide.updates._json_url",
-        lambda _url, _timeout: {"sha": revision},
+        repository_api(revision, files),
     )
 
     def download(url, _timeout):
@@ -1186,6 +1470,9 @@ def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, mo
     assert (target / "Skripte/imperativ/01_start.md").read_bytes() == files[
         "Skripte/imperativ/01_start.md"
     ]
+    assert not (target / "Skripte/_backup/00_alt.md").exists()
+    assert not (target / "Skripte/imperativ/_entwurf.md").exists()
+    assert not (target / "content.yml").exists()
     assert active_content_root(PACKAGED_CONTENT_ROOT) == target
 
 
@@ -1241,11 +1528,7 @@ def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, m
     from pykim.submission.crypto import ContentConfiguration
 
     files = {
-        "content.yml": (
-            b"format: 1\nid: testkurs\nchapters: {}\nexercises:\n"
-            b"  - id: quadrat-5\n    assignment: Aufgaben/imperativ/quadrat-5.md\n"
-            b"    trainer: Trainer/quadrat-5.yml\n"
-        ),
+        "Skripte/imperativ/01_start.md": b"# Start\n",
         "Aufgaben/imperativ/quadrat-5.md": b"# Alte Aufgabe\n",
         "Trainer/quadrat-5.yml": (
             b"format: 1\nid: quadrat-5\ntitle: Quadrat\ntests:\n"
@@ -1262,7 +1545,9 @@ def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, m
     }
     revision = "b" * 40
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
-    monkeypatch.setattr("pykim.guide.updates._json_url", lambda *_args: {"sha": revision})
+    monkeypatch.setattr(
+        "pykim.guide.updates._json_url", repository_api(revision, files)
+    )
 
     def download(url, _timeout):
         if url.endswith("/.pykim/trainer-hashes.json"):
@@ -1295,11 +1580,7 @@ def test_trainer_verification_replaces_changed_trainer_data(tmp_path, monkeypatc
     )
     new_trainer = old_trainer.replace(b"side: 5", b"side: 6")
     files = {
-        "content.yml": (
-            b"format: 1\nid: testkurs\nchapters: {}\nexercises:\n"
-            b"  - id: quadrat-5\n    assignment: Aufgaben/imperativ/quadrat-5.md\n"
-            b"    trainer: Trainer/quadrat-5.yml\n"
-        ),
+        "Skripte/imperativ/01_start.md": b"# Start\n",
         "Aufgaben/imperativ/quadrat-5.md": b"# Quadrat\n",
         "Trainer/quadrat-5.yml": old_trainer,
     }
@@ -1319,7 +1600,7 @@ def test_trainer_verification_replaces_changed_trainer_data(tmp_path, monkeypatc
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
         "pykim.guide.updates._json_url",
-        lambda *_args: {"sha": current_revision[0]},
+        repository_api(lambda: current_revision[0], files),
     )
 
     def download(url, _timeout):

@@ -45,7 +45,10 @@ def _documents(folder: str, paradigm: str) -> tuple[MarkdownDocument, ...]:
 
     directory = active_content_root(PACKAGED_CONTENT_ROOT) / folder / paradigm
     documents = []
-    for path in sorted(directory.glob("*.md")):
+    for path in sorted(directory.rglob("*.md")):
+        relative = path.relative_to(directory)
+        if any(part.startswith("_") for part in relative.parts):
+            continue
         content = path.read_text(encoding="utf-8")
         documents.append(
             MarkdownDocument(path.stem, _title(content, path.stem), paradigm, content, path)
@@ -132,8 +135,6 @@ def task_assignment(name: str) -> TaskAssignment:
         for line in body_lines
         if line.startswith("- ")
     )
-    if not requirements:
-        raise ValueError(f"Für {name!r} fehlen Anforderungen im Markdown.")
     return TaskAssignment(summary, requirements, difficulty)
 
 
@@ -145,8 +146,13 @@ def render_task_markdown(content: str) -> str:
 
 
 def task_names() -> tuple[str, ...]:
+    """Liefere nur automatisch prüfbare Aufgabenkennungen."""
+    from pykim.trainer.exercises import exercise_names
+
+    trainable = set(exercise_names())
     return tuple(
         document.name
         for paradigm in PARADIGMS
         for document in task_documents(paradigm)
+        if document.name in trainable
     )

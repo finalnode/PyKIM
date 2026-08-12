@@ -5,6 +5,7 @@ from pykim import (
     animate,
     down,
     get_color,
+    get_position,
     get_x,
     get_y,
     left,
@@ -38,10 +39,12 @@ def test_position_and_movement():
     left(2)
     up()
     assert (get_x(), get_y()) == (9, 22)
+    assert get_position() == (9, 22)
 
 
 def test_pixel_position_properties_replace_getters_in_oop_code():
     mia = pykim.world.new_pixel("MIA", 10, 20)
+    assert mia.get_position() == (10, 20)
 
     assert mia.x == 10
     assert mia.y == 20

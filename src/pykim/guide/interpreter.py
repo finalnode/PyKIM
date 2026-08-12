@@ -13,7 +13,8 @@ def command_for(executable: str) -> list[str]:
         getattr(sys, "frozen", False)
         and executable == sys.executable
     ):
-        runner = Path(sys.executable).with_name("PyKIM Python")
+        executable_path = Path(sys.executable)
+        runner = executable_path.with_name(f"PyKIM Python{executable_path.suffix}")
         command = [str(runner if runner.is_file() else Path(sys.executable))]
         command.append("--pykim-python")
     return command

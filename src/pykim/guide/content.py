@@ -9,6 +9,7 @@ CHEATSHEET = r"""
 set_position(20, 20)
 get_x()
 get_y()
+get_position()
 up()       # Standardschritt: 1
 down(5)
 left(3)

@@ -37,30 +37,31 @@ ALLOWED_TESTS = {
 
 
 def content_files() -> list[Path]:
-    result = [ROOT / "content.yml"]
+    result = []
     for folder, suffix in (("Skripte", ".md"), ("Aufgaben", ".md"), ("Trainer", ".yml")):
-        result.extend(path for path in (ROOT / folder).rglob(f"*{suffix}") if path.is_file())
+        result.extend(
+            path for path in (ROOT / folder).rglob(f"*{suffix}")
+            if path.is_file()
+            and not any(part.startswith("_") for part in path.relative_to(ROOT).parts)
+        )
     return sorted(result)
 
 
 def validate() -> None:
-    catalog = yaml.safe_load((ROOT / "content.yml").read_text(encoding="utf-8"))
-    if not isinstance(catalog, dict) or catalog.get("format") != 1:
-        raise ValueError("content.yml benötigt format: 1.")
-    exercises = catalog.get("exercises")
-    if not isinstance(exercises, list):
-        raise ValueError("content.yml benötigt eine Aufgabenliste.")
     seen = set()
-    for entry in exercises:
-        exercise_id = entry.get("id")
+    trainers = [path for path in content_files() if path.is_relative_to(ROOT / "Trainer")]
+    for trainer in trainers:
+        definition = yaml.safe_load(trainer.read_text(encoding="utf-8"))
+        exercise_id = definition.get("id") if isinstance(definition, dict) else None
         if not isinstance(exercise_id, str) or exercise_id in seen:
             raise ValueError(f"Ungültige oder doppelte Aufgabenkennung: {exercise_id!r}")
         seen.add(exercise_id)
-        assignment = ROOT / entry.get("assignment", "")
-        trainer = ROOT / entry.get("trainer", "")
-        if not assignment.is_file() or not trainer.is_file():
-            raise ValueError(f"Aufgabe oder Trainer fehlt für {exercise_id}.")
-        definition = yaml.safe_load(trainer.read_text(encoding="utf-8"))
+        assignments = [
+            path for path in content_files()
+            if path.is_relative_to(ROOT / "Aufgaben") and path.stem == exercise_id
+        ]
+        if len(assignments) != 1:
+            raise ValueError(f"Aufgabe fehlt oder ist nicht eindeutig: {exercise_id}.")
         if definition.get("format") != 1 or definition.get("id") != exercise_id:
             raise ValueError(f"Trainerkennung stimmt nicht: {trainer}")
         tests = definition.get("tests")
@@ -71,15 +72,21 @@ def validate() -> None:
             raise ValueError(f"Unbekannte Prüftypen in {trainer}: {sorted(unknown)}")
 
 
-def hashes() -> dict[str, object]:
+def trainer_hashes() -> dict[str, object]:
     files = {
         path.relative_to(ROOT).as_posix(): {
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             "size": path.stat().st_size,
         }
         for path in content_files()
+        if path.is_relative_to(ROOT / "Trainer")
     }
-    return {"format": 1, "algorithm": "sha256", "files": files}
+    return {
+        "format": 1,
+        "algorithm": "sha256",
+        "scope": "trainer",
+        "files": files,
+    }
 
 
 def main() -> int:
@@ -87,14 +94,17 @@ def main() -> int:
     parser.add_argument("--write-hashes", action="store_true")
     options = parser.parse_args()
     validate()
-    rendered = json.dumps(hashes(), ensure_ascii=False, indent=2) + "\n"
-    target = ROOT / ".pykim" / "hashes.json"
+    rendered = json.dumps(trainer_hashes(), ensure_ascii=False, indent=2) + "\n"
+    target = ROOT / ".pykim" / "trainer-hashes.json"
     if options.write_hashes:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(rendered, encoding="utf-8")
     elif not target.is_file() or target.read_text(encoding="utf-8") != rendered:
-        raise SystemExit(".pykim/hashes.json ist nicht aktuell.")
-    print(f"Kursinhalt gültig: {len(hashes()['files'])} Dateien")
+        raise SystemExit(".pykim/trainer-hashes.json ist nicht aktuell.")
+    print(
+        f"Kursinhalt gültig: {len(content_files())} sichtbare Dateien, "
+        f"{len(trainer_hashes()['files'])} Trainer"
+    )
     return 0
 
 
@@ -109,7 +119,7 @@ on:
   push:
     branches: [main, beta]
     paths-ignore:
-      - .pykim/hashes.json
+      - .pykim/trainer-hashes.json
   pull_request:
     branches: [main, beta]
 
@@ -129,10 +139,10 @@ jobs:
       - name: Hashliste zurückschreiben
         if: github.event_name == 'push'
         run: |
-          if git diff --quiet -- .pykim/hashes.json; then exit 0; fi
+          if git diff --quiet -- .pykim/trainer-hashes.json; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .pykim/hashes.json
+          git add .pykim/trainer-hashes.json
           git commit -m "chore: Inhaltshashes aktualisieren"
           git push
 '''
@@ -145,8 +155,9 @@ für die PyKIM Suite.
 
 - `main` enthält den stabilen Unterrichtsstand.
 - `beta` dient zur Erprobung neuer und geänderter Inhalte.
-- Jede Aufgabe besitzt eine gleichnamige Datei unter `Trainer/`.
-- `.pykim/hashes.json` wird durch GitHub Actions erzeugt und nicht von Hand gepflegt.
+- Automatisch geprüfte Aufgaben besitzen eine gleichnamige Datei unter `Trainer/`.
+- Dateien und Ordner, deren Name mit `_` beginnt, werden von der Suite ignoriert.
+- `.pykim/trainer-hashes.json` wird durch GitHub Actions erzeugt und nicht von Hand gepflegt.
 
 Nach Änderungen kann lokal geprüft werden:
 
@@ -183,37 +194,6 @@ def main() -> int:
             encoding="utf-8",
         )
 
-    chapters = {
-        paradigm: [
-            path.relative_to(TARGET).as_posix()
-            for path in sorted((TARGET / "Skripte" / paradigm).glob("*.md"))
-        ]
-        for paradigm in ("imperativ", "oop")
-    }
-    exercises = []
-    for definition in definitions:
-        exercise_id = definition["id"]
-        matches = list((TARGET / "Aufgaben").glob(f"*/{exercise_id}.md"))
-        if len(matches) != 1:
-            raise ValueError(f"Aufgaben-Markdown nicht eindeutig: {exercise_id}")
-        exercises.append(
-            {
-                "id": exercise_id,
-                "assignment": matches[0].relative_to(TARGET).as_posix(),
-                "trainer": f"Trainer/{exercise_id}.yml",
-            }
-        )
-    catalog = {
-        "format": 1,
-        "id": "pykim-standardkurs",
-        "title": "PyKIM-Standardkurs",
-        "minimum_app_version": "0.3.0",
-        "chapters": chapters,
-        "exercises": exercises,
-    }
-    (TARGET / "content.yml").write_text(
-        yaml.safe_dump(catalog, allow_unicode=True, sort_keys=False), encoding="utf-8"
-    )
     (TARGET / "README.md").write_text(README, encoding="utf-8")
     (TARGET / ".gitignore").write_text(".DS_Store\n__pycache__/\n", encoding="utf-8")
     workflow = TARGET / ".github" / "workflows"

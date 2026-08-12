@@ -54,6 +54,10 @@ class Pixel:
 
     @property
     def position(self) -> tuple[int, int]:
+        """Kompatible Eigenschaft; neuer Code kann ``get_position()`` verwenden."""
+        return self.get_position()
+
+    def get_position(self) -> tuple[int, int]:
         return self.get_x(), self.get_y()
 
     @position.setter

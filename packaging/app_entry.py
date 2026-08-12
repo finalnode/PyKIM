@@ -1,10 +1,11 @@
-"""Einstiegspunkt der eigenständigen macOS-App."""
+"""Gemeinsamer Einstiegspunkt der gebündelten Desktop-App."""
 
 from __future__ import annotations
 
-import multiprocessing
 import faulthandler
+import multiprocessing
 import os
+import platform
 import runpy
 import sys
 import traceback
@@ -13,7 +14,7 @@ from pathlib import Path
 
 
 def restore_standard_streams() -> None:
-    """Verbinde den windowed PyInstaller-Prozess wieder mit seinen Pipes."""
+    """Verbinde einen fensterlosen PyInstaller-Prozess wieder mit seinen Pipes."""
     if sys.stdout is None:
         sys.stdout = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
     if sys.stderr is None:
@@ -21,7 +22,7 @@ def restore_standard_streams() -> None:
 
 
 def run_python(arguments: list[str]) -> int:
-    """Führe Schülercode mit dem im App-Bundle enthaltenen Python aus."""
+    """Führe Schülercode mit dem in der App enthaltenen Python aus."""
     args = list(arguments)
     if args and args[0] == "-u":
         args.pop(0)
@@ -44,6 +45,27 @@ def run_python(arguments: list[str]) -> int:
     )
 
 
+def run_app() -> None:
+    """Starte die Suite und schreibe Absturzdetails in ein lokales Log."""
+    from pykim.guide.app import main
+
+    log_directory = Path.home() / ".pykim" / "logs"
+    log_directory.mkdir(parents=True, exist_ok=True)
+    log_file = log_directory / f"desktop-app-{platform.system().lower()}.log"
+    with log_file.open("a", encoding="utf-8", buffering=1) as log:
+        sys.stdout = log
+        sys.stderr = log
+        faulthandler.enable(log)
+        print(f"\n[{datetime.now().isoformat()}] PyKIM Suite startet")
+        try:
+            # Desktop-Starter können eigene Argumente ergänzen. Die App startet
+            # deshalb bewusst im nativen Modus ohne Auswertung dieser Argumente.
+            main(arguments=[], native=True)
+        except BaseException:
+            traceback.print_exc(file=log)
+            raise
+
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     if len(sys.argv) > 1 and sys.argv[1] == "--pykim-python":
@@ -52,19 +74,4 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.stderr.flush()
         raise SystemExit(status)
-    from pykim.guide.app import main
-
-    log_directory = Path.home() / ".pykim" / "logs"
-    log_directory.mkdir(parents=True, exist_ok=True)
-    with (log_directory / "macos-app.log").open("a", encoding="utf-8", buffering=1) as log:
-        sys.stdout = log
-        sys.stderr = log
-        faulthandler.enable(log)
-        print(f"\n[{datetime.now().isoformat()}] PyKIM Suite startet")
-        try:
-            # Finder kann eigene Kommandozeilenargumente ergänzen. Die Desktop-App
-            # startet deshalb immer bewusst im nativen Modus ohne CLI-Auswertung.
-            main(arguments=[], native=True)
-        except BaseException:
-            traceback.print_exc(file=log)
-            raise
+    run_app()
