@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[test,guide]"
+      - run: python -m pip install -e ".[test]"
       - run: python -m pytest
       - name: Release-Tag gegen Projektversion prüfen
         if: startsWith(github.ref, 'refs/tags/v')
