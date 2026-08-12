@@ -111,6 +111,24 @@ als eigenständiges Pythonpaket ausgebaut. Dadurch kann PyKIM sowohl innerhalb
 eines CS-Suite-Kurses als auch unabhängig davon in einer IDE, in eigenen
 Unterrichtsmaterialien oder in anderen Pythonprojekten verwendet werden.
 
+### Geplante Weiterentwicklung von PyKIM
+
+Die Pixelwelt soll schrittweise über reine Zeichen- und Bewegungsaufgaben
+hinauswachsen. Als nächste fachliche Ebene sind Hindernisse (`Obstacle`) und
+daraus zusammengesetzte Labyrinthe (`Maze`) vorgesehen. KIM soll begehbare und
+gesperrte Felder erkennen, Nachbarn untersuchen und gefundene Wege in der
+Pixelwelt sichtbar machen können.
+
+Darauf aufbauend sollen typische Themen aus Algorithmik und Graphentheorie
+anschaulich programmierbar werden: systematisches Durchsuchen eines Labyrinths,
+Breiten- und Tiefensuche sowie die Suche nach kürzesten oder günstigsten Wegen,
+beispielsweise mit Breitensuche, Dijkstra oder A*. Die Animation der einzelnen
+Suchschritte und passende Trainer sollen nicht nur das Ergebnis, sondern auch
+den Weg zum Algorithmus nachvollziehbar und testbar machen.
+
+Diese Bausteine gehören zur geplanten PyKIM-Modul-Roadmap und sind noch nicht
+Bestandteil der stabilen API.
+
 Die Umstellung erfolgt schrittweise. Bis Paketnamen, Migration und neue Builds
 festgelegt sind, heißen Anwendung und Downloads weiterhin **PyKIM Suite**. Diese
 Roadmap ist eine Zielarchitektur und keine Ankündigung, dass bestehende
@@ -850,6 +868,22 @@ Beispiel `Python`, `Programmiergrundlagen`, `PyKIM`, `Pyxel` und `OOP`.
 Der Katalog ist bereits als allgemeine Plattformfunktion angelegt. Mit der
 späteren Umbenennung zur CS Suite soll er auch Kurse aufnehmen, die PyKIM nicht
 verwenden und andere Themen oder Werkzeuge der Informatik bereitstellen.
+
+### Geplante portable Kursquellen
+
+In kommenden Versionen soll die Suite Kurse nicht nur aus GitHub beziehen.
+Geplant sind sowohl Git-Repositories unabhängig von Anbieter oder Hoster –
+einschließlich selbst betriebener Git-Server – als auch portable Kursarchive.
+Ein Archiv soll einen vollständigen, direkt importierbaren Kursstand enthalten,
+sodass zum Einrichten weder ein Git-Client noch eine Internetverbindung nötig
+ist.
+
+Damit sollen Lernende App, Kursarchive und ihre Arbeitsordner auf einem mit
+exFAT formatierten USB-Stick mitnehmen und unter Windows, macOS und Linux
+vollständig offline arbeiten können. Kursformat und Dateipfade sollen dabei
+keine betriebssystemspezifischen Annahmen voraussetzen. Synchronisation und ein
+Online-Kurskatalog bleiben optionale Komfortfunktionen, aber keine Voraussetzung
+für die Arbeit mit einem lokal bereitgestellten Kurs.
 
 Der erneute Import derselben Setupdatei ist nicht destruktiv: Repository-Inhalte
 und Konfiguration werden aktualisiert, während Schülerlösungen, freie Antworten,
