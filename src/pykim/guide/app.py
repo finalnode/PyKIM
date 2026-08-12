@@ -1,6 +1,9 @@
 """NiceGUI-Prototyp für Setup, Aufgabenübersicht und Dokubuch."""
 
 import argparse
+import platform
+import threading
+import webbrowser
 from pathlib import Path
 
 import pykim
@@ -104,6 +107,34 @@ def _preferred_ide_label() -> str:
 def course_name_confirmation_matches(value: object, expected: str) -> bool:
     """Prüfe den aktuellen Eingabewert ohne verzögerten UI-Zustand."""
     return isinstance(value, str) and value == expected
+
+
+def prepare_windows_browser_fallback(
+    event_manager,
+    url: str,
+    *,
+    delay: float = 12.0,
+    opener=webbrowser.open,
+) -> threading.Event:
+    """Öffne bei einem hängenden nativen Windows-Fenster den Browser."""
+    window_shown = threading.Event()
+    event_manager.on("shown", lambda _: window_shown.set())
+
+    def open_if_needed() -> None:
+        if window_shown.wait(delay):
+            return
+        print(
+            "Das native Windows-Fenster wurde nicht rechtzeitig sichtbar; "
+            f"öffne die Suite im Standardbrowser unter {url}"
+        )
+        opener(url)
+
+    threading.Thread(
+        target=open_if_needed,
+        name="pykim-windows-browser-fallback",
+        daemon=True,
+    ).start()
+    return window_shown
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
@@ -1756,10 +1787,21 @@ def main(
 
     nicegui_app.on_shutdown(execution_manager.stop_all)
     nicegui_app.on_shutdown(script_example_manager.stop_all)
+    port = None
+    if desktop and platform.system() == "Windows":
+        from nicegui.native.event_manager import event_manager
+        from nicegui.native.native_mode import find_open_port
+
+        port = find_open_port()
+        prepare_windows_browser_fallback(
+            event_manager,
+            f"http://127.0.0.1:{port}/",
+        )
     ui.run(
         title=f"PyKIM Suite {pykim.__version__}",
         favicon="🤖",
         host="127.0.0.1",
+        port=port,
         reload=False,
         show=show and not desktop,
         native=desktop,
