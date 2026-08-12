@@ -70,7 +70,12 @@ from pykim.guide.author_workspace import (
     save_author_draft,
     validate_author_draft,
 )
-from pykim.guide.examples import copy_example_to_course, example_programs, launch_example
+from pykim.guide.examples import (
+    copy_example_to_course,
+    example_programs,
+    launch_example,
+    start_example,
+)
 from pykim.guide.pyxel_examples_view import copy_pyxel_example_to_course
 from pykim.guide.projects import (
     create_project,
@@ -781,6 +786,17 @@ def test_running_example_explicitly_disables_progress(monkeypatch):
     launch_example("interaktive_steuerung_aufgabe")
 
     assert calls[0][1]["env"]["PYKIM_PROGRESS_MODE"] == "disabled"
+
+
+def test_gallery_example_uses_observable_execution_manager(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "pykim.guide.examples.script_example_manager.start",
+        lambda source: calls.append(source) or "job-123",
+    )
+
+    assert start_example("paint_line") == "job-123"
+    assert calls == [next(item.source for item in example_programs() if item.name == "paint_line")]
 
 
 def test_cleanup_removes_only_packaged_example_attempts(tmp_path):
@@ -1835,6 +1851,17 @@ def test_script_example_manager_streams_output_before_program_finishes():
         time.sleep(0.01)
     assert final_status["returncode"] == 0
     assert "fertig" in final_status["stdout"]
+
+
+def test_script_example_manager_can_stop_one_program():
+    manager = ScriptExampleManager()
+    first = manager.start("import time\ntime.sleep(30)")
+    second = manager.start("import time\ntime.sleep(30)")
+
+    assert manager.stop(first)
+    assert not manager.status(first)["running"] or manager.status(first)["returncode"] is not None
+    assert manager.status(second)["running"]
+    assert manager.stop(second)
 
 
 def test_pyxel_repair_uses_supported_version_range(monkeypatch):

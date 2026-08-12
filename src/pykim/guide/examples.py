@@ -9,6 +9,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from .interpreter import python_command
+from .execution import script_example_manager
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,12 @@ def launch_example(name: str) -> Path:
         env=environment,
     )
     return example.path
+
+
+def start_example(name: str) -> str:
+    """Starte ein geprüftes Galeriebeispiel und liefere seine Laufkennung."""
+    example = _example(name)
+    return script_example_manager.start(example.source)
 
 
 def copy_example_to_course(name: str, course: str | Path) -> tuple[Path, bool]:

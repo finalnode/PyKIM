@@ -27,7 +27,7 @@ def source_version(path: Path) -> str:
 
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="PyKIM-Releaseversion prüfen")
-    parser.add_argument("tag", help="Git-Tag, beispielsweise v0.5.1")
+    parser.add_argument("tag", help="Git-Tag, beispielsweise v0.5.2")
     options = parser.parse_args(arguments)
     project = Path(__file__).resolve().parents[1]
     with (project / "pyproject.toml").open("rb") as source:

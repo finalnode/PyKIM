@@ -6,7 +6,7 @@ import threading
 import os
 import tempfile
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .interpreter import python_command
@@ -107,6 +107,7 @@ class ScriptExampleJob:
     stdout: str = ""
     stderr: str = ""
     finished: bool = False
+    finished_event: threading.Event = field(default_factory=threading.Event)
 
 
 class ScriptExampleManager:
@@ -164,6 +165,7 @@ class ScriptExampleManager:
             path.unlink(missing_ok=True)
             with self._lock:
                 job.finished = True
+                job.finished_event.set()
 
         stdout_reader.start()
         stderr_reader.start()
@@ -183,12 +185,25 @@ class ScriptExampleManager:
                 "stderr": job.stderr,
             }
 
+    def stop(self, job_id: str) -> bool:
+        """Beende genau einen laufenden Skript- oder Galerieprozess."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.process.poll() is not None:
+                return False
+            job.process.terminate()
+        try:
+            job.process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            job.process.kill()
+        job.finished_event.wait(timeout=3)
+        return True
+
     def stop_all(self) -> None:
         with self._lock:
             jobs = tuple(self._jobs.values())
-        for job in jobs:
-            if job.process.poll() is None:
-                job.process.terminate()
+        for job_id in tuple(self._jobs):
+            self.stop(job_id)
 
 
 script_example_manager = ScriptExampleManager()
