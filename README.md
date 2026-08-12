@@ -1,4 +1,4 @@
-# PyKIM
+# <img src="packaging/macos/assets/app-icon-master.png" alt="PyKIM-Logo" width="72" align="center"> PyKIM
 
 PyKIM 0.5.0 ist eine deutschsprachige Python-Lernumgebung auf Basis von
 [Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
@@ -17,6 +17,11 @@ verwenden.
 | macOS | Apple Silicon (`arm64`) | **[macOS-App für M1/M2/M3/M4 herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-macos-arm64.dmg)** |
 | macOS | Intel (`x86_64`) | **[macOS-App für Intel herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-macos-x86_64.dmg)** |
 | Linux | x86_64 | **[Linux-App herunterladen (.tar.gz)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz)** |
+
+**Direkt mit dem Beispielkurs starten:**
+
+- **[PyKIM-Standardkurs herunterladen (.pykim-setup)](https://raw.githubusercontent.com/finalnode/PyKIM/main/examples/course-setups/pykim-standardkurs.pykim-setup)** – nach dem App-Start in der Kursauswahl hochladen
+- **[Inhalte des Beispielkurses ansehen](https://github.com/finalnode/PyKIM_Kurs)** – Skripte, Aufgaben und automatische Trainer
 
 Die Builds werden durch GitHub Actions geprüft und anschließend dauerhaft im
 [GitHub Release v0.5.0](https://github.com/finalnode/PyKIM/releases/tag/v0.5.0)
