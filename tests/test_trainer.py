@@ -625,6 +625,72 @@ def test_yaml_trainer_rejects_unknown_top_level_fields():
         })
 
 
+def test_yaml_answer_trainer_is_valid_but_not_executable(tmp_path):
+    from pykim.trainer.definitions import load_exercises
+
+    (tmp_path / "antwort.yml").write_text(
+        "format: 1\nid: begruendung\ntitle: Begründe deine Antwort\nmode: answer\n",
+        encoding="utf-8",
+    )
+
+    assert load_exercises(tmp_path) == {}
+
+
+def test_yaml_answer_trainer_rejects_unknown_fields(tmp_path):
+    from pykim.trainer.definitions import load_exercises
+
+    (tmp_path / "antwort.yml").write_text(
+        "format: 1\nid: begruendung\ntitle: Begründe\nmode: answer\ntests: []\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unbekannte Felder für Antwortaufgabe"):
+        load_exercises(tmp_path)
+
+
+def test_yaml_function_cases_check_live_student_function():
+    from pykim.trainer.definitions import exercise_from_data
+
+    exercise = exercise_from_data({
+        "id": "doppelt",
+        "title": "Verdoppeln",
+        "tests": [
+            {
+                "type": "function",
+                "name": "doppelt",
+                "parameters": ["zahl"],
+                "returns": True,
+            },
+            {
+                "type": "function-cases",
+                "name": "doppelt",
+                "cases": [
+                    {"args": [2], "expected": 4},
+                    {"args": [-3], "expected": -6},
+                ],
+            },
+        ],
+    })
+
+    source = "def doppelt(zahl):\n    return zahl * 2\n"
+    report = exercise.checker(source, {"doppelt": lambda zahl: zahl * 2})
+    assert report.successful
+    assert not exercise.checker(source, {"doppelt": lambda zahl: zahl + 2}).successful
+
+
+def test_yaml_loop_can_require_while():
+    from pykim.trainer.definitions import exercise_from_data
+
+    exercise = exercise_from_data({
+        "id": "warte",
+        "title": "Warten",
+        "tests": [{"type": "loop", "kind": "while"}],
+    })
+
+    assert exercise.checker("while bereit:\n    pass").successful
+    assert not exercise.checker("for _ in range(3):\n    pass").successful
+
+
 @pytest.mark.parametrize(
     ("name", "title", "rules"),
     (("Nicht gültig", "Titel", ("loop",)), ("gueltig", "", ("loop",)), ("gueltig", "Titel", ())),

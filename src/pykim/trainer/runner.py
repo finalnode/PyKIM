@@ -41,10 +41,14 @@ def _refresh_remote_trainers() -> None:
         print(f"\nHinweis: Repository nicht erreichbar; verwende zuletzt geprüfte Trainerdaten: {error}")
 
 
-def check_exercise(name: str, source: str) -> CheckReport:
+def check_exercise(
+    name: str,
+    source: str,
+    namespace: dict[str, object] | None = None,
+) -> CheckReport:
     _refresh_remote_trainers()
     exercise = get_exercise(name)
-    report = exercise.checker(source)
+    report = exercise.checker(source, namespace)
     print_report(report)
     if os.environ.get("PYKIM_PROGRESS_MODE") == "disabled":
         return report

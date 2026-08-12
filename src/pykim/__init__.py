@@ -633,16 +633,20 @@ def run(
 
         from pykim.trainer.runner import check_exercise
 
+        caller = inspect.currentframe()
+        caller = caller.f_back if caller is not None else None
         if _source is None:
-            caller = inspect.currentframe()
-            caller = caller.f_back if caller is not None else None
             try:
                 source = inspect.getsource(caller) if caller is not None else ""
             except (OSError, TypeError):
                 source = ""
         else:
             source = _source
-        check_exercise(check, source)
+        namespace = {}
+        if caller is not None:
+            namespace.update(caller.f_globals)
+            namespace.update(caller.f_locals)
+        check_exercise(check, source, namespace)
 
     # Dokumentations- und CI-Prüfungen führen vollständige Schülerprogramme
     # absichtlich ohne Fenster aus. Die gesamte Weltlogik ist zu diesem

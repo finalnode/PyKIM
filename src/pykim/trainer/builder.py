@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 from collections.abc import Callable, Iterable, Mapping
+from contextvars import ContextVar
 from typing import TypeAlias
 
 import pykim
@@ -21,6 +22,9 @@ Position: TypeAlias = tuple[int, int]
 Color: TypeAlias = str | int
 ResultFactory: TypeAlias = Callable[[str], CheckResult]
 Optimization: TypeAlias = Callable[[str], OptimizationResult]
+_ACTIVE_NAMESPACE: ContextVar[Mapping[str, object]] = ContextVar(
+    "pykim_trainer_namespace", default={}
+)
 
 
 def _tree(source: str) -> ast.AST | None:
@@ -221,7 +225,7 @@ class ExerciseBuilder:
         self,
         count: int,
         *,
-        success: str,
+        success: str = "Die Anzahl der gemalten Pixel stimmt.",
         failure: str | None = None,
         hint: str = "",
     ) -> "ExerciseBuilder":
@@ -342,9 +346,12 @@ class ExerciseBuilder:
             check_source, success=success, failure=failure, hint=hint, rule=rule
         )
 
-    def require_loop(self, *, success: str = "Du verwendest eine Schleife.", failure: str = "Es wurde noch keine Schleife erkannt.", hint: str = "Nutze for und range(), um Wiederholungen zu formulieren.") -> "ExerciseBuilder":
+    def require_loop(self, *, kind: str | None = None, success: str = "Du verwendest eine Schleife.", failure: str = "Es wurde noch keine Schleife erkannt.", hint: str = "Nutze for und range(), um Wiederholungen zu formulieren.") -> "ExerciseBuilder":
+        node_type = {None: (ast.For, ast.While), "for": (ast.For,), "while": (ast.While,)}.get(kind)
+        if node_type is None:
+            raise ValueError("Schleifenart muss 'for', 'while' oder leer sein.")
         return self._require_source(
-            lambda tree, _source: any(isinstance(node, (ast.For, ast.While)) for node in ast.walk(tree)),
+            lambda tree, _source: any(isinstance(node, node_type) for node in ast.walk(tree)),
             success=success, failure=failure, hint=hint, rule="loop",
         )
 
@@ -371,13 +378,62 @@ class ExerciseBuilder:
             success=success, failure=failure, hint=hint, rule="condition",
         )
 
-    def require_function(self, name: str | None = None, *, success: str = "Du verwendest eine eigene Funktion.", failure: str = "Es wurde noch keine passende Funktion erkannt.", hint: str = "Definiere die wiederholte Teilaufgabe mit def.") -> "ExerciseBuilder":
+    def require_function(self, name: str | None = None, *, parameters: Iterable[str] | None = None, returns: bool | None = None, success: str = "Du verwendest eine eigene Funktion.", failure: str = "Es wurde noch keine passende Funktion erkannt.", hint: str = "Definiere die wiederholte Teilaufgabe mit def.") -> "ExerciseBuilder":
+        expected_parameters = None if parameters is None else tuple(parameters)
+        def predicate(tree: ast.AST, _source: str) -> bool:
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if name is not None and node.name != name:
+                    continue
+                actual = tuple(argument.arg for argument in node.args.args)
+                if expected_parameters is not None and actual != expected_parameters:
+                    continue
+                has_return = any(
+                    isinstance(child, ast.Return) and child.value is not None
+                    for child in ast.walk(node)
+                )
+                if returns is not None and has_return is not returns:
+                    continue
+                return True
+            return False
         return self._require_source(
-            lambda tree, _source: any(
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and (name is None or node.name == name)
-                for node in ast.walk(tree)
-            ), success=success, failure=failure, hint=hint, rule="function",
+            predicate, success=success, failure=failure, hint=hint, rule="function",
+        )
+
+    def expect_function_cases(
+        self,
+        name: str,
+        cases: Iterable[Mapping[str, object]],
+        *,
+        success: str = "Die Funktion liefert für alle Testfälle das richtige Ergebnis.",
+        failure: str = "Mindestens ein Funktionstest liefert noch ein falsches Ergebnis.",
+        hint: str = "Prüfe Rückgabewert und Sonderfälle deiner Funktion.",
+    ) -> "ExerciseBuilder":
+        normalized = tuple(
+            (
+                tuple(case.get("args", ())),
+                dict(case.get("kwargs", {})),
+                case.get("expected"),
+            )
+            for case in cases
+        )
+
+        def predicate(_source: str) -> bool:
+            function = _ACTIVE_NAMESPACE.get().get(name)
+            if not callable(function):
+                return False
+            try:
+                return all(function(*args, **kwargs) == expected for args, kwargs, expected in normalized)
+            except Exception:
+                return False
+
+        return self.add_check(
+            predicate,
+            success=success,
+            failure=failure,
+            hint=hint,
+            rule="function-cases",
         )
 
     def require_calls(self, *names: str, success: str | None = None, failure: str | None = None, hint: str = "Prüfe, ob alle geforderten Funktionen aufgerufen werden.") -> "ExerciseBuilder":
@@ -496,13 +552,17 @@ class ExerciseBuilder:
         evaluator = self._optimization
         title = self.title
 
-        def checker(source: str) -> CheckReport:
-            optimization = None if evaluator is None else evaluator(source)
-            return CheckReport(
-                title,
-                tuple(factory(source) for factory in factories),
-                optimization,
-            )
+        def checker(source: str, namespace: Mapping[str, object] | None = None) -> CheckReport:
+            token = _ACTIVE_NAMESPACE.set(namespace or {})
+            try:
+                optimization = None if evaluator is None else evaluator(source)
+                return CheckReport(
+                    title,
+                    tuple(factory(source) for factory in factories),
+                    optimization,
+                )
+            finally:
+                _ACTIVE_NAMESPACE.reset(token)
 
         definition = {
             "name": self.name,

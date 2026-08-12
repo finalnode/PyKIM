@@ -60,6 +60,6 @@ class Exercise:
 
     name: str
     title: str
-    checker: Callable[[str], CheckReport]
+    checker: Callable[..., CheckReport]
     rules: tuple[RuleDefinition, ...] = ()
     definition_hash: str = ""

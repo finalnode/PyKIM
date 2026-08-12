@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -30,11 +31,12 @@ RULE_FIELDS = {
     "pixel-names": {"names"},
     "visibility": {"pixel", "visible"},
     "audio": {"events"},
-    "loop": set(),
+    "loop": {"kind"},
     "nested-loop": set(),
     "parallel": set(),
     "condition": {"calls"},
-    "function": {"name"},
+    "function": {"name", "parameters", "returns"},
+    "function-cases": {"name", "cases"},
     "calls": {"names"},
     "class": {"name", "base"},
     "methods": {"class", "names"},
@@ -163,11 +165,28 @@ def _apply_rule(builder: ExerciseBuilder, rule: dict) -> None:
             raise ValueError("audio.events muss eine Liste sein.")
         builder.expect_audio([tuple(event) for event in events], **feedback)
     elif kind in RULE_METHODS:
-        getattr(builder, RULE_METHODS[kind])(**feedback)
+        getattr(builder, RULE_METHODS[kind])(
+            **({"kind": rule.get("kind")} if kind == "loop" else {}), **feedback
+        )
     elif kind == "condition":
         builder.require_condition(calls=rule.get("calls", []), **feedback)
     elif kind == "function":
-        builder.require_function(rule.get("name"), **feedback)
+        builder.require_function(
+            rule.get("name"),
+            parameters=rule.get("parameters"),
+            returns=rule.get("returns"),
+            **feedback,
+        )
+    elif kind == "function-cases":
+        cases = rule.get("cases")
+        if not isinstance(cases, list) or not cases:
+            raise ValueError("function-cases.cases muss eine nichtleere Liste sein.")
+        for case in cases:
+            if not isinstance(case, dict) or set(case) - {"args", "kwargs", "expected"}:
+                raise ValueError("Jeder Funktionstest unterstützt args, kwargs und expected.")
+            if not isinstance(case.get("args", []), list) or not isinstance(case.get("kwargs", {}), dict):
+                raise ValueError("Funktionstest-Argumente sind ungültig.")
+        builder.expect_function_cases(rule.get("name"), cases, **feedback)
     elif kind == "calls":
         builder.require_calls(*rule.get("names", []), **feedback)
     elif kind == "class":
@@ -221,10 +240,31 @@ def load_exercises(path: str | Path) -> dict[str, Exercise]:
         else:
             definitions.append({key: value for key, value in data.items() if key != "format"})
     result = {}
+    seen_names: set[str] = set()
     for definition in definitions:
+        if isinstance(definition, dict) and definition.get("mode") == "answer":
+            unknown = set(definition) - {"id", "title", "mode"}
+            if unknown:
+                raise ValueError(
+                    "Unbekannte Felder für Antwortaufgabe: "
+                    + ", ".join(sorted(unknown))
+                )
+            name = definition.get("id")
+            title = definition.get("title")
+            if not isinstance(name, str) or not re.fullmatch(
+                r"[a-z0-9]+(?:-[a-z0-9]+)*", name
+            ):
+                raise ValueError("Die Kennung einer Antwortaufgabe muss kebab-case sein.")
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError(f"Für die Antwortaufgabe {name!r} fehlt der Titel.")
+            if name in seen_names:
+                raise ValueError(f"Die Aufgabenkennung {name!r} ist doppelt.")
+            seen_names.add(name)
+            continue
         exercise = exercise_from_data(definition)
-        if exercise.name in result:
+        if exercise.name in seen_names:
             raise ValueError(f"Die Aufgabenkennung {exercise.name!r} ist doppelt.")
+        seen_names.add(exercise.name)
         audit = audit_exercise(exercise)
         errors = [issue.message for issue in audit.issues if issue.level == "error"]
         if errors:

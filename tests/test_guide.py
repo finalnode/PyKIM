@@ -413,6 +413,9 @@ def test_every_exercise_has_a_complete_assignment():
     assert "@difficulty:" not in render_task_markdown(
         task_document("quadrat-5").content
     )
+    assert "# Praxischeck" not in render_task_markdown(
+        task_document("quadrat-5").content
+    )
 
 
 def test_assignment_metadata_is_optional_for_repository_markdown(

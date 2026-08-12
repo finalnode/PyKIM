@@ -139,10 +139,18 @@ def task_assignment(name: str) -> TaskAssignment:
 
 
 def render_task_markdown(content: str) -> str:
-    """Blende Autorenmetadaten in der Schüleransicht aus."""
-    return "\n".join(
-        line for line in content.splitlines() if not line.startswith("@difficulty:")
-    )
+    """Blende Autorenmetadaten und die bereits angezeigte Überschrift aus."""
+    lines = content.splitlines()
+    heading_hidden = False
+    visible = []
+    for line in lines:
+        if line.startswith("@difficulty:"):
+            continue
+        if not heading_hidden and line.startswith("# "):
+            heading_hidden = True
+            continue
+        visible.append(line)
+    return "\n".join(visible).strip()
 
 
 def task_names() -> tuple[str, ...]:

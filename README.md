@@ -98,7 +98,7 @@ müssen.
 - eingebautes Skript mit Inhaltsnavigation
 - ausführbare und kopierbare Codebeispiele
 - Aufgabenbearbeitung in einem Codeeditor
-- freie Aufgaben ohne Trainer mit dauerhaft gespeichertem Antwortfeld
+- freie Aufgaben mit optionalem Antwort-Trainer und dauerhaft gespeichertem Antwortfeld
 - Speichern, Starten, Stoppen, Kopieren und Öffnen in einer externen IDE
 - deutschsprachige automatische Testfälle mit ausklappbaren Details
 - Analyse von Schleifen, Funktionen, Bedingungen, Klassen und Parallelität
@@ -578,6 +578,17 @@ enthalten. Jede Aufgabe besitzt:
 - mindestens einen Eintrag unter `tests`
 - optional `optimization.optimal_lines`
 
+Offene Aufgaben können ebenfalls eine gleichnamige Trainerdatei erhalten. Sie
+verwenden statt `tests` den Modus `answer` und bleiben damit Aufgaben mit einem
+lokal gespeicherten Antwortfeld:
+
+```yaml
+format: 1
+id: schleifen-vergleichen
+title: Schleifen vergleichen
+mode: answer
+```
+
 ### Unterstützte Prüftypen
 
 | Typ | Prüft |
@@ -591,10 +602,11 @@ enthalten. Jede Aufgabe besitzt:
 | `pixel-names` | exakte Figurenmenge |
 | `visibility` | sichtbar oder versteckt |
 | `audio` | Noten, Pausen, Reihenfolge und Beats |
-| `loop` | mindestens eine `for`- oder `while`-Schleife |
+| `loop` | mindestens eine Schleife; optional gezielt `kind: for` oder `kind: while` |
 | `nested-loop` | verschachtelte Schleifen |
 | `condition` | Bedingung und optional erforderliche Aufrufe |
-| `function` | eigene Funktion, optional mit festem Namen |
+| `function` | eigene Funktion, optional mit Name, Parametern und `return` |
+| `function-cases` | Funktionsaufrufe mit Argumenten und erwarteten Rückgabewerten |
 | `calls` | geforderte Funktions- oder Methodenaufrufe |
 | `parallel` | `with world.parallel():` |
 | `class` | Klasse und optionale Basisklasse |
@@ -780,8 +792,9 @@ Die Suite übernimmt automatisch alle Markdown-Dateien unter `Skripte/` und
 Ordnerbäume werden ignoriert, sobald ein Pfadteil mit `_` beginnt. Die
 alphabetische Pfadreihenfolge bestimmt die Anzeige. Eine Aufgabenstellung wird
 automatisch prüfbar, wenn unter `Trainer/` eine Definition mit demselben
-Dateistamm liegt. Ohne passenden Trainer erscheint sie als freie Aufgabe mit
-einem mehrzeiligen, lokal gespeicherten Antwortfeld.
+Dateistamm und `tests` liegt. Ohne passenden Trainer oder mit `mode: answer`
+erscheint sie als freie Aufgabe mit einem mehrzeiligen, lokal gespeicherten
+Antwortfeld.
 
 Die Suite ermittelt zuerst den Commit des konfigurierten Branches und speichert
 den vollständigen sichtbaren Stand danach versionsweise und atomar unter
