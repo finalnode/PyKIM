@@ -885,6 +885,44 @@ keine betriebssystemspezifischen Annahmen voraussetzen. Synchronisation und ein
 Online-Kurskatalog bleiben optionale Komfortfunktionen, aber keine Voraussetzung
 für die Arbeit mit einem lokal bereitgestellten Kurs.
 
+### Heutige Trennung von Kursquelle und Student Workspace
+
+Die Grundlage für sichere Kursupdates ist bereits implementiert. Geladene
+Kursquellen werden nicht in den Arbeitsordner der Lernenden entpackt, sondern
+commitgenau und versionsweise unter `~/.pykim/content/versions` gespeichert.
+Neue Inhalte landen zunächst in einem temporären Staging-Verzeichnis, werden
+dort einschließlich der Trainerdateien validiert und erst danach atomar als
+aktive Kursversion markiert. Schlägt Download oder Prüfung fehl, bleibt die
+zuletzt erfolgreich aktivierte Version erhalten.
+
+Davon getrennt liegt der persönliche Student Workspace im gewählten
+Kursordner. Er enthält insbesondere bearbeitete Python-Aufgaben, `Projekte/`,
+`erweiterungen.py`, freie Antworten sowie Lernstand und Dokubuch unter
+`.pykim/progress.json`. Beim Einrichten oder erneuten Öffnen erzeugt die Suite
+nur fehlende Starterdateien; bereits vorhandene Lösungen werden erkannt und
+nicht überschrieben. Auch ein Inhaltsupdate schreibt nicht in Projekte,
+Erweiterungen oder den Lernstand.
+
+Damit schützt der heutige Mechanismus bereits die Dateien der Lernenden vor
+einem technischen Überschreiben. Die folgenden geplanten Regeln ergänzen diese
+Trennung um die noch fehlende semantische Kompatibilität, etwa wenn ein
+Kursautor Aufgaben umbenennt, entfernt oder ihre Bewertung verändert.
+
+### Geplante Kompatibilitätsregeln für Kursupdates
+
+Die bestehende Trennung zwischen unveränderlicher Kursquelle und persönlichem
+Student Workspace soll zu einem verbindlichen Updatevertrag ausgebaut werden.
+Auch künftige Kursupdates dürfen bearbeitete Aufgaben, eigene Projekte,
+Erweiterungen, freie Antworten oder den Lernstand nicht überschreiben.
+
+Für semantische Änderungen sind stabile Aufgaben-IDs, versionierte Kursformate
+und gespeicherte Trainerrevisionen vorgesehen. Entfernte oder umbenannte
+Aufgaben sollen vor der Aktivierung erkannt werden. Notwendige Änderungen
+werden über explizite Migrationstabellen zugeordnet; bei inkompatiblen Updates
+warnt die Suite und sichert den Workspace, bevor eine Migration bestätigt wird.
+Bereits abgegebene Versuche sollen weiterhin mit der Trainerrevision
+nachvollziehbar bleiben, unter der sie bearbeitet wurden.
+
 Der erneute Import derselben Setupdatei ist nicht destruktiv: Repository-Inhalte
 und Konfiguration werden aktualisiert, während Schülerlösungen, freie Antworten,
 Projekte und Lernstand erhalten bleiben. Aus der Kursauswahl kann der Ordner im
