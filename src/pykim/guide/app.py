@@ -1,6 +1,7 @@
 """NiceGUI-Prototyp für Setup, Aufgabenübersicht und Dokubuch."""
 
 import argparse
+import asyncio
 import json
 import platform
 import threading
@@ -12,6 +13,7 @@ from pykim.trainer.exercises import exercise_names, get_exercise
 from pykim.trainer.activities import get_activity
 from pykim.trainer.assignments import get_assignment
 from .course_setup import (
+    activate_installed_course_content,
     course_setup_info,
     install_course_setup,
     install_new_course_setup,
@@ -26,6 +28,7 @@ from pykim.submission.export import (
 )
 
 from .content import CHEATSHEET, PYODIDE_PLAYGROUND, PYXEL_REFERENCE
+from .course_catalog import load_course_catalog
 from .author_view import render_authoring_view
 from .activity_view import (
     current_parsons_order,
@@ -38,10 +41,14 @@ from .library import (
     PARADIGMS,
     render_task_markdown,
     task_documents,
+    task_hints,
+    task_sources,
 )
 from .learning_view import (
     friendly_python_error,
     render_overview,
+    render_task_hints,
+    render_task_sources,
     render_test_results as render_exercise_test_results,
 )
 from .course import (
@@ -174,7 +181,11 @@ def main(
 
     register_script_api(nicegui_app)
 
-    course_sync_state: dict[str, object] = {"result": None, "error": ""}
+    course_sync_state: dict[str, object] = {
+        "result": None,
+        "error": "",
+        "pending": False,
+    }
     course_selection_state = {"confirmed": False}
 
     @ui.page("/")
@@ -184,24 +195,26 @@ def main(
         # Farben des OSZ KIM: kräftiges Orange, technisches Grau und Weiß.
         configure_theme(ui)
         if not course_selection_state["confirmed"]:
-            async def select_course(course: Path) -> None:
+            async def select_course(course: Path, card, button, sync_activity) -> None:
+                card.classes(add="pykim-course-opening")
+                sync_activity.set_visibility(True)
+                button.text = "Wird geöffnet …"
+                button.disable()
+                await ui.run_javascript(
+                    "await new Promise(resolve => requestAnimationFrame("
+                    "() => requestAnimationFrame(resolve)))"
+                )
                 set_course_directory(course)
-                course_sync_state.update(result=None, error="")
+                course_sync_state.update(result=None, error="", pending=True)
                 try:
-                    course_sync_state["result"] = await nicegui_run.io_bound(
-                        sync_installed_course_content, course
+                    await asyncio.gather(
+                        nicegui_run.io_bound(
+                            activate_installed_course_content, course
+                        ),
+                        asyncio.sleep(1.05),
                     )
                 except Exception as error:
                     course_sync_state["error"] = str(error)
-                    # Ein bereits für diesen Kurs gespeicherter Stand bleibt
-                    # offline nutzbar und muss in die Registrys geladen werden.
-                    from pykim.trainer.assignments import refresh_assignments
-                    from pykim.trainer.activities import refresh_activities
-                    from pykim.trainer.exercises import refresh_exercises
-
-                    refresh_exercises()
-                    refresh_activities()
-                    refresh_assignments()
                 course_selection_state["confirmed"] = True
                 ui.navigate.reload()
 
@@ -217,7 +230,9 @@ def main(
                         info = course_setup_info(course)
                     except (OSError, ValueError):
                         info = None
-                    with ui.card().classes("w-full py-2 px-3 shadow-none border"):
+                    with ui.card().classes(
+                        "w-full py-2 px-3 shadow-none border gap-1"
+                    ) as course_card:
                         with ui.row().classes("w-full items-center no-wrap gap-3"):
                             ui.icon("school", color="primary", size="sm")
                             with ui.column().classes("grow gap-0 min-w-0"):
@@ -245,9 +260,8 @@ def main(
                                 icon="folder_open",
                                 on_click=open_course_folder,
                             ).props("flat round dense").tooltip("Kursordner öffnen")
-                            ui.button(
+                            open_course_button = ui.button(
                                 "Öffnen",
-                                on_click=lambda _, selected=course: select_course(selected),
                                 icon="arrow_forward",
                             ).props("flat dense")
                             expected_name = (
@@ -322,6 +336,49 @@ def main(
                             ).props("flat round dense color=negative").tooltip(
                                 "Kurs löschen"
                             )
+                        with ui.column().classes(
+                            "w-full items-center gap-1 py-1 text-positive"
+                        ) as course_sync_activity:
+                            with ui.row().classes("items-center justify-center gap-2"):
+                                ui.icon("sync", size="sm").classes(
+                                    "pykim-course-sync-icon"
+                                )
+                                ui.label(
+                                    "Lokaler Kurs wird geladen · Online-Abgleich folgt"
+                                ).classes("pykim-course-sync-dots text-sm font-medium")
+                        course_sync_activity.set_visibility(False)
+                        pixel_palette = (
+                            ("#f36b2b", "#ffd166"),
+                            ("#00a8e8", "#70d6ff"),
+                            ("#9b5de5", "#f15bb5"),
+                            ("#21ba45", "#8bd450"),
+                            ("#ff9f1c", "#ff4d6d"),
+                        )
+                        ui.html(
+                            "".join(
+                                '<span style="'
+                                f'--pixel-x:{(index * 37 + index * index * 3) % 94 + 2}%;'
+                                f'--pixel-y:{(index * 53 + index * index * 7) % 78 + 8}%;'
+                                f'--pixel-size:{0.46 + (index % 4) * 0.12:.2f}rem;'
+                                f'--pixel-delay:-{(index * 0.23) % 3.7:.2f}s;'
+                                f'--pixel-duration:{2.25 + (index % 6) * 0.31:.2f}s;'
+                                f'--pixel-color-a:{pixel_palette[index % len(pixel_palette)][0]};'
+                                f'--pixel-color-b:{pixel_palette[index % len(pixel_palette)][1]}'
+                                '"></span>'
+                                for index in range(32)
+                            ),
+                            sanitize=False,
+                        ).classes("pykim-course-pixel-field").props(
+                            "aria-hidden=true"
+                        )
+                        open_course_button.on(
+                            "click",
+                            lambda _, selected=course, card=course_card,
+                            button=open_course_button,
+                            activity=course_sync_activity: select_course(
+                                selected, card, button, activity
+                            ),
+                        )
                 if not known_courses:
                     ui.label("Noch kein Kurs eingerichtet.").classes("text-grey-7")
 
@@ -391,6 +448,127 @@ def main(
                                 "GitHub geladen. Der erste Import kann etwas dauern."
                             ).classes("text-xs text-grey-7")
                         course_import_activity.set_visibility(False)
+
+                ui.separator()
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.icon("public", color="primary")
+                    with ui.column().classes("grow gap-0"):
+                        ui.label("Freie Kurse entdecken").classes("font-bold")
+                        ui.label(
+                            "Öffentliche PyKIM-Kurse direkt aus dem Kurskatalog installieren."
+                        ).classes("text-sm text-grey-7")
+                    catalog_refresh_button = ui.button(
+                        "Katalog aktualisieren", icon="refresh"
+                    ).props("flat dense")
+                catalog_container = ui.column().classes("w-full gap-2")
+                catalog_state = {"courses": load_course_catalog(online=False)}
+
+                def render_course_catalog() -> None:
+                    catalog_container.clear()
+                    installed_repositories = set()
+                    for path in get_course_directories():
+                        try:
+                            installed_setup = course_setup_info(path)
+                        except (OSError, ValueError):
+                            installed_setup = None
+                        if installed_setup is not None:
+                            installed_repositories.add(
+                                installed_setup.repository.removesuffix(".git")
+                            )
+                    with catalog_container:
+                        for catalog_course in catalog_state["courses"]:
+                            installed = (
+                                catalog_course.setup.repository.removesuffix(".git")
+                                in installed_repositories
+                            )
+                            caption = " · ".join(catalog_course.tags)
+                            if installed:
+                                caption += " · Installiert"
+                            with ui.expansion(
+                                f"{catalog_course.setup.course} · {catalog_course.level}",
+                                caption=caption,
+                                icon="menu_book",
+                            ).classes("w-full border rounded").props(
+                                "header-class='text-primary'"
+                            ):
+                                ui.label(catalog_course.description).classes(
+                                    "text-sm text-grey-8"
+                                )
+                                with ui.row().classes("w-full items-center gap-2"):
+                                    ui.label(
+                                        f"{catalog_course.setup.school} · "
+                                        f"{catalog_course.setup.teacher}"
+                                    ).classes("text-xs text-grey-6")
+                                    ui.space()
+                                    ui.link(
+                                        "Repository ansehen",
+                                        catalog_course.setup.repository.removesuffix(".git"),
+                                        new_tab=True,
+                                    ).classes("text-xs text-primary")
+                                with ui.row().classes(
+                                    "w-full items-center justify-end gap-2"
+                                ):
+                                    if installed:
+                                        ui.badge("Bereits installiert", color="positive")
+                                    else:
+                                        install_button = ui.button(
+                                            "Installieren", icon="download"
+                                        ).props("outline color=primary")
+                                        install_status = ui.row().classes(
+                                            "items-center gap-2 text-primary"
+                                        )
+                                        with install_status:
+                                            ui.spinner(size="sm", color="primary")
+                                            ui.label("Kurs wird geladen …")
+                                        install_status.set_visibility(False)
+
+                                        async def install_catalog_course(
+                                            item=catalog_course,
+                                            button=install_button,
+                                            status=install_status,
+                                        ) -> None:
+                                            button.disable()
+                                            status.set_visibility(True)
+                                            try:
+                                                info, _course = await nicegui_run.io_bound(
+                                                    install_new_course_setup,
+                                                    item.setup_data,
+                                                )
+                                                course_selection_state["confirmed"] = True
+                                                course_sync_state.update(
+                                                    result=None, error="", pending=False
+                                                )
+                                                ui.notify(
+                                                    f"{info.course} wurde installiert.",
+                                                    type="positive",
+                                                )
+                                                ui.navigate.reload()
+                                            except Exception as error:
+                                                status.set_visibility(False)
+                                                button.enable()
+                                                ui.notify(
+                                                    f"Kursinstallation fehlgeschlagen: {error}",
+                                                    type="negative",
+                                                )
+
+                                        install_button.on(
+                                            "click",
+                                            lambda _, action=install_catalog_course: action(),
+                                        )
+
+                async def refresh_course_catalog() -> None:
+                    catalog_refresh_button.disable()
+                    try:
+                        catalog_state["courses"] = await nicegui_run.io_bound(
+                            load_course_catalog
+                        )
+                        render_course_catalog()
+                        ui.notify("Kurskatalog wurde aktualisiert.", type="positive")
+                    finally:
+                        catalog_refresh_button.enable()
+
+                catalog_refresh_button.on("click", refresh_course_catalog)
+                render_course_catalog()
             return
 
         ui.link("Zum Hauptinhalt springen", "#pykim-main").classes("pykim-skip-link")
@@ -1068,6 +1246,8 @@ def main(
                 async def refresh_course_content() -> None:
                     course_sync_button.disable()
                     course_sync_label.text = "Kursrepository wird abgeglichen …"
+                    update_badge.text = "Kursabgleich läuft …"
+                    update_badge.props("color=positive")
                     try:
                         result = await nicegui_run.io_bound(
                             sync_installed_course_content
@@ -1093,6 +1273,21 @@ def main(
                             type="negative",
                         )
                     finally:
+                        course_sync_state["pending"] = False
+                        status = update_state["status"]
+                        if course_sync_state["error"]:
+                            update_badge.text = "Kursabgleich offline"
+                            update_badge.props("color=warning")
+                        elif (
+                            status is not None
+                            and status.app is not None
+                            and status.app.newer
+                        ):
+                            update_badge.text = "Update verfügbar"
+                            update_badge.props("color=orange")
+                        else:
+                            update_badge.text = "Aktuell"
+                            update_badge.props("color=positive")
                         course_sync_button.enable()
                         refresh_update_dialog()
 
@@ -1371,6 +1566,8 @@ def main(
                 refresh_button.on("click", refresh_updates)
                 update_badge.on("click", open_update_dialog)
                 ui.timer(0.2, refresh_updates, once=True)
+                if course_sync_state["pending"]:
+                    ui.timer(0.35, refresh_course_content, once=True)
 
                 author_course = get_course_directory()
                 if author_course is not None and course_setup_info(author_course) is not None:
@@ -1436,16 +1633,21 @@ def main(
                         with ui.expansion(material.title, icon="description").classes(
                             "w-full"
                         ):
+                            hint_key = f"{material.paradigm}/{material.name}"
                             ui.markdown(
                                 render_task_markdown(material.content)
                             ).classes("prose max-w-none")
+                            render_task_sources(ui, task_sources(material.content))
+                            render_task_hints(
+                                ui, hint_key, task_hints(material.content)
+                            )
                             activity = get_activity(material.name)
                             if activity is not None and activity.mode == "matching":
                                 render_matching_activity(
                                     ui, activity, paradigm=material.paradigm
                                 )
                                 continue
-                            answer_key = f"{material.paradigm}/{material.name}"
+                            answer_key = hint_key
                             old_answer = (
                                 answers.get(answer_key, {})
                                 if isinstance(answers, dict)
@@ -1494,6 +1696,14 @@ def main(
                             ui.markdown(render_task_markdown(task_document.content)).classes(
                                 "prose max-w-none"
                             )
+                            render_task_sources(
+                                ui, task_sources(task_document.content)
+                            )
+                        render_task_hints(
+                            ui,
+                            f"{task_document.paradigm}/{name}",
+                            task_hints(task_document.content),
+                        )
                         target = exercise_file(name)
                         activity = get_activity(name)
                         if (

@@ -6,7 +6,7 @@ from pykim.trainer.exercises import get_exercise
 from pykim.trainer.activities import get_activity
 
 from .library import task_names
-from .progress import load_progress
+from .progress import load_progress, revealed_hint_count, save_revealed_hint_count
 from .components import empty_state, section_heading
 
 
@@ -18,6 +18,58 @@ def latest_attempts(progress: dict[str, object]) -> dict[str, dict[str, object]]
             if isinstance(attempt, dict) and isinstance(attempt.get("exercise"), str):
                 latest[attempt["exercise"]] = attempt
     return latest
+
+
+def render_task_hints(ui, task: str, hints: tuple[str, ...]) -> None:
+    """Zeige Autorenhinweise schrittweise und merke den geöffneten Stand."""
+    if not hints:
+        return
+    state = {"count": min(revealed_hint_count(task), len(hints))}
+    container = ui.column().classes("w-full gap-2")
+
+    def reveal_next() -> None:
+        if state["count"] < len(hints):
+            state["count"] += 1
+            save_revealed_hint_count(task, state["count"])
+            render()
+
+    def render() -> None:
+        container.clear()
+        with container:
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.icon("lightbulb", size="sm").classes("text-primary")
+                ui.label("Hinweise").classes("font-bold")
+                if state["count"]:
+                    ui.badge(f"{state['count']} / {len(hints)}", color="grey")
+            for index, hint in enumerate(hints[:state["count"]], start=1):
+                with ui.card().classes("w-full shadow-none bg-orange-1 border-l-4 border-primary"):
+                    ui.label(f"Hinweis {index}").classes("text-sm font-bold text-primary")
+                    ui.markdown(hint).classes("prose max-w-none")
+            if state["count"] < len(hints):
+                label = "Ersten Hinweis anzeigen" if state["count"] == 0 else "Nächsten Hinweis anzeigen"
+                ui.button(label, on_click=reveal_next, icon="lightbulb_outline").props(
+                    "outline color=primary"
+                )
+            else:
+                ui.label("Alle verfügbaren Hinweise sind geöffnet.").classes("text-grey-7 text-sm")
+
+    render()
+
+
+def render_task_sources(ui, sources) -> None:
+    """Zeige eine oder mehrere Aufgabenquellen platzsparend an."""
+    if not sources:
+        return
+    with ui.row().classes("w-full items-center gap-1 text-sm text-grey-7"):
+        ui.icon("source", size="xs")
+        ui.label("Quelle:" if len(sources) == 1 else "Quellen:")
+        for index, source in enumerate(sources):
+            if index:
+                ui.label("·")
+            if source.url:
+                ui.link(source.label, source.url, new_tab=True).classes("text-primary")
+            else:
+                ui.label(source.label)
 
 
 def render_test_results(ui, exercise_name: str) -> None:
@@ -106,4 +158,11 @@ def friendly_python_error(stderr: str) -> tuple[int | None, str]:
     return line, last or "Das Programm wurde mit einem Fehler beendet."
 
 
-__all__ = ["friendly_python_error", "latest_attempts", "render_overview", "render_test_results"]
+__all__ = [
+    "friendly_python_error",
+    "latest_attempts",
+    "render_overview",
+    "render_task_hints",
+    "render_task_sources",
+    "render_test_results",
+]

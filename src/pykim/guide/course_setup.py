@@ -172,8 +172,22 @@ def sync_installed_course_content(
     previous = active_content_root(PACKAGED_CONTENT_ROOT)
     target = sync_certificate_content(info, timeout=timeout)
 
-    # Beide Registrys werden beim Modulimport aufgebaut und müssen deshalb nach
-    # einem Startabgleich ausdrücklich auf den neuen Inhaltsstand zeigen.
+    activate_installed_course_content(selected)
+    updated = previous.resolve() != target.resolve()
+    return TrainerVerification(
+        True,
+        updated,
+        "Kursinhalte wurden aktualisiert." if updated else "Kursinhalte sind aktuell.",
+    )
+
+
+def activate_installed_course_content(course: str | Path) -> None:
+    """Aktiviere den bereits lokal geprüften Kursstand ohne Netzwerkzugriff."""
+    from .course import provision_course_exercises
+
+    selected = Path(course).expanduser().resolve()
+    # Die Registrys werden beim Modulimport aufgebaut und müssen beim
+    # Kurswechsel ausdrücklich auf den lokal aktiven Inhaltsstand zeigen.
     from pykim.trainer.assignments import refresh_assignments
     from pykim.trainer.activities import refresh_activities
     from pykim.trainer.exercises import refresh_exercises
@@ -182,12 +196,6 @@ def sync_installed_course_content(
     refresh_activities()
     refresh_assignments()
     provision_course_exercises(selected)
-    updated = previous.resolve() != target.resolve()
-    return TrainerVerification(
-        True,
-        updated,
-        "Kursinhalte wurden aktualisiert." if updated else "Kursinhalte sind aktuell.",
-    )
 
 
 def verify_installed_course_setup(course: str | Path, *, allow_offline: bool = False):

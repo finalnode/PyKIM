@@ -57,6 +57,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 pykim = [
   "guide/content-manifest.json",
+  "guide/course_catalog.json",
   "guide/Skripte/imperativ/*.md",
   "guide/Skripte/oop/*.md",
   "guide/Skripte/README.md",

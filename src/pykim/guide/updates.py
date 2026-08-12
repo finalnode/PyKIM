@@ -31,6 +31,7 @@ CONTENT_MANIFEST_URL = (
 )
 MAX_CONTENT_FILES = 500
 MAX_CONTENT_SIZE = 20 * 1024 * 1024
+_VALIDATED_CONTENT_ROOTS: set[Path] = set()
 
 
 @dataclass(frozen=True)
@@ -176,7 +177,9 @@ def active_content_root(packaged_root: Path) -> Path:
             (root / "content-manifest.json").read_text(encoding="utf-8")
         )
         if root.is_dir() and isinstance(manifest, dict):
-            _validate_content(root, manifest)
+            if root not in _VALIDATED_CONTENT_ROOTS:
+                _validate_content(root, manifest)
+                _VALIDATED_CONTENT_ROOTS.add(root)
             return root
     except (OSError, ValueError, KeyError, TypeError):
         pass

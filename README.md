@@ -7,6 +7,13 @@ zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
 einfachen Befehlen, später objektorientiert und schließlich mit der Pyxel-API
 verwenden.
 
+> **Projektperspektive:** Die heutige **PyKIM Suite** ist der Ausgangspunkt für
+> eine allgemeine **CS Suite**. Die zukünftige Desktop-Lernumgebung soll neben
+> Python und PyKIM auch weitere Themen der Informatik über installierbare Kurse
+> bedienen. **PyKIM** wird dafür aus der Suite herausgelöst und als eigenständiges
+> Pythonmodul mit seiner Pixelwelt, API und Testunterstützung weiterentwickelt.
+> Der aktuelle Name und die Downloads bleiben bis zu dieser Trennung bestehen.
+
 ## PyKIM Suite herunterladen
 
 > **Desktop-Version 0.5.4 – fertige Builds für alle unterstützten Systeme**
@@ -33,6 +40,15 @@ Zum Projekt gehören zwei eng verbundene Teile:
 - **PyKIM Suite:** lokale Desktop-Lernumgebung mit Skript, Aufgaben, Tests,
   Lernstand, IDE-Anbindung, Projekten und persönlichen Erweiterungen.
 
+Langfristig werden diese Verantwortlichkeiten deutlicher getrennt:
+
+- **CS Suite:** themenübergreifende Desktop-Plattform, Kursverwaltung,
+  Aufgabenansichten, Hinweise, Lernstand, Tests und Kurskatalog.
+- **PyKIM:** eigenständiges und erweiterbares Pythonmodul für den Einstieg in
+  Programmierung mit Pixelwelt, Bewegung, Farbe, Audio und Pyxel.
+- **Kurse:** separat veröffentlichte Inhaltspakete, die PyKIM verwenden können,
+  aber nicht darauf beschränkt sind.
+
 Die fachliche Weltlogik liegt nicht nur im Grafikfenster. Aufgaben können
 deshalb deterministisch geprüft werden, ohne Bildschirminhalte vergleichen zu
 müssen.
@@ -44,6 +60,7 @@ müssen.
 ## Inhalt
 
 - [PyKIM Suite herunterladen](#pykim-suite-herunterladen)
+- [Projektperspektive: CS Suite und PyKIM-Modul](#projektperspektive-cs-suite-und-pykim-modul)
 - [Funktionsumfang](#funktionsumfang)
 - [Schnellstart](#schnellstart)
 - [Grundmodell](#grundmodell)
@@ -67,6 +84,36 @@ müssen.
 - [GitHub Actions und Releases](#github-actions-und-releases)
 - [Grenzen und zurückgestellte Funktionen](#grenzen-und-zurückgestellte-funktionen)
 - [Lizenzierung](#lizenzierung)
+
+## Projektperspektive: CS Suite und PyKIM-Modul
+
+Die derzeitige PyKIM Suite verbindet noch Lernplattform, Kursverwaltung und
+Python-Pixelwelt in einer Anwendung. Für die weitere Entwicklung ist eine klare
+Trennung vorgesehen:
+
+| Baustein | Zukünftige Verantwortung |
+|---|---|
+| **CS Suite** | Allgemeine Lernumgebung für unterschiedliche Themen der Informatik |
+| **PyKIM-Modul** | Installierbares Pythonmodul für Pixelwelt, Bewegung, Farbe, Audio und Tests |
+| **Kursrepositories** | Unabhängige Skripte, Aufgaben, Hinweise, Quellen und Trainerdefinitionen |
+| **Kurskatalog** | Auffindbarkeit und Installation frei verfügbarer Kurse |
+
+Die CS Suite soll damit nicht nur einen einzelnen Pythonkurs abbilden. Denkbare
+Kurse können beispielsweise Grundlagen der Informatik, Algorithmen,
+Datenstrukturen, Webentwicklung, Datenbanken, Netzwerke oder andere
+Programmiersprachen behandeln. Aufgabentypen, Lernstand, Quellen, Hinweise und
+Kursinstallation gehören zur Plattform; fachliche Laufzeiten und Bibliotheken
+werden als Module angebunden.
+
+PyKIM bleibt dabei erhalten. Es wird aus der Desktop-Anwendung herausgelöst und
+als eigenständiges Pythonpaket ausgebaut. Dadurch kann PyKIM sowohl innerhalb
+eines CS-Suite-Kurses als auch unabhängig davon in einer IDE, in eigenen
+Unterrichtsmaterialien oder in anderen Pythonprojekten verwendet werden.
+
+Die Umstellung erfolgt schrittweise. Bis Paketnamen, Migration und neue Builds
+festgelegt sind, heißen Anwendung und Downloads weiterhin **PyKIM Suite**. Diese
+Roadmap ist eine Zielarchitektur und keine Ankündigung, dass bestehende
+Kursordner oder Setupdateien bereits inkompatibel werden.
 
 ## Funktionsumfang
 
@@ -649,6 +696,29 @@ Die Blöcke lassen sich per Drag-and-drop oder ↑/↓ anordnen. Der daraus
 zusammengesetzte Code kann direkt ausgeführt werden; ein zusätzlicher
 Codeeditor wird dafür nicht angezeigt.
 
+### Gestufte Hinweise und Aufgabenquellen
+
+Hinweise gehören in das Aufgaben-Markdown und werden mit `@hint:` verborgen.
+Die Suite zeigt sie auf Wunsch nacheinander an und merkt pro Schüler und Kurs,
+wie viele Hinweise bereits geöffnet wurden:
+
+```markdown
+@hint: Überlege zuerst, welcher Block das Programm vorbereitet.
+@hint: Die Schleife muss vor `run(...)` stehen.
+```
+
+Optionale Quellen stehen kompakt unter der Aufgabenstellung. Mehrere
+`@source`-Zeilen sind zulässig; der Link kann weggelassen werden:
+
+```markdown
+@source: CS Circles | https://cscircles.cemc.uwaterloo.ca/
+@source: Eigene Erweiterung
+```
+
+Hinweise und Quellen werden nicht als Teil des sichtbaren Aufgabentextes
+gerendert. Die Testhinweise in den Trainerdateien bleiben davon unabhängig und
+erklären weiterhin konkret fehlgeschlagene Prüfungen.
+
 ### Unterstützte Prüftypen
 
 | Typ | Prüft |
@@ -696,6 +766,10 @@ erreichbaren Quelle werden abweichende Trainer neu synchronisiert. Offline
 wird mit dem zuletzt erfolgreich synchronisierten Stand gearbeitet.
 
 ## PyKIM Suite
+
+Dieser Abschnitt beschreibt die aktuelle Anwendung. Ihre allgemeinen
+Lernplattform-Funktionen bilden später den Kern der CS Suite; PyKIM-spezifische
+Welt- und Laufzeitfunktionen wandern in das eigenständige Pythonmodul.
 
 Start als Desktopanwendung:
 
@@ -750,6 +824,31 @@ Kursauswahl. Ein bestehender Kurs wird geöffnet oder eine Setupdatei direkt
 hochgeladen. Neue Kurse aus einem Upload liegen standardmäßig unter
 `~/PyKIM-Kurse/<setup-name>`; bereits bekannte Kursordner bleiben an ihrem
 bisherigen Speicherort.
+
+### Freier Kurskatalog
+
+In der Kursauswahl zeigt **Freie Kurse entdecken** öffentlich verfügbare
+Kurse wie den PyKIM-Standardkurs. Sie lassen sich ähnlich wie Pakete mit
+einem Klick installieren; ein manueller Download der `.pykim-setup`-Datei ist
+nicht erforderlich. Bereits installierte Kursrepositories werden erkannt.
+Jeder kompakte Eintrag zeigt Niveaustufe und thematische Tags. Beim Aufklappen
+erscheinen Kurzbeschreibung, Herausgeber, Repository und Installationsaktion.
+
+Die Suite enthält eine offline verfügbare Katalogkopie und kann über
+**Katalog aktualisieren** die aktuelle Registry aus dem PyKIM-Repository laden.
+Jeder Eintrag wird mit denselben Regeln wie eine hochgeladene Setupdatei
+validiert: unterstützt werden ausschließlich öffentliche GitHub-Repositories
+mit sicheren Branch- und Inhaltspfaden.
+
+Neue freie Kurse werden in
+[`src/pykim/guide/course_catalog.json`](src/pykim/guide/course_catalog.json)
+eingetragen. Zur normalen Setupkonfiguration kommen nur Kennung,
+Kurzbeschreibung, Niveaustufe und Tags hinzu. Der Standardkurs verwendet zum
+Beispiel `Python`, `Programmiergrundlagen`, `PyKIM`, `Pyxel` und `OOP`.
+
+Der Katalog ist bereits als allgemeine Plattformfunktion angelegt. Mit der
+späteren Umbenennung zur CS Suite soll er auch Kurse aufnehmen, die PyKIM nicht
+verwenden und andere Themen oder Werkzeuge der Informatik bereitstellen.
 
 Der erneute Import derselben Setupdatei ist nicht destruktiv: Repository-Inhalte
 und Konfiguration werden aktualisiert, während Schülerlösungen, freie Antworten,

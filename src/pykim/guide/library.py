@@ -14,9 +14,14 @@ _ANNOTATED_CODE = re.compile(
     flags=re.MULTILINE | re.DOTALL,
 )
 _ANNOTATED_TASK_BLOCK = re.compile(
-    r"^@block:[a-z0-9]+(?:-[a-z0-9]+)*[ \t]*\n"
+    r"^@block:[a-z0-9]+(?:-[a-z0-9]+)*"
+    r"(?:[ \t]+step=[1-9][0-9]*)?[ \t]*\n"
     r"```python[ \t]*\n.*?```[ \t]*(?:\n|$)",
     flags=re.MULTILINE | re.DOTALL,
+)
+_TASK_HINT = re.compile(
+    r"^@hint:[ \t]*(?P<body>.+?)[ \t]*$",
+    flags=re.MULTILINE,
 )
 
 
@@ -34,6 +39,12 @@ class TaskAssignment:
     summary: str
     requirements: tuple[str, ...]
     difficulty: str
+
+
+@dataclass(frozen=True)
+class TaskSource:
+    label: str
+    url: str = ""
 
 
 def _title(content: str, fallback: str) -> str:
@@ -117,7 +128,8 @@ def task_assignment(name: str) -> TaskAssignment:
     document = task_document(name)
     if document is None:
         raise ValueError(f"Für {name!r} fehlt die Aufgabenstellung.")
-    lines = document.content.splitlines()
+    metadata_content = _TASK_HINT.sub("", _ANNOTATED_TASK_BLOCK.sub("", document.content))
+    lines = metadata_content.splitlines()
     difficulty = next(
         (
             line.removeprefix("@difficulty:").strip()
@@ -126,7 +138,10 @@ def task_assignment(name: str) -> TaskAssignment:
         ),
         "mittel",
     )
-    body_lines = [line for line in lines if not line.startswith("@difficulty:")]
+    body_lines = [
+        line for line in lines
+        if not line.startswith("@difficulty:") and not line.startswith("@source:")
+    ]
     summary = next(
         (
             line.strip()
@@ -146,17 +161,43 @@ def task_assignment(name: str) -> TaskAssignment:
 def render_task_markdown(content: str) -> str:
     """Blende Autorenmetadaten und die bereits angezeigte Überschrift aus."""
     content = _ANNOTATED_TASK_BLOCK.sub("", content)
+    content = _TASK_HINT.sub("", content)
     lines = content.splitlines()
     heading_hidden = False
     visible = []
     for line in lines:
         if line.startswith("@difficulty:"):
             continue
+        if line.startswith("@source:"):
+            continue
         if not heading_hidden and line.startswith("# "):
             heading_hidden = True
             continue
         visible.append(line)
     return "\n".join(visible).strip()
+
+
+def task_hints(content: str) -> tuple[str, ...]:
+    """Lese gestufte, in der Aufgabenansicht zunächst verborgene Hinweise."""
+    return tuple(
+        match.group("body").strip()
+        for match in _TASK_HINT.finditer(content)
+        if match.group("body").strip()
+    )
+
+
+def task_sources(content: str) -> tuple[TaskSource, ...]:
+    """Lese optionale Quellenangaben im Format ``Name | URL``."""
+    sources = []
+    for line in content.splitlines():
+        if not line.startswith("@source:"):
+            continue
+        value = line.removeprefix("@source:").strip()
+        label, separator, url = value.partition("|")
+        label, url = label.strip(), url.strip()
+        if label:
+            sources.append(TaskSource(label, url if separator else ""))
+    return tuple(sources)
 
 
 def task_names() -> tuple[str, ...]:

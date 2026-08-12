@@ -60,6 +60,8 @@ from pykim.guide.progress import (
     remove_packaged_example_attempts,
     save_journal_entry,
     save_task_answer,
+    save_revealed_hint_count,
+    revealed_hint_count,
 )
 from pykim.guide.execution import ExecutionManager, ScriptExampleManager
 from pykim.guide.script_quality import (
@@ -99,7 +101,9 @@ from pykim.guide.library import (
     render_task_markdown,
     task_assignment,
     task_document,
+    task_hints,
     task_names,
+    task_sources,
 )
 from pykim.guide.updates import (
     _course_active_marker,
@@ -118,6 +122,7 @@ from pykim.guide.course_setup import (
     install_new_course_setup,
     sync_installed_course_content,
 )
+from pykim.guide.course_catalog import load_course_catalog, parse_course_catalog
 from pykim.guide.system import (
     execute_student_program,
     execute_script_example,
@@ -200,6 +205,40 @@ def test_published_example_course_setup_is_valid():
     parsed = setup_info(setup)
     assert parsed.course == "PyKIM Standardkurs"
     assert parsed.repository == "https://github.com/finalnode/PyKIM_Kurs.git"
+
+
+def test_packaged_course_catalog_contains_the_public_standard_course():
+    courses = load_course_catalog(online=False)
+
+    assert [course.id for course in courses] == ["pykim-standardkurs"]
+    assert courses[0].setup.course == "PyKIM Standardkurs"
+    assert courses[0].setup.repository == "https://github.com/finalnode/PyKIM_Kurs.git"
+    assert "Python" in courses[0].tags
+
+
+def test_course_catalog_rejects_an_invalid_setup():
+    with pytest.raises(ValueError, match="GitHub"):
+        parse_course_catalog(json.dumps({
+            "format": 1,
+            "courses": [{
+                "id": "unsafe",
+                "description": "Ungültig",
+                "level": "Test",
+                "tags": ["Test"],
+                "setup": {
+                    "format": "pykim-course-setup-v1",
+                    "name": "unsafe.pykim-setup",
+                    "teacher": "Test",
+                    "school": "Test",
+                    "course": "Test",
+                    "repository": "https://example.test/course.git",
+                    "branch": "main",
+                    "scripts_path": "Skripte",
+                    "assignments_path": "Aufgaben",
+                    "trainers_path": "Trainer",
+                },
+            }],
+        }).encode())
 
 
 def test_multiple_course_directories_are_remembered_and_selectable(
@@ -443,6 +482,26 @@ def test_task_block_annotations_are_hidden_from_assignment_text():
     )
 
     assert rendered == "Ordne den Code."
+
+
+def test_task_hints_and_sources_are_parsed_but_hidden_from_assignment():
+    content = """# Aufgabe
+@difficulty:mittel
+@source: CS Circles | https://example.test/task
+
+Ordne den Code.
+
+@hint: Beginne mit dem Import.
+@hint: Der Funktionsaufruf steht am Ende.
+"""
+
+    assert render_task_markdown(content) == "Ordne den Code."
+    assert task_hints(content) == (
+        "Beginne mit dem Import.",
+        "Der Funktionsaufruf steht am Ende.",
+    )
+    assert task_sources(content)[0].label == "CS Circles"
+    assert task_sources(content)[0].url == "https://example.test/task"
 
 
 def test_markdown_library_covers_all_trainers_and_both_learning_paths():
@@ -1198,6 +1257,7 @@ def test_progress_and_journal_travel_inside_the_course_folder(tmp_path):
         "Meine freie Antwort.",
         course=course,
     )
+    save_revealed_hint_count("imperativ/test", 2, course=course)
     progress = load_progress(course)
 
     attempt = progress["attempts"][0]
@@ -1208,6 +1268,7 @@ def test_progress_and_journal_travel_inside_the_course_folder(tmp_path):
     assert progress["answers"]["imperativ/erste-schritte"]["text"] == (
         "Meine freie Antwort."
     )
+    assert revealed_hint_count("imperativ/test", course=course) == 2
     assert (course / ".pykim" / "progress.json").exists()
 
 
@@ -1865,7 +1926,10 @@ def test_reset_exercise_creates_backups_for_source_and_progress(tmp_path, monkey
     progress.write_text(
         json.dumps({"format": 1, "attempts": [
             {"exercise": "quadrat-5"}, {"exercise": "treppe-5"}
-        ], "journal": {}}),
+        ], "journal": {}, "hints": {
+            "imperativ/quadrat-5": 2,
+            "imperativ/treppe-5": 1,
+        }}),
         encoding="utf-8",
     )
 
@@ -1874,6 +1938,7 @@ def test_reset_exercise_creates_backups_for_source_and_progress(tmp_path, monkey
 
     assert 'run(check="quadrat-5")' in task.read_text(encoding="utf-8")
     assert load_progress(course)["attempts"] == [{"exercise": "treppe-5"}]
+    assert load_progress(course)["hints"] == {"imperativ/treppe-5": 1}
     assert list((course / ".pykim" / "backups").glob("quadrat_5-*.py"))
     assert list((course / ".pykim" / "backups").glob("progress-quadrat-5-*.json"))
 

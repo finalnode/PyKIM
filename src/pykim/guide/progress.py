@@ -13,7 +13,7 @@ from .course import get_course_directory
 
 
 def _empty_progress() -> dict[str, object]:
-    return {"format": 1, "attempts": [], "journal": {}, "answers": {}}
+    return {"format": 1, "attempts": [], "journal": {}, "answers": {}, "hints": {}}
 
 
 def progress_file(course: Path | None = None) -> Path | None:
@@ -124,6 +124,28 @@ def save_task_answer(
     _save(data, course)
 
 
+def revealed_hint_count(task: str, *, course: Path | None = None) -> int:
+    data = load_progress(course)
+    hints = data.get("hints", {})
+    value = hints.get(task, 0) if isinstance(hints, dict) else 0
+    return max(0, value) if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def save_revealed_hint_count(
+    task: str,
+    count: int,
+    *,
+    course: Path | None = None,
+) -> None:
+    """Merke, wie viele gestufte Hinweise bereits geöffnet wurden."""
+    data = load_progress(course)
+    hints = data.setdefault("hints", {})
+    if not isinstance(hints, dict):
+        hints = data["hints"] = {}
+    hints[task] = max(0, int(count))
+    _save(data, course)
+
+
 def remove_packaged_example_attempts(course: Path | None = None) -> int:
     """Entferne irrtümlich erfasste Musterlösungen und sichere den alten Stand."""
     target = progress_file(course)
@@ -152,7 +174,7 @@ def remove_packaged_example_attempts(course: Path | None = None) -> int:
 
 
 def clear_exercise_progress(exercise: str, course: Path | None = None) -> int:
-    """Entferne nur die Versuche einer Aufgabe und sichere den vorherigen Stand."""
+    """Entferne Versuche und geöffnete Hinweise einer Aufgabe mit Backup."""
     target = progress_file(course)
     if target is None or not target.exists():
         return 0
@@ -166,7 +188,14 @@ def clear_exercise_progress(exercise: str, course: Path | None = None) -> int:
         if not isinstance(attempt, dict) or attempt.get("exercise") != exercise
     ]
     removed = len(attempts) - len(retained)
-    if removed:
+    hints = data.get("hints", {})
+    removed_hint = False
+    if isinstance(hints, dict):
+        for key in tuple(hints):
+            if key == exercise or key.endswith(f"/{exercise}"):
+                del hints[key]
+                removed_hint = True
+    if removed or removed_hint:
         backup_directory = target.parent / "backups"
         backup_directory.mkdir(exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")

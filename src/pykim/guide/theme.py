@@ -113,6 +113,82 @@ def configure_theme(ui) -> None:
                 border: 1px solid #b8b9bb; border-radius: .3rem; background: white;
                 min-width: 2.2rem; min-height: 2.2rem; cursor: pointer;
             }
+            .pykim-course-opening {
+                position: relative;
+                overflow: hidden;
+                background: white !important;
+                border-color: #f36b2b !important;
+                transition: background-color .2s ease, border-color .2s ease;
+            }
+            .pykim-course-opening > * { position: relative; z-index: 2; }
+            .pykim-course-sync-icon {
+                animation: pykim-course-spin 1.1s linear infinite;
+            }
+            .pykim-course-sync-dots::after {
+                content: '';
+                display: inline-block;
+                width: 1.4em;
+                text-align: left;
+                animation: pykim-course-dots 1.2s steps(4, end) infinite;
+            }
+            .pykim-course-pixel-field {
+                position: absolute !important;
+                inset: 0;
+                z-index: 1 !important;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity .2s ease;
+            }
+            .pykim-course-opening .pykim-course-pixel-field { opacity: .86; }
+            .pykim-course-pixel-field span {
+                position: absolute;
+                left: var(--pixel-x);
+                top: var(--pixel-y);
+                width: var(--pixel-size);
+                height: var(--pixel-size);
+                border-radius: .14rem;
+                background: rgba(255, 255, 255, .5);
+                animation-name: pykim-pixel-field-float;
+                animation-duration: var(--pixel-duration);
+                animation-delay: var(--pixel-delay);
+                animation-timing-function: ease-in-out;
+                animation-iteration-count: infinite;
+                animation-direction: alternate;
+                will-change: transform, opacity, background-color;
+            }
+            @keyframes pykim-course-spin {
+                to { transform: rotate(360deg); }
+            }
+            @keyframes pykim-course-dots {
+                0% { content: ''; }
+                25% { content: '·'; }
+                50% { content: '··'; }
+                75%, 100% { content: '···'; }
+            }
+            @keyframes pykim-pixel-field-float {
+                0% {
+                    background: rgba(255, 255, 255, .34);
+                    transform: translate3d(-.25rem, .18rem, 0) scale(.72);
+                    opacity: .22;
+                }
+                38% {
+                    background: var(--pixel-color-a);
+                    transform: translate3d(.12rem, -.2rem, 0) scale(.94);
+                    opacity: .76;
+                }
+                72% {
+                    background: var(--pixel-color-b);
+                    transform: translate3d(.42rem, -.08rem, 0) scale(1.08);
+                    opacity: .9;
+                    box-shadow: 0 0 .38rem rgba(33, 186, 69, .3);
+                }
+                100% {
+                    background: rgba(255, 255, 255, .48);
+                    transform: translate3d(.68rem, -.3rem, 0) scale(.78);
+                    opacity: .3;
+                    box-shadow: none;
+                }
+            }
             .q-page-container { padding-bottom: 2.4rem; }
             .pykim-project-workspace {
                 min-height: 48rem;
