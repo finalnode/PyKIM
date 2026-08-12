@@ -994,6 +994,12 @@ Gezielt importieren:
 from erweiterungen import square
 ```
 
+Die persönlichen Erweiterungen stehen in allen Aufgaben und eigenen Projekten
+desselben Kurses zur Verfügung. Eine einmal entwickelte Funktion oder Klasse
+kann dadurch in weiteren Suite-Projekten wiederverwendet werden, ohne den Code
+zu kopieren. Erweiterungen sind derzeit kursbezogen: Projekte in einem anderen
+Kurs verwenden dessen eigene `erweiterungen.py`.
+
 Die Suite prüft vor dem Hinzufügen:
 
 - gültige Python-Syntax
