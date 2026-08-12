@@ -1081,7 +1081,7 @@ Für den nativen Fenstermodus werden GTK 3 und WebKitGTK benötigt. Unter Ubuntu
 
 ```bash
 sudo apt-get update
-sudo apt-get install gcc libcairo2-dev libgirepository-2.0-dev pkg-config \
+sudo apt-get install gcc libcairo2-dev libgirepository1.0-dev pkg-config \
   python3-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
   libgtk-3-dev libwebkit2gtk-4.1-dev
 python tools/build_desktop_app.py
