@@ -28,6 +28,7 @@ def test_desktop_workflow_covers_all_release_targets():
         "macos-15-intel",
         "runner: macos-15",
         "tools/build_desktop_app.py",
+        "tools/check_windows_desktop.ps1",
         "tools/build_macos_dmg.py --rebuild-app",
         "tools/check_release_version.py",
         "gh release upload",
