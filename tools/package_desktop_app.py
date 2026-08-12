@@ -40,7 +40,7 @@ def main(arguments: list[str] | None = None) -> int:
         raise FileNotFoundError(
             f"{application} fehlt. Führe zuerst tools/build_desktop_app.py aus."
         )
-    releases = project / "dist" / "releases"
+    releases = project / "dist" / "releases" / platform_name
     releases.mkdir(parents=True, exist_ok=True)
     stem = (
         f"PyKIM-Suite-{project_version(project)}-{platform_name}-{architecture()}"

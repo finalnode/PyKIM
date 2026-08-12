@@ -7,6 +7,21 @@ zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
 einfachen Befehlen, später objektorientiert und schließlich mit der Pyxel-API
 verwenden.
 
+## PyKIM Suite herunterladen
+
+> **Desktop-Version 0.5.0 – fertige Builds für alle unterstützten Systeme**
+
+| Betriebssystem | Architektur | Download |
+|---|---|---|
+| Windows | x86_64 | **[Windows-App herunterladen (.zip)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-windows-x86_64.zip)** |
+| macOS | Apple Silicon (`arm64`) | **[macOS-App für M1/M2/M3/M4 herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-macos-arm64.dmg)** |
+| macOS | Intel (`x86_64`) | **[macOS-App für Intel herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-macos-x86_64.dmg)** |
+| Linux | x86_64 | **[Linux-App herunterladen (.tar.gz)](https://github.com/finalnode/PyKIM/releases/download/v0.5.0/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz)** |
+
+Die Builds werden durch GitHub Actions geprüft und anschließend dauerhaft im
+[GitHub Release v0.5.0](https://github.com/finalnode/PyKIM/releases/tag/v0.5.0)
+bereitgestellt. Die Apps sind derzeit noch nicht signiert oder notarisiert.
+
 Zum Projekt gehören zwei eng verbundene Teile:
 
 - **PyKIM-Bibliothek:** testbare Zeichen-, Bewegungs-, Audio- und Weltlogik.
@@ -23,6 +38,7 @@ müssen.
 
 ## Inhalt
 
+- [PyKIM Suite herunterladen](#pykim-suite-herunterladen)
 - [Funktionsumfang](#funktionsumfang)
 - [Schnellstart](#schnellstart)
 - [Grundmodell](#grundmodell)
@@ -1071,7 +1087,7 @@ Das ZIP enthält den vollständigen Ordner `PyKIM Suite`. Nach dem Entpacken wir
 `PyKIM Suite.exe` gestartet. Beispiel:
 
 ```text
-dist/releases/PyKIM-Suite-0.5.0-windows-x86_64.zip
+dist/releases/windows/PyKIM-Suite-0.5.0-windows-x86_64.zip
 ```
 
 ### Linux
@@ -1097,7 +1113,7 @@ Nach dem Entpacken wird die Suite gestartet mit:
 Das Release-Archiv heißt beispielsweise:
 
 ```text
-dist/releases/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz
+dist/releases/linux/PyKIM-Suite-0.5.0-linux-x86_64.tar.gz
 ```
 
 ### macOS
@@ -1164,6 +1180,21 @@ entstehen vier getrennte Artefakte:
 | Linux x86_64 | `ubuntu-24.04` | `.tar.gz` |
 | macOS Intel | `macos-15-intel` | `.dmg` |
 | macOS Apple Silicon | `macos-15` | `.dmg` |
+
+Erfolgreiche Pakete werden im jeweiligen Buildordner gesammelt:
+
+```text
+dist/releases/
+├── windows/
+├── linux/
+├── macos-x86_64/
+└── macos-arm64/
+```
+
+Die Ordner werden als GitHub-Actions-Artefakte gespeichert. Bei einem
+Versionstag lädt der Releasejob die enthaltenen Dateien zusätzlich dauerhaft
+in das zugehörige GitHub Release. Die Binärdateien werden nicht in die
+Git-Historie committed.
 
 Jeder Build prüft den enthaltenen Python-Runner, bevor das Artefakt hochgeladen
 wird. Ein Tag nach dem Schema `v0.5.0` startet dieselbe Matrix und erstellt

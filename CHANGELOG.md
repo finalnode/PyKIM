@@ -16,6 +16,8 @@
 - reproduzierbare PyInstaller-Builds für Windows und Linux ergänzt
 - GitHub-Actions-Matrix für Windows, Linux, macOS Intel und Apple Silicon samt
   Release-Artefakten eingerichtet
+- erfolgreiche Plattformpakete in getrennten `dist/releases`-Buildordnern
+  gesammelt und bei Versionstags automatisch als GitHub Release veröffentlicht
 - gemeinsamen Desktop-Einstieg und plattformgerechten eingebetteten
   Python-Runner eingeführt
 - veralteten lokalen Kurs-Snapshot und betriebssystemgenerierte Dateien aus dem

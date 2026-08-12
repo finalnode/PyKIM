@@ -47,7 +47,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: pykim-windows-x86_64
-          path: dist/releases/*.zip
+          path: dist/releases/windows/*.zip
           if-no-files-found: error
 
   linux:
@@ -72,7 +72,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: pykim-linux-x86_64
-          path: dist/releases/*.tar.gz
+          path: dist/releases/linux/*.tar.gz
           if-no-files-found: error
 
   macos:
@@ -96,10 +96,14 @@ jobs:
       - run: python tools/build_macos_dmg.py --rebuild-app
       - name: Eingebettetes Python prüfen
         run: '"dist/macos/PyKIM Suite.app/Contents/MacOS/PyKIM Python" --pykim-python -c "import pykim; print(pykim.__version__)"'
+      - name: Release-Datei in Buildordner kopieren
+        run: |
+          mkdir -p "dist/releases/macos-${{ matrix.architecture }}"
+          cp dist/macos/*.dmg "dist/releases/macos-${{ matrix.architecture }}/"
       - uses: actions/upload-artifact@v4
         with:
           name: pykim-macos-${{ matrix.architecture }}
-          path: dist/macos/*.dmg
+          path: dist/releases/macos-${{ matrix.architecture }}/*.dmg
           if-no-files-found: error
 
   release:
@@ -113,8 +117,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: pykim-*
-          path: release
-          merge-multiple: true
+          path: dist/releases
       - name: Release erstellen oder aktualisieren
         env:
           GH_TOKEN: ${{ github.token }}
@@ -123,4 +126,4 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --title "PyKIM Suite $TAG" --generate-notes
           fi
-          gh release upload "$TAG" release/* --clobber
+          gh release upload "$TAG" dist/releases/*/* --clobber
