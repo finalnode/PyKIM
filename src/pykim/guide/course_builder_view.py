@@ -13,6 +13,7 @@ from .author_workspace import AuthorDraft, assignment_markdown, validate_author_
 
 from .course_archive import build_course_archive
 from .course_setup import generate_course_setup
+from .library import is_repository_document
 from .markedown import validate_markedown
 
 
@@ -55,6 +56,8 @@ def analyze_course_directory(source: str | Path) -> tuple[CourseFileCandidate, .
                 kind, reason = "trainer", "YAML mit PyKIM-Formatkennung"
             else:
                 kind, reason = "ignore", "YAML ohne erkennbare Trainerdefinition"
+        elif is_repository_document(relative):
+            kind, reason = "ignore", "Übliche Repository-Dokumentation"
         elif any(
             marker in text
             for marker in ("@difficulty:", "@hint:", "@block:", "## Anforderungen")
@@ -130,6 +133,7 @@ def course_source_counts(source: str | Path) -> dict[str, int]:
             if path.is_file()
             and not path.is_symlink()
             and not any(part.startswith("_") for part in path.relative_to(root).parts)
+            and not is_repository_document(path)
         )
 
     return {
@@ -179,7 +183,9 @@ def course_documents(
     return tuple(
         path.stem
         for path in sorted(directory.glob(f"*{suffix}"))
-        if path.is_file() and not path.name.startswith("_")
+        if path.is_file()
+        and not path.name.startswith("_")
+        and not is_repository_document(path)
     )
 
 

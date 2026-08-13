@@ -592,6 +592,32 @@ def test_existing_course_files_are_suggested_and_copied_by_user_mapping(tmp_path
     assert (source / "Kapitel.md").is_file()
 
 
+def test_repository_documentation_is_not_suggested_as_course_content(tmp_path):
+    source = tmp_path / "Repository"
+    source.mkdir()
+    for name in (
+        "README.md",
+        "CHANGELOG.md",
+        "SECURITY.md",
+        "QUALITAETSSICHERUNG.md",
+        "TRAINER_AUTOREN.md",
+    ):
+        (source / name).write_text(f"# {name}\n", encoding="utf-8")
+    (source / "01_start.md").write_text("# Start\n", encoding="utf-8")
+
+    suggestions = {
+        item.relative_path: item.suggested_kind
+        for item in analyze_course_directory(source)
+    }
+
+    assert suggestions["01_start.md"] == "script"
+    assert all(
+        suggestions[name] == "ignore"
+        for name in suggestions
+        if name != "01_start.md"
+    )
+
+
 def test_portable_course_archive_rejects_unsafe_paths():
     target = io.BytesIO()
     with zipfile.ZipFile(target, "w") as archive:
@@ -878,6 +904,9 @@ def test_content_overlay_can_replace_scripts_without_touching_packaged_files(
     hidden = overlay / "Skripte" / "imperativ" / "_entwuerfe" / "alt.md"
     hidden.parent.mkdir()
     hidden.write_text("# Unsichtbar\n", encoding="utf-8")
+    (overlay / "Skripte" / "imperativ" / "README.md").write_text(
+        "# Repository-Dokumentation\n", encoding="utf-8"
+    )
     monkeypatch.setenv("PYKIM_CONTENT_DIR", str(overlay))
 
     assert active_content_root(PACKAGED_CONTENT_ROOT) == overlay

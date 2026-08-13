@@ -10,6 +10,9 @@
 - den bisherigen 2.500-Zeilen-UI-Einstieg in einen kleinen Application Composer,
   einen expliziten `AppContext` und getrennte Kurs-, Setup-, Werkzeug-, Aufgaben-
   und Abgabeansichten zerlegt; Architekturgrenzen werden durch Tests geschützt.
+- übliche Repository-Dokumente wie `README.md`, `CHANGELOG.md` oder
+  `SECURITY.md` bei der Kursanalyse standardmäßig ignoriert und aus bereits
+  importierten Skript- und Aufgabenlisten ausgeblendet.
 - farbbasierte Hindernisse, Hintergrundfarben, Nachbarschaftserkennung und
   vorbereitete Spielfelder ergänzt.
 - einsammelbare Farbfelder samt automatisch prüfbaren Sammelaufgaben ergänzt.

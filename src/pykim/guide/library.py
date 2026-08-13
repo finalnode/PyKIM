@@ -8,6 +8,18 @@ import re
 PACKAGED_CONTENT_ROOT = Path(__file__).resolve().parent
 PARADIGMS = ("imperativ", "oop")
 BUTTON_DIRECTIVES = ("run", "copy")
+REPOSITORY_DOCUMENT_STEMS = frozenset({
+    "aufgaben",
+    "authors",
+    "changelog",
+    "code_of_conduct",
+    "contributing",
+    "license",
+    "qualitaetssicherung",
+    "readme",
+    "security",
+    "trainer_autoren",
+})
 _ANNOTATED_CODE = re.compile(
     r"(?P<directives>(?:^@button:(?:run|copy)[ \t]*\n)+)"
     r"(?P<fence>```python[ \t]*\n(?P<source>.*?)```)",
@@ -51,6 +63,11 @@ class TaskSource:
     url: str = ""
 
 
+def is_repository_document(path: str | Path) -> bool:
+    """Erkenne übliche Projektmetadaten, die keine Lernkapitel sind."""
+    return Path(path).stem.casefold() in REPOSITORY_DOCUMENT_STEMS
+
+
 def _title(content: str, fallback: str) -> str:
     for line in content.splitlines():
         if line.startswith("# "):
@@ -67,7 +84,10 @@ def _documents(folder: str, paradigm: str) -> tuple[MarkdownDocument, ...]:
     documents = []
     for path in sorted(directory.rglob("*.md")):
         relative = path.relative_to(directory)
-        if any(part.startswith("_") for part in relative.parts):
+        if (
+            any(part.startswith("_") for part in relative.parts)
+            or is_repository_document(relative)
+        ):
             continue
         content = path.read_text(encoding="utf-8")
         documents.append(
