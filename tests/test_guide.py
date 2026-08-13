@@ -1245,7 +1245,9 @@ def test_project_launch_uses_selected_runtime_and_project_working_directory(
     )
     monkeypatch.setattr(
         "pykim.guide.projects.subprocess.Popen",
-        lambda command, cwd=None, env=None: calls.append((command, cwd, env)),
+        lambda command, cwd=None, env=None, **_options: calls.append(
+            (command, cwd, env)
+        ),
     )
 
     assert launch_project(project, tmp_path) == project.entrypoint
@@ -2191,7 +2193,9 @@ def test_run_student_program_is_limited_to_python_files_in_course(
     calls = []
     monkeypatch.setattr(
         "pykim.guide.system.subprocess.Popen",
-        lambda command, cwd=None, env=None: calls.append((command, cwd, env)),
+        lambda command, cwd=None, env=None, **_options: calls.append(
+            (command, cwd, env)
+        ),
     )
     monkeypatch.setattr(
         "pykim.guide.runtime.selected_runtime",

@@ -12,6 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .interpreter import command_for
+from .execution_security import (
+    execution_environment,
+    popen_isolation_options,
+    student_policy,
+)
 from tempfile import NamedTemporaryFile
 
 PROJECTS_DIRECTORY = "Projekte"
@@ -258,15 +263,16 @@ def launch_project(project: StudentProject, course: str | Path) -> Path:
     from .runtime import selected_runtime
 
     python = selected_runtime(course_root).executable
-    environment = os.environ.copy()
-    existing_pythonpath = environment.get("PYTHONPATH", "")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(course_root), existing_pythonpath) if part
+    policy = student_policy(course_root)
+    environment = execution_environment(
+        policy,
+        pythonpath=(course_root,),
     )
     subprocess.Popen(
         [*command_for(python), str(project.entrypoint)],
         cwd=project.directory,
         env=environment,
+        **popen_isolation_options(),
     )
     return project.entrypoint
 

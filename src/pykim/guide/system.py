@@ -11,6 +11,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .interpreter import command_for, python_command
+from .execution_security import (
+    course_code_policy,
+    execution_environment,
+    limited_output,
+    popen_isolation_options,
+    student_policy,
+)
 from tempfile import NamedTemporaryFile
 from urllib.request import Request
 
@@ -54,6 +61,7 @@ class ProgramResult:
     returncode: int
     stdout: str
     stderr: str
+    output_truncated: bool = False
 
 
 class SourceConflictError(RuntimeError):
@@ -221,13 +229,17 @@ def run_student_program(path: str | Path, course: str | Path) -> Path:
     from .runtime import selected_runtime
 
     python = selected_runtime(course).executable
-    environment = os.environ.copy()
-    existing_pythonpath = environment.get("PYTHONPATH", "")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(Path(course).expanduser().resolve()), existing_pythonpath) if part
+    root = Path(course).expanduser().resolve()
+    policy = student_policy(root)
+    environment = execution_environment(
+        policy,
+        pythonpath=(root,),
     )
     subprocess.Popen(
-        [*command_for(python), str(target)], cwd=target.parent, env=environment
+        [*command_for(python), str(target)],
+        cwd=target.parent,
+        env=environment,
+        **popen_isolation_options(),
     )
     return target
 
@@ -239,11 +251,11 @@ def execute_student_program(path: str | Path, course: str | Path) -> ProgramResu
         raise ValueError("Nur Python-Dateien mit der Endung .py können gestartet werden.")
     from .runtime import selected_runtime
 
-    environment = os.environ.copy()
-    environment["PYTHONUNBUFFERED"] = "1"
-    existing_pythonpath = environment.get("PYTHONPATH", "")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(Path(course).expanduser().resolve()), existing_pythonpath) if part
+    root = Path(course).expanduser().resolve()
+    policy = student_policy(root)
+    environment = execution_environment(
+        policy,
+        pythonpath=(root,),
     )
     completed = subprocess.run(
         [*command_for(selected_runtime(course).executable), str(target)],
@@ -251,8 +263,21 @@ def execute_student_program(path: str | Path, course: str | Path) -> ProgramResu
         capture_output=True,
         text=True,
         env=environment,
+        timeout=policy.timeout_seconds,
+        **popen_isolation_options(),
     )
-    return ProgramResult(completed.returncode, completed.stdout, completed.stderr)
+    stdout, stdout_truncated = limited_output(
+        completed.stdout, policy.max_output_chars
+    )
+    stderr, stderr_truncated = limited_output(
+        completed.stderr, policy.max_output_chars
+    )
+    return ProgramResult(
+        completed.returncode,
+        stdout,
+        stderr,
+        stdout_truncated or stderr_truncated,
+    )
 
 
 def execute_script_example(source: str, timeout: int = 15) -> ProgramResult:
@@ -264,12 +289,14 @@ def execute_script_example(source: str, timeout: int = 15) -> ProgramResult:
         ) as temporary:
             temporary.write(source.rstrip() + "\n")
             temporary_path = Path(temporary.name)
-        environment = os.environ.copy()
-        environment["PYKIM_PROGRESS_MODE"] = "disabled"
+        policy = course_code_policy(temporary_path.parent, timeout_seconds=timeout)
         # Pyxel kann den Prozess beim Schließen des Fensters sehr direkt
         # beenden. Ungepufferte Ausgabe verhindert, dass vorherige print()-
         # Ausgaben dabei noch im stdout-Puffer liegen und verloren gehen.
-        environment["PYTHONUNBUFFERED"] = "1"
+        environment = execution_environment(
+            policy,
+            overrides={"PYKIM_PROGRESS_MODE": "disabled"},
+        )
         try:
             completed = subprocess.run(
                 [*python_command(), "-u", str(temporary_path)],
@@ -278,8 +305,20 @@ def execute_script_example(source: str, timeout: int = 15) -> ProgramResult:
                 text=True,
                 timeout=timeout,
                 env=environment,
+                **popen_isolation_options(),
             )
-            return ProgramResult(completed.returncode, completed.stdout, completed.stderr)
+            stdout, stdout_truncated = limited_output(
+                completed.stdout, policy.max_output_chars
+            )
+            stderr, stderr_truncated = limited_output(
+                completed.stderr, policy.max_output_chars
+            )
+            return ProgramResult(
+                completed.returncode,
+                stdout,
+                stderr,
+                stdout_truncated or stderr_truncated,
+            )
         except subprocess.TimeoutExpired as error:
             stdout = error.stdout.decode() if isinstance(error.stdout, bytes) else error.stdout or ""
             stderr = error.stderr.decode() if isinstance(error.stderr, bytes) else error.stderr or ""

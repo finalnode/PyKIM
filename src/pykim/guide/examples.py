@@ -1,15 +1,18 @@
 """Katalog der mitinstallierten PyKIM-Beispielprogramme."""
 
 import ast
-import os
 import subprocess
-import sys
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
 from .interpreter import python_command
 from .execution import script_example_manager
+from .execution_security import (
+    builtin_policy,
+    execution_environment,
+    popen_isolation_options,
+)
 
 
 @dataclass(frozen=True)
@@ -76,12 +79,16 @@ def _example(name: str) -> ExampleProgram:
 def launch_example(name: str) -> Path:
     """Starte ausschließlich ein Programm aus dem installierten Beispielkatalog."""
     example = _example(name)
-    environment = os.environ.copy()
-    environment["PYKIM_PROGRESS_MODE"] = "disabled"
+    policy = builtin_policy(example.path.parent)
+    environment = execution_environment(
+        policy,
+        overrides={"PYKIM_PROGRESS_MODE": "disabled"},
+    )
     subprocess.Popen(
         [*python_command(), str(example.path)],
         cwd=example.path.parent,
         env=environment,
+        **popen_isolation_options(),
     )
     return example.path
 

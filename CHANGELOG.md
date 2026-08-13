@@ -1,5 +1,16 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- farbbasierte Hindernisse, Hintergrundfarben, Nachbarschaftserkennung und
+  vorbereitete Spielfelder ergänzt.
+- einsammelbare Farbfelder samt automatisch prüfbaren Sammelaufgaben ergänzt.
+- gemeinsame Ausführungsrichtlinie für Schüler-, Kurs- und Beispielcode
+  eingeführt: getrennte Prozessgruppen, bereinigte Umgebungen sowie Laufzeit-
+  und Ausgabegrenzen für integrierte Programmläufe.
+- aktuellen Schutzumfang und die noch fehlende garantierte OS-Sandbox sichtbar
+  im Systemcheck und in `SECURITY.md` dokumentiert.
+
 ## 0.5.5
 
 - Kursstudio zum Anlegen, Bearbeiten, Zuordnen, Prüfen und Vorschauen eigener

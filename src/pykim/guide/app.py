@@ -89,6 +89,7 @@ from .pyxel_examples_view import render_pyxel_examples_view
 from .projects_view import render_projects_view
 from .extensions_view import render_extensions_view
 from .execution import execution_manager, script_example_manager
+from .execution_security import ACTIVE_PROTECTION
 from .progress import (
     clear_exercise_progress,
     load_progress,
@@ -1339,6 +1340,20 @@ def main(
                     status_line("Pyxel installiert" if status.pyxel else "Pyxel fehlt", status.pyxel)
                     status_line("Thonny gefunden" if status.thonny else "Thonny nicht gefunden", status.thonny)
                     status_line("VS Code gefunden" if status.vscode else "VS Code nicht gefunden", status.vscode)
+                ui.label("Schutz bei Codeausführung").classes("font-bold mt-2")
+                with ui.column().classes("w-full gap-1"):
+                    status_line("Schülercode läuft in einem getrennten Prozess")
+                    status_line(
+                        "Integrierte Aufgabenläufe begrenzen Laufzeit und gespeicherte Ausgabe"
+                    )
+                    status_line("Typische Zugangsdaten werden nicht weitergegeben")
+                    status_line(
+                        "Noch keine aktive Betriebssystem-Sandbox für Dateisystem und Netzwerk",
+                        ACTIVE_PROTECTION.os_sandbox_active,
+                    )
+                ui.label(ACTIVE_PROTECTION.summary).classes(
+                    "text-sm text-orange-8"
+                )
                 with ui.row().classes("items-center gap-3"):
                     ui.link(
                         "Thonny herunterladen",

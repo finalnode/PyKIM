@@ -81,6 +81,7 @@ müssen.
 - [Eigene Erweiterungen](#eigene-erweiterungen)
 - [Eigene Projekte und Pyxel-Ressourcen](#eigene-projekte-und-pyxel-ressourcen)
 - [IDE und Python-Laufzeit](#ide-und-python-laufzeit)
+- [Sicherheit bei der Codeausführung](#sicherheit-bei-der-codeausführung)
 - [Speicherorte und Datenschutz](#speicherorte-und-datenschutz)
 - [Installation und Entwicklung](#installation-und-entwicklung)
 - [Desktop-Apps bauen](#desktop-apps-bauen)
@@ -1431,6 +1432,26 @@ blockiert den Start nicht.
 Der ältere ZIP-basierte Inhaltsupdatekanal ist technisch noch vorhanden. Der
 aktuelle Kursworkflow verwendet jedoch die direkte GitHub-Synchronisation.
 
+## Sicherheit bei der Codeausführung
+
+Pythonprogramme aus Aufgaben, Kursen und Projekten werden nicht bereits beim
+Kursimport ausgeführt. Beim bewussten Start laufen sie in einem getrennten
+Prozess mit bereinigter Umgebung; integrierte Aufgabenläufe begrenzen außerdem
+Laufzeit und gespeicherte Ausgabe. Typische Zugangsdaten wie API- oder
+GitHub-Tokens und die Verbindung zu einem SSH-Agenten werden nicht an den
+Lernprozess weitergegeben.
+
+Diese Prozessisolation ist noch **keine Betriebssystem-Sandbox**. Der gestartete
+Code kann derzeit grundsätzlich mit den Rechten des angemeldeten Benutzers auf
+Dateien, Netzwerk und Systemfunktionen zugreifen. Die Suite weist beim
+Kursimport und im Systemcheck sichtbar darauf hin. Die geplante Runner-Architektur
+soll vorhandene OS-Sandbox-Mechanismen verwenden und definierte Schreibbereiche
+freigeben, sodass beispielsweise SQLite-Datenbanken innerhalb eines
+Schülerprojekts möglich bleiben.
+
+Das aktuelle Bedrohungsmodell, aktive Grenzen und ausdrücklich nicht gegebene
+Garantien stehen in [SECURITY.md](SECURITY.md).
+
 ## Speicherorte und Datenschutz
 
 ### Im Kursordner
@@ -1701,6 +1722,9 @@ wären Repository-Secrets und die jeweiligen Herstellerkonten erforderlich.
 ## Grenzen und zurückgestellte Funktionen
 
 - Die Setupdatei ist noch nicht signiert oder kryptografisch authentifiziert.
+- Schüler- und Kurscode läuft in getrennten, begrenzten Prozessen, aber noch
+  nicht in einer garantierten Betriebssystem-Sandbox für Dateisystem und
+  Netzwerk.
 - Der verschlüsselte Moodle-Dateiexport ist experimentell und ausgeblendet.
 - Der alte Zertifikats-/Schlüsselcode ist technische Vorarbeit, nicht Teil des
   stabilen 0.5-Workflows.

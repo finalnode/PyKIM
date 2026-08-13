@@ -1,12 +1,15 @@
 """Qualitätsprüfung für ausführbare Codeblöcke im didaktischen Skript."""
 
 import ast
-import os
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from .execution_security import (
+    course_code_policy,
+    execution_environment,
+    popen_isolation_options,
+)
 from .interpreter import python_command
 
 from .library import PARADIGMS, script_chapters
@@ -129,15 +132,21 @@ def run_headless(audit: ScriptBlockAudit, timeout: float = 5.0) -> subprocess.Co
     """Führe ein freigegebenes Konsolen-/PyKIM-Programm ohne Grafikfenster aus."""
     if not audit.runnable or audit.kind == "pyxel":
         raise ValueError("Nur freigegebene Konsolen- und PyKIM-Blöcke sind fensterlos prüfbar.")
-    environment = os.environ.copy()
-    environment["PYKIM_HEADLESS"] = "1"
-    environment["PYKIM_PROGRESS_MODE"] = "disabled"
+    policy = course_code_policy(audit.path.parent, timeout_seconds=timeout)
+    environment = execution_environment(
+        policy,
+        overrides={
+            "PYKIM_HEADLESS": "1",
+            "PYKIM_PROGRESS_MODE": "disabled",
+        },
+    )
     return subprocess.run(
         [*python_command(), "-c", audit.source],
         capture_output=True,
         text=True,
         timeout=timeout,
         env=environment,
+        **popen_isolation_options(),
     )
 
 
