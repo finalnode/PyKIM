@@ -39,6 +39,8 @@ def test_desktop_workflow_covers_all_release_targets():
         "tools/build_macos_dmg.py --rebuild-app",
         "tools/check_release_version.py",
         "gh release upload",
+        'dist/windows/insi/insi-python.exe',
+        'dist/macos/insi.app/Contents/MacOS/insi-python',
     ):
         assert expected in workflow
 
@@ -52,3 +54,18 @@ def test_pyinstaller_specs_are_valid_python_and_use_common_entrypoint():
         source = path.read_text(encoding="utf-8")
         compile(source, str(path), "exec")
         assert 'packaging" / "app_entry.py' in source
+
+
+def test_desktop_brand_uses_safe_technical_names_and_visible_display_name():
+    desktop = (PROJECT / "packaging/desktop/PyKIM.spec").read_text(
+        encoding="utf-8"
+    )
+    macos = (PROJECT / "packaging/macos/PyKIM.spec").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'name="insi"' in desktop
+    assert 'name="insi-python"' in desktop
+    assert 'name="insi.app"' in macos
+    assert '"CFBundleDisplayName": "in:si"' in macos
+    assert 'bundle_identifier="de.simplicissima.insi"' in macos

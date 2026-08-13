@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht
 
+- sichtbare Desktop-Lernumgebung von PyKIM Suite zu **in:si** umbenannt;
+  ausführbare Dateien, App-Bundle und Release-Artefakte verwenden den sicheren
+  technischen Namen `insi`.
+- `insi` als neuen Kommandozeileneinstieg ergänzt; `pykim-guide`, bestehende
+  Kursformate und lokale Speicherorte bleiben kompatibel.
 - farbbasierte Hindernisse, Hintergrundfarben, Nachbarschaftserkennung und
   vorbereitete Spielfelder ergänzt.
 - einsammelbare Farbfelder samt automatisch prüfbaren Sammelaufgaben ergänzt.

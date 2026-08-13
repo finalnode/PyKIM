@@ -1,6 +1,6 @@
 # Sicherheit
 
-PyKIM und die heutige PyKIM Suite sind Lernsoftware im Alpha-Stadium. Kurse
+PyKIM und die Lernumgebung in:si sind Lernsoftware im Alpha-Stadium. Kurse
 und Schülerprogramme können Pythoncode enthalten. Pythoncode ist grundsätzlich
 in der Lage, mit den Rechten des angemeldeten Benutzers auf Dateien, Netzwerk
 und andere Systemfunktionen zuzugreifen.

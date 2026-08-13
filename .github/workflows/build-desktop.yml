@@ -42,11 +42,11 @@ jobs:
       - run: python tools/build_desktop_app.py
       - name: Eingebettetes Python prüfen
         shell: pwsh
-        run: '& "dist/windows/PyKIM Suite/PyKIM Python.exe" --pykim-python -c "import clr, pykim; clr.AddReference(''System.Windows.Forms''); print(pykim.__version__)"'
+        run: '& "dist/windows/insi/insi-python.exe" --pykim-python -c "import clr, pykim; clr.AddReference(''System.Windows.Forms''); print(pykim.__version__)"'
       - name: Kompatible pythonnet-Runtime prüfen
         shell: pwsh
         run: |
-          $runtime = 'dist/windows/PyKIM Suite/_internal/pythonnet/runtime'
+          $runtime = 'dist/windows/insi/_internal/pythonnet/runtime'
           if (-not (Test-Path "$runtime/Python.Runtime.dll")) {
             throw 'Python.Runtime.dll fehlt im Windows-Build.'
           }
@@ -61,13 +61,13 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: pykim-windows-startup-logs
+          name: insi-windows-startup-logs
           path: dist/windows-startup-logs/**
           if-no-files-found: warn
       - run: python tools/package_desktop_app.py
       - uses: actions/upload-artifact@v4
         with:
-          name: pykim-windows-x86_64
+          name: insi-windows-x86_64
           path: dist/releases/windows/*.zip
           if-no-files-found: error
 
@@ -88,11 +88,11 @@ jobs:
           cache: pip
       - run: python tools/build_desktop_app.py
       - name: Eingebettetes Python prüfen
-        run: '"dist/linux/PyKIM Suite/PyKIM Python" --pykim-python -c "import pykim; print(pykim.__version__)"'
+        run: '"dist/linux/insi/insi-python" --pykim-python -c "import pykim; print(pykim.__version__)"'
       - run: python tools/package_desktop_app.py
       - uses: actions/upload-artifact@v4
         with:
-          name: pykim-linux-x86_64
+          name: insi-linux-x86_64
           path: dist/releases/linux/*.tar.gz
           if-no-files-found: error
 
@@ -116,14 +116,14 @@ jobs:
           cache: pip
       - run: python tools/build_macos_dmg.py --rebuild-app
       - name: Eingebettetes Python prüfen
-        run: '"dist/macos/PyKIM Suite.app/Contents/MacOS/PyKIM Python" --pykim-python -c "import pykim; print(pykim.__version__)"'
+        run: '"dist/macos/insi.app/Contents/MacOS/insi-python" --pykim-python -c "import pykim; print(pykim.__version__)"'
       - name: Release-Datei in Buildordner kopieren
         run: |
           mkdir -p "dist/releases/macos-${{ matrix.architecture }}"
           cp dist/macos/*.dmg "dist/releases/macos-${{ matrix.architecture }}/"
       - uses: actions/upload-artifact@v4
         with:
-          name: pykim-macos-${{ matrix.architecture }}
+          name: insi-macos-${{ matrix.architecture }}
           path: dist/releases/macos-${{ matrix.architecture }}/*.dmg
           if-no-files-found: error
 
@@ -137,7 +137,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: pykim-*
+          pattern: insi-*
           path: dist/releases
       - name: Release erstellen oder aktualisieren
         env:
@@ -146,6 +146,6 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "PyKIM Suite $TAG" --generate-notes
+            gh release create "$TAG" --title "in:si $TAG" --generate-notes
           fi
           gh release upload "$TAG" dist/releases/*/* --clobber

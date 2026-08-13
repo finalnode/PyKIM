@@ -1,4 +1,4 @@
-"""Baue Wheelhouse und eigenständige PyKIM-macOS-App."""
+"""Baue Wheelhouse und eigenständige in:si-macOS-App."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 def main(arguments: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="PyKIM Suite für macOS bauen")
+    parser = argparse.ArgumentParser(description="in:si für macOS bauen")
     parser.add_argument("--skip-wheelhouse", action="store_true")
     parser.add_argument("--skip-clean", action="store_true")
     options = parser.parse_args(arguments)
@@ -65,7 +65,7 @@ def main(arguments: list[str] | None = None) -> int:
         command.append("--clean")
     command.append(str(project / "packaging" / "macos" / "PyKIM.spec"))
     subprocess.run(command, cwd=project, check=True)
-    application = project / "dist" / "macos" / "PyKIM Suite.app"
+    application = project / "dist" / "macos" / "insi.app"
     if not application.is_dir():
         raise RuntimeError("PyInstaller hat keine macOS-App erzeugt.")
     print(f"macOS-App erstellt: {application}")

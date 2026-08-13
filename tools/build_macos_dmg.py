@@ -1,4 +1,4 @@
-"""Erzeuge ein komprimiertes macOS-DMG für die PyKIM Suite."""
+"""Erzeuge ein komprimiertes macOS-DMG für in:si."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def project_version(project: Path) -> str:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="PyKIM Suite als macOS-DMG bauen")
+    parser = argparse.ArgumentParser(description="in:si als macOS-DMG bauen")
     parser.add_argument(
         "--rebuild-app",
         action="store_true",
@@ -34,7 +34,7 @@ def main(arguments: list[str] | None = None) -> int:
         raise SystemExit("Das DMG muss unter macOS gebaut werden.")
 
     project = Path(__file__).resolve().parents[1]
-    application = project / "dist" / "macos" / "PyKIM Suite.app"
+    application = project / "dist" / "macos" / "insi.app"
     if options.rebuild_app:
         subprocess.run(
             [sys.executable, str(project / "tools" / "build_macos_app.py")],
@@ -43,7 +43,7 @@ def main(arguments: list[str] | None = None) -> int:
         )
     if not application.is_dir():
         raise FileNotFoundError(
-            "PyKIM Suite.app fehlt. Führe zuerst tools/build_macos_app.py aus."
+            "insi.app fehlt. Führe zuerst tools/build_macos_app.py aus."
         )
 
     architecture = platform.machine() or "unknown"
@@ -51,10 +51,10 @@ def main(arguments: list[str] | None = None) -> int:
         project
         / "dist"
         / "macos"
-        / f"PyKIM-Suite-{project_version(project)}-macos-{architecture}.dmg"
+        / f"insi-{project_version(project)}-macos-{architecture}.dmg"
     )
     with tempfile.TemporaryDirectory(prefix="pykim-dmg-") as temporary:
-        staging = Path(temporary) / "PyKIM Suite"
+        staging = Path(temporary) / "insi"
         staging.mkdir()
         shutil.copytree(
             application,
@@ -67,7 +67,7 @@ def main(arguments: list[str] | None = None) -> int:
                 "hdiutil",
                 "create",
                 "-volname",
-                "PyKIM Suite",
+                "in:si",
                 "-srcfolder",
                 str(staging),
                 "-ov",

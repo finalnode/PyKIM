@@ -1773,7 +1773,7 @@ def test_pyxel_tools_use_bundled_python_without_global_command(tmp_path, monkeyp
     monkeypatch.setattr("pykim.guide.system.shutil.which", lambda _name: None)
     monkeypatch.setattr(
         "pykim.guide.system.python_command",
-        lambda: ["/Applications/PyKIM.app/Contents/MacOS/PyKIM Python", "--pykim-python"],
+        lambda: ["/Applications/insi.app/Contents/MacOS/insi-python", "--pykim-python"],
     )
     calls = []
     monkeypatch.setattr(
@@ -1784,7 +1784,7 @@ def test_pyxel_tools_use_bundled_python_without_global_command(tmp_path, monkeyp
 
     assert launch_pyxel_editor(resource) == resource
     assert launch_pyxel_example(example) == example
-    runner = "/Applications/PyKIM.app/Contents/MacOS/PyKIM Python"
+    runner = "/Applications/insi.app/Contents/MacOS/insi-python"
     assert calls == [
         (
             [runner, "--pykim-python", "-m", "pyxel", "edit", str(resource)],
@@ -1800,8 +1800,8 @@ def test_pyxel_tools_use_bundled_python_without_global_command(tmp_path, monkeyp
 def test_frozen_python_runner_keeps_windows_executable_suffix(tmp_path, monkeypatch):
     from pykim.guide.interpreter import command_for
 
-    suite = tmp_path / "PyKIM Suite.exe"
-    runner = tmp_path / "PyKIM Python.exe"
+    suite = tmp_path / "insi.exe"
+    runner = tmp_path / "insi-python.exe"
     runner.touch()
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(suite))
@@ -1894,11 +1894,11 @@ def test_release_update_selects_matching_macos_architecture(monkeypatch):
             "html_url": "https://example.invalid/release",
             "assets": [
                 {
-                    "name": "PyKIM-Suite-9.9.9-macos-arm64.dmg",
+                    "name": "insi-9.9.9-macos-arm64.dmg",
                     "browser_download_url": "https://example.invalid/arm.dmg",
                 },
                 {
-                    "name": "PyKIM-Suite-9.9.9-macos-x86_64.dmg",
+                    "name": "insi-9.9.9-macos-x86_64.dmg",
                     "browser_download_url": "https://example.invalid/intel.dmg",
                 },
             ],

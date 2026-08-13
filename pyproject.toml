@@ -48,6 +48,7 @@ build = [
     "tomli>=2; python_version < '3.11'",
 ]
 [project.scripts]
+insi = "pykim.guide.app:main"
 pykim-guide = "pykim.guide.app:main"
 pykim-teacher = "pykim.submission.cli:main"
 

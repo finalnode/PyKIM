@@ -1,4 +1,4 @@
-"""Baue die eigenständige PyKIM Suite unter Windows oder Linux."""
+"""Baue die eigenständige in:si-App unter Windows oder Linux."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def environment_python(environment: Path) -> Path:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="PyKIM Suite für Windows/Linux bauen")
+    parser = argparse.ArgumentParser(description="in:si für Windows/Linux bauen")
     parser.add_argument("--skip-wheelhouse", action="store_true")
     parser.add_argument("--skip-clean", action="store_true")
     options = parser.parse_args(arguments)
@@ -76,7 +76,7 @@ def main(arguments: list[str] | None = None) -> int:
     command.append(str(project / "packaging" / "desktop" / "PyKIM.spec"))
     subprocess.run(command, cwd=project, check=True)
 
-    application = destination / "PyKIM Suite"
+    application = destination / "insi"
     if not application.is_dir():
         raise RuntimeError("PyInstaller hat keinen App-Ordner erzeugt.")
     print(f"{system}-App erstellt: {application}")

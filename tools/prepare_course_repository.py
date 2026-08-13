@@ -151,7 +151,7 @@ jobs:
 README = '''# PyKIM-Kursinhalte
 
 Öffentliche Skripte, Aufgabenstellungen und deklarative Trainerdefinitionen
-für die PyKIM Suite.
+für in:si und das PyKIM-Modul.
 
 - `main` enthält den stabilen Unterrichtsstand.
 - `beta` dient zur Erprobung neuer und geänderter Inhalte.

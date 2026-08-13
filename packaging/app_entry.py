@@ -69,7 +69,7 @@ def run_app() -> None:
     """Starte die Suite und schreibe Absturzdetails in ein lokales Log."""
     from pykim.guide.app import main
 
-    print(f"[{datetime.now().isoformat()}] PyKIM Suite startet")
+    print(f"[{datetime.now().isoformat()}] in:si startet")
     try:
         # Desktop-Starter können eigene Argumente ergänzen. Die App startet
         # deshalb bewusst im nativen Modus ohne Auswertung dieser Argumente.

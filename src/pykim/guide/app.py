@@ -24,6 +24,7 @@ from .course_setup import (
     setup_info,
     sync_installed_course_content,
 )
+from .branding import APP_DISPLAY_NAME
 from .course_archive import (
     MAX_ARCHIVE_SIZE,
     course_content_source,
@@ -152,7 +153,7 @@ def prepare_windows_browser_fallback(
             return
         print(
             "Das native Windows-Fenster wurde nicht rechtzeitig sichtbar; "
-            f"öffne die Suite im Standardbrowser unter {url}"
+            f"öffne {APP_DISPLAY_NAME} im Standardbrowser unter {url}"
         )
         opener(url)
 
@@ -166,7 +167,7 @@ def prepare_windows_browser_fallback(
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     """Lese die bewusst kleine Kommandozeile der Suite."""
-    parser = argparse.ArgumentParser(description="PyKIM Suite starten")
+    parser = argparse.ArgumentParser(description=f"{APP_DISPLAY_NAME} starten")
     parser.add_argument(
         "--browser",
         action="store_true",
@@ -235,7 +236,7 @@ def main(
         from nicegui import app as nicegui_app, run as nicegui_run, ui
     except ImportError:
         raise RuntimeError(
-            "Die PyKIM Suite benötigt NiceGUI. Installiere es mit "
+            f"{APP_DISPLAY_NAME} benötigt NiceGUI. Installiere es mit "
             "pip install 'pykim[guide]'."
         ) from None
 
@@ -367,7 +368,7 @@ def main(
                 "w-full max-w-4xl mx-auto items-stretch gap-3 p-6"
             ):
                 with ui.row().classes("w-full items-baseline gap-3"):
-                    ui.label("PyKIM Suite").classes("text-2xl font-bold text-primary")
+                    ui.label(APP_DISPLAY_NAME).classes("text-2xl font-bold text-primary")
                     ui.label("Kurs auswählen").classes("text-lg text-grey-7")
                     ui.space()
                     ui.button(
@@ -777,7 +778,7 @@ def main(
                         header_setup = course_setup_info(configured)
                     except (OSError, ValueError):
                         header_setup = None
-                ui.label("PyKIM Suite").classes("text-xl font-bold")
+                ui.label(APP_DISPLAY_NAME).classes("text-xl font-bold")
                 if header_setup is not None:
                     ui.label(f"· {header_setup.course}").classes(
                         "text-lg font-medium text-white"
@@ -1375,7 +1376,7 @@ def main(
                     try:
                         install_or_repair_pyxel()
                         ui.notify(
-                            "Pyxel wurde installiert bzw. repariert. Bitte Suite neu starten.",
+                            f"Pyxel wurde installiert bzw. repariert. Bitte {APP_DISPLAY_NAME} neu starten.",
                             type="positive",
                         )
                     except Exception as error:
@@ -1404,7 +1405,7 @@ def main(
                 ui.label("IDE, Dateien und Updates").classes("text-2xl font-bold")
                 ui.markdown(
                     "Diese Werkzeuge werden lokal gestartet und öffnen sich in einem "
-                    "**eigenen Fenster** neben der PyKIM Suite."
+                    f"**eigenen Fenster** neben {APP_DISPLAY_NAME}."
                 )
                 course = get_course_directory()
                 if course is None:
@@ -1571,7 +1572,7 @@ def main(
                             "wurden aktiviert."
                         )
                         ui.notify(
-                            "Neue Lerninhalte aktiviert. Bitte die Suite neu starten.",
+                            f"Neue Lerninhalte aktiviert. Bitte {APP_DISPLAY_NAME} neu starten.",
                             type="positive",
                         )
                     except Exception as error:
@@ -1608,13 +1609,13 @@ def main(
                 ):
                     with ui.row().classes("w-full items-center gap-2"):
                         ui.icon("system_update", size="md").classes("text-primary")
-                        ui.label("PyKIM aktualisieren").classes("text-xl font-bold")
+                        ui.label(f"{APP_DISPLAY_NAME} aktualisieren").classes("text-xl font-bold")
                         ui.space()
                         ui.button(icon="close", on_click=update_dialog.close).props(
                             "flat round dense aria-label='Dialog schließen'"
                         )
                     ui.label(
-                        "Prüfe getrennt, ob eine neue Suite oder neue Lerninhalte "
+                        f"Prüfe getrennt, ob eine neue Version von {APP_DISPLAY_NAME} oder neue Lerninhalte "
                         "bereitstehen. Du entscheidest, was installiert wird."
                     ).classes("text-grey-7")
                     with ui.card().classes("w-full shadow-none border"):
@@ -1838,7 +1839,7 @@ def main(
                         ):
                             render_overview(ui)
                         else:
-                            ui.label("PyKIM Suite").classes("text-2xl font-bold")
+                            ui.label(APP_DISPLAY_NAME).classes("text-2xl font-bold")
                             ui.label(
                                 "Lege zuerst einen Kursordner an und importiere die "
                                 ".pykim-setup-Datei deiner Lehrkraft. Danach erscheinen "
@@ -2567,7 +2568,7 @@ def main(
             f"http://127.0.0.1:{port}/",
         )
     ui.run(
-        title=f"PyKIM Suite {pykim.__version__}",
+        title=f"{APP_DISPLAY_NAME} {pykim.__version__}",
         favicon=browser_favicon(),
         host="127.0.0.1",
         port=port,

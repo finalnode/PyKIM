@@ -7,17 +7,19 @@ zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
 einfachen Befehlen, später objektorientiert und schließlich mit der Pyxel-API
 verwenden.
 
-> **Projektperspektive:** Die heutige **PyKIM Suite** ist der Ausgangspunkt für
-> **in:si/suite**, die Informatik-Lernumgebung von Simplicissima. Die zukünftige
-> Desktop-Lernumgebung soll neben
+> **Projektperspektive:** Die bisherige **PyKIM Suite** wird zu **in:si**, der
+> Informatik-Lernumgebung von Simplicissima. Die Desktop-Lernumgebung soll neben
 > Python und PyKIM auch weitere Themen der Informatik über installierbare Kurse
 > bedienen. **PyKIM** wird dafür aus der Suite herausgelöst und als eigenständiges
 > Pythonmodul mit seiner Pixelwelt, API und Testunterstützung weiterentwickelt.
-> Der aktuelle Name und die Downloads bleiben bis zu dieser Trennung bestehen.
+> Technische Paketnamen, Kursformate und vorhandene Schülerdaten bleiben bei
+> dieser schrittweisen Trennung kompatibel.
 
-## PyKIM Suite herunterladen
+## in:si herunterladen
 
-> **Desktop-Version 0.5.5 – fertige Builds für alle unterstützten Systeme**
+> **Desktop-Version 0.5.5 – letzte Veröffentlichung unter dem bisherigen Namen
+> PyKIM Suite. Kommende Builds tragen sichtbar den Namen in:si und technisch
+> den Dateinamen `insi`.**
 
 | Betriebssystem | Architektur | Download |
 |---|---|---|
@@ -38,12 +40,12 @@ bereitgestellt. Die Apps sind derzeit noch nicht signiert oder notarisiert.
 Zum Projekt gehören zwei eng verbundene Teile:
 
 - **PyKIM-Bibliothek:** testbare Zeichen-, Bewegungs-, Audio- und Weltlogik.
-- **PyKIM Suite:** lokale Desktop-Lernumgebung mit Skript, Aufgaben, Tests,
+- **in:si:** lokale Desktop-Lernumgebung mit Skript, Aufgaben, Tests,
   Lernstand, IDE-Anbindung, Projekten und persönlichen Erweiterungen.
 
 Langfristig werden diese Verantwortlichkeiten deutlicher getrennt:
 
-- **in:si/suite:** komfortable Desktop-Lernumgebung für einen breiten Einstieg in
+- **in:si:** komfortable Desktop-Lernumgebung für einen breiten Einstieg in
   die Informatik. Sie unterstützt unterschiedliche Themen, Programmiersprachen
   und Werkzeuge, ohne auf Python oder PyKIM festgelegt zu sein.
 - **PyKIM:** eigenständiges und erweiterbares Pythonmodul für den Einstieg in
@@ -61,9 +63,9 @@ müssen.
 
 ## Inhalt
 
-- [PyKIM Suite herunterladen](#pykim-suite-herunterladen)
+- [in:si herunterladen](#insi-herunterladen)
 - [Didaktische Einordnung: Simplicissima und in:si](#didaktische-einordnung-simplicissima-und-insi)
-- [Projektperspektive: in:si/suite und PyKIM-Modul](#projektperspektive-insisuite-und-pykim-modul)
+- [Projektperspektive: in:si und PyKIM-Modul](#projektperspektive-insi-und-pykim-modul)
 - [Funktionsumfang](#funktionsumfang)
 - [Schnellstart](#schnellstart)
 - [Grundmodell](#grundmodell)
@@ -75,7 +77,7 @@ müssen.
 - [Mehrere Pixel und Parallelität](#mehrere-pixel-und-parallelität)
 - [Interaktive Programme](#interaktive-programme)
 - [Aufgaben und Trainer](#aufgaben-und-trainer)
-- [PyKIM Suite](#pykim-suite)
+- [in:si](#insi)
 - [Kursordner und Setupdatei](#kursordner-und-setupdatei)
 - [Externes Kurs-Repository](#externes-kurs-repository)
 - [Eigene Erweiterungen](#eigene-erweiterungen)
@@ -123,32 +125,31 @@ normale Python-Projekte
 Damit ist PyKIM eine konkrete Umsetzung der Simplicissima-Leitidee und kein
 proprietäres Endsystem. In der zukünftigen Marken- und Projektstruktur bildet
 **in:si** den Informatikbereich von Simplicissima. Die allgemeine Lern- und
-Arbeitsumgebung ist als **in:si/suite** vorgesehen; PyKIM bleibt darin ein
+Arbeitsumgebung ist als **in:si** vorgesehen; PyKIM bleibt darin ein
 eigenständiges Python-Lernmodul, das auch außerhalb der Suite eingesetzt werden
 kann.
 
 ```text
 Simplicissima         didaktisches Dach
-└── in:si             Informatikbereich
-    ├── in:si/suite   Lern- und Arbeitsumgebung
+└── in:si             Informatikbereich und Lernumgebung
     ├── PyKIM         Python-Lernmodul
     └── Kurse         didaktische Lernpfade und Inhalte
 ```
 
-## Projektperspektive: in:si/suite und PyKIM-Modul
+## Projektperspektive: in:si und PyKIM-Modul
 
-Die derzeitige PyKIM Suite verbindet noch Lernplattform, Kursverwaltung und
-Python-Pixelwelt in einer Anwendung. Für die weitere Entwicklung ist eine klare
+in:si verbindet derzeit noch Lernplattform, Kursverwaltung und
+Python-Pixelwelt in einem Repository. Für die weitere Entwicklung ist eine klare
 Trennung vorgesehen:
 
 | Baustein | Zukünftige Verantwortung |
 |---|---|
-| **in:si/suite** | Allgemeine Lernumgebung für unterschiedliche Themen der Informatik |
+| **in:si** | Allgemeine Lernumgebung für unterschiedliche Themen der Informatik |
 | **PyKIM-Modul** | Installierbares Pythonmodul für Pixelwelt, Bewegung, Farbe, Audio und Tests |
 | **Kursrepositories** | Unabhängige Skripte, Aufgaben, Hinweise, Quellen und Trainerdefinitionen |
 | **Kurskatalog** | Auffindbarkeit und Installation frei verfügbarer Kurse |
 
-in:si/suite soll damit nicht nur einen einzelnen Pythonkurs abbilden. Denkbare
+in:si soll damit nicht nur einen einzelnen Pythonkurs abbilden. Denkbare
 Kurse können beispielsweise Grundlagen der Informatik, Algorithmen,
 Datenstrukturen, Webentwicklung, Datenbanken, Netzwerke oder andere
 Programmiersprachen behandeln. Aufgabentypen, Lernstand, Quellen, Hinweise und
@@ -157,7 +158,7 @@ werden als Module angebunden.
 
 PyKIM bleibt dabei erhalten. Es wird aus der Desktop-Anwendung herausgelöst und
 als eigenständiges Pythonpaket ausgebaut. Dadurch kann PyKIM sowohl innerhalb
-eines in:si/suite-Kurses als auch unabhängig davon in einer IDE, in eigenen
+eines in:si-Kurses als auch unabhängig davon in einer IDE, in eigenen
 Unterrichtsmaterialien oder in anderen Pythonprojekten verwendet werden.
 
 ### Geplante Weiterentwicklung von PyKIM
@@ -178,10 +179,10 @@ den Weg zum Algorithmus nachvollziehbar und testbar machen.
 Diese Bausteine gehören zur geplanten PyKIM-Modul-Roadmap und sind noch nicht
 Bestandteil der stabilen API.
 
-Die Umstellung erfolgt schrittweise. Bis Paketnamen, Migration und neue Builds
-festgelegt sind, heißen Anwendung und Downloads weiterhin **PyKIM Suite**. Diese
-Roadmap ist eine Zielarchitektur und keine Ankündigung, dass bestehende
-Kursordner oder Setupdateien bereits inkompatibel werden.
+Die Umstellung erfolgt schrittweise. Der sichtbare App-Name lautet **in:si**,
+technische Desktop-Artefakte heißen `insi`; das Pythonmodul, vorhandene
+Kursordner und `.pykim-setup`-Dateien behalten ihre kompatiblen PyKIM-Namen.
+Die Zielarchitektur macht bestehende Schülerdaten nicht inkompatibel.
 
 ## Funktionsumfang
 
@@ -941,22 +942,23 @@ einer Bewertung vergleicht die Suite die lokalen Trainerdateien mit
 erreichbaren Quelle werden abweichende Trainer neu synchronisiert. Offline
 wird mit dem zuletzt erfolgreich synchronisierten Stand gearbeitet.
 
-## PyKIM Suite
+## in:si
 
 Dieser Abschnitt beschreibt die aktuelle Anwendung. Ihre allgemeinen
-Lernplattform-Funktionen bilden später den Kern von in:si/suite; PyKIM-spezifische
+Lernplattform-Funktionen bilden später den Kern von in:si; PyKIM-spezifische
 Welt- und Laufzeitfunktionen wandern in das eigenständige Pythonmodul.
 
-Start als Desktopanwendung:
+Start als Desktopanwendung über den neuen oder den kompatiblen alten Befehl:
 
 ```bash
+insi
 pykim-guide
 ```
 
 Alternativ im Browserfenster:
 
 ```bash
-pykim-guide --browser
+insi --browser
 ```
 
 Die Suite bindet nur an `127.0.0.1`. Andere Geräte im Netzwerk können die
@@ -1023,7 +1025,7 @@ Kurzbeschreibung, Niveaustufe und Tags hinzu. Der Standardkurs verwendet zum
 Beispiel `Python`, `Programmiergrundlagen`, `PyKIM`, `Pyxel` und `OOP`.
 
 Der Katalog ist bereits als allgemeine Plattformfunktion angelegt. Mit der
-späteren Umbenennung zu in:si/suite soll er auch Kurse aufnehmen, die PyKIM nicht
+späteren Umbenennung zu in:si soll er auch Kurse aufnehmen, die PyKIM nicht
 verwenden und andere Themen oder Werkzeuge der Informatik bereitstellen.
 
 ### Portable Kursarchive und geplante Git-Quellen
@@ -1588,14 +1590,14 @@ python tools/build_desktop_app.py
 python tools/package_desktop_app.py
 ```
 
-Das ZIP enthält den vollständigen Ordner `PyKIM Suite`. Nach dem Entpacken wird
-`PyKIM Suite.exe` gestartet. Beispiel:
+Das ZIP enthält den vollständigen Ordner `insi`. Nach dem Entpacken wird
+`insi.exe` gestartet. Beispiel:
 
 ```text
-dist/releases/windows/PyKIM-Suite-0.5.5-windows-x86_64.zip
+dist/releases/windows/insi-0.5.5-windows-x86_64.zip
 ```
 
-Unter Windows gehören zwei `PyKIM Suite.exe`-Prozesse zum normalen nativen
+Unter Windows gehören zwei `insi.exe`-Prozesse zum normalen nativen
 Fenstermodus: einer betreibt den lokalen Server, der zweite das WebView-Fenster.
 Bleibt das native Fenster auf einem Rechner unsichtbar, öffnet die Suite nach
 12 Sekunden automatisch im Standardbrowser. Startdiagnosen stehen unter
@@ -1618,13 +1620,13 @@ python tools/package_desktop_app.py
 Nach dem Entpacken wird die Suite gestartet mit:
 
 ```bash
-'PyKIM Suite/PyKIM Suite'
+'insi/insi'
 ```
 
 Das Release-Archiv heißt beispielsweise:
 
 ```text
-dist/releases/linux/PyKIM-Suite-0.5.5-linux-x86_64.tar.gz
+dist/releases/linux/insi-0.5.5-linux-x86_64.tar.gz
 ```
 
 ### macOS
@@ -1633,7 +1635,7 @@ Eigenständige App inklusive Python, PyKIM, Pyxel, NiceGUI und Wheelhouse:
 
 ```bash
 python tools/build_macos_app.py
-open 'dist/macos/PyKIM Suite.app'
+open 'dist/macos/insi.app'
 ```
 
 Schneller Wiederholungs-Build:
@@ -1657,7 +1659,7 @@ python tools/build_macos_dmg.py --rebuild-app
 Der Dateiname enthält Version und Architektur, beispielsweise:
 
 ```text
-PyKIM-Suite-0.5.5-macos-x86_64.dmg
+insi-0.5.5-macos-x86_64.dmg
 ```
 
 Der Build muss auf derselben macOS-Architektur wie das Ziel erzeugt werden.

@@ -57,7 +57,7 @@ Pyxel-Version, Laufwerkstyp und die genaue Fehlermeldung.
 
 ### macOS-Bundle
 
-1. `PyKIM Suite.app` startet per Doppelklick ohne systemweit installiertes Python.
+1. `insi.app` startet als **in:si** per Doppelklick ohne systemweit installiertes Python.
 2. Übersicht, Skript, Aufgaben und Beispiele öffnen ohne Serverfehler.
 3. Ein PyKIM-Beispiel öffnet das Pyxel-Fenster und lässt sich wieder stoppen.
 4. Eine Aufgabe lässt sich speichern, prüfen und in die gewählte IDE öffnen.

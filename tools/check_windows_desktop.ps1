@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$application = Resolve-Path 'dist/windows/PyKIM Suite/PyKIM Suite.exe'
+$application = Resolve-Path 'dist/windows/insi/insi.exe'
 $diagnostics = 'dist/windows-startup-logs'
 New-Item -ItemType Directory -Force $diagnostics | Out-Null
 $process = Start-Process -FilePath $application -PassThru
@@ -12,15 +12,15 @@ try {
         Start-Sleep -Milliseconds 500
         $process.Refresh()
         if ($process.HasExited) {
-            throw "PyKIM Suite wurde vor dem Anzeigen eines Fensters beendet (Exitcode $($process.ExitCode))."
+            throw "in:si wurde vor dem Anzeigen eines Fensters beendet (Exitcode $($process.ExitCode))."
         }
-        $window = Get-Process -Name 'PyKIM Suite' -ErrorAction SilentlyContinue |
+        $window = Get-Process -Name 'insi' -ErrorAction SilentlyContinue |
             Where-Object { $_.MainWindowHandle -ne 0 } |
             Select-Object -First 1
     } while (-not $window -and (Get-Date) -lt $deadline)
 
     if (-not $window) {
-        throw 'PyKIM Suite hat innerhalb von 45 Sekunden kein Windows-Fenster angezeigt.'
+        throw 'in:si hat innerhalb von 45 Sekunden kein Windows-Fenster angezeigt.'
     }
 
     Write-Host "Windows-Fenster erkannt: PID $($window.Id), Handle $($window.MainWindowHandle)"

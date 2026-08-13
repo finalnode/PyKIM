@@ -27,7 +27,7 @@ def architecture() -> str:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="PyKIM Desktop-Build verpacken")
+    parser = argparse.ArgumentParser(description="in:si-Desktop-Build verpacken")
     parser.parse_args(arguments)
     system = platform.system()
     if system not in {"Windows", "Linux"}:
@@ -35,27 +35,25 @@ def main(arguments: list[str] | None = None) -> int:
 
     project = Path(__file__).resolve().parents[1]
     platform_name = system.lower()
-    application = project / "dist" / platform_name / "PyKIM Suite"
+    application = project / "dist" / platform_name / "insi"
     if not application.is_dir():
         raise FileNotFoundError(
             f"{application} fehlt. Führe zuerst tools/build_desktop_app.py aus."
         )
     releases = project / "dist" / "releases" / platform_name
     releases.mkdir(parents=True, exist_ok=True)
-    stem = (
-        f"PyKIM-Suite-{project_version(project)}-{platform_name}-{architecture()}"
-    )
+    stem = f"insi-{project_version(project)}-{platform_name}-{architecture()}"
 
     if system == "Windows":
         output = releases / f"{stem}.zip"
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for path in sorted(application.rglob("*")):
                 if path.is_file():
-                    archive.write(path, Path("PyKIM Suite") / path.relative_to(application))
+                    archive.write(path, Path("insi") / path.relative_to(application))
     else:
         output = releases / f"{stem}.tar.gz"
         with tarfile.open(output, "w:gz") as archive:
-            archive.add(application, arcname="PyKIM Suite", recursive=True)
+            archive.add(application, arcname="insi", recursive=True)
 
     print(f"Release-Archiv erstellt: {output}")
     return 0
