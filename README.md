@@ -8,7 +8,8 @@ einfachen Befehlen, später objektorientiert und schließlich mit der Pyxel-API
 verwenden.
 
 > **Projektperspektive:** Die heutige **PyKIM Suite** ist der Ausgangspunkt für
-> eine allgemeine **CS Suite**. Die zukünftige Desktop-Lernumgebung soll neben
+> **in:si/suite**, die Informatik-Lernumgebung von Simplicissima. Die zukünftige
+> Desktop-Lernumgebung soll neben
 > Python und PyKIM auch weitere Themen der Informatik über installierbare Kurse
 > bedienen. **PyKIM** wird dafür aus der Suite herausgelöst und als eigenständiges
 > Pythonmodul mit seiner Pixelwelt, API und Testunterstützung weiterentwickelt.
@@ -42,7 +43,7 @@ Zum Projekt gehören zwei eng verbundene Teile:
 
 Langfristig werden diese Verantwortlichkeiten deutlicher getrennt:
 
-- **CS Suite:** komfortable Desktop-Lernumgebung für einen breiten Einstieg in
+- **in:si/suite:** komfortable Desktop-Lernumgebung für einen breiten Einstieg in
   die Informatik. Sie unterstützt unterschiedliche Themen, Programmiersprachen
   und Werkzeuge, ohne auf Python oder PyKIM festgelegt zu sein.
 - **PyKIM:** eigenständiges und erweiterbares Pythonmodul für den Einstieg in
@@ -61,7 +62,8 @@ müssen.
 ## Inhalt
 
 - [PyKIM Suite herunterladen](#pykim-suite-herunterladen)
-- [Projektperspektive: CS Suite und PyKIM-Modul](#projektperspektive-cs-suite-und-pykim-modul)
+- [Didaktische Einordnung: Simplicissima und in:si](#didaktische-einordnung-simplicissima-und-insi)
+- [Projektperspektive: in:si/suite und PyKIM-Modul](#projektperspektive-insisuite-und-pykim-modul)
 - [Funktionsumfang](#funktionsumfang)
 - [Schnellstart](#schnellstart)
 - [Grundmodell](#grundmodell)
@@ -86,7 +88,53 @@ müssen.
 - [Grenzen und zurückgestellte Funktionen](#grenzen-und-zurückgestellte-funktionen)
 - [Lizenzierung](#lizenzierung)
 
-## Projektperspektive: CS Suite und PyKIM-Modul
+## Didaktische Einordnung: Simplicissima und in:si
+
+PyKIM folgt der didaktischen Idee von **Simplicissima**: Komplexe fachliche
+Prozesse werden so weit vereinfacht, dass Lernende unmittelbar beginnen können,
+ohne den eigentlichen Gegenstand dauerhaft durch eine künstliche Lernwelt zu
+ersetzen. Dabei gilt:
+
+> **So viel vereinfachen wie nötig, so wenig abstrahieren wie möglich.**
+
+PyKIM setzt diese Haltung für den Einstieg in Python konkret um. Lernende
+schreiben von Anfang an echtes Python. Technische Einstiegshürden wie
+Fensterverwaltung, Eventloop und die direkte Arbeit mit einer Spielebibliothek
+treten zunächst zurück, während Bewegung, Zustand, Schleifen, Bedingungen und
+Funktionen sichtbar bleiben. Die Vereinfachung blendet Komplexität zeitweise
+aus, vermittelt aber kein fachlich falsches Modell, das später widerrufen
+werden müsste.
+
+Der vorgesehene Lernweg führt deshalb bewusst aus dem Gerüst heraus:
+
+```text
+imperative PyKIM-Befehle
+        ↓
+Objekte verwenden
+        ↓
+eigene Klassen entwickeln
+        ↓
+direkt mit Pyxel arbeiten
+        ↓
+normale Python-Projekte
+```
+
+Damit ist PyKIM eine konkrete Umsetzung der Simplicissima-Leitidee und kein
+proprietäres Endsystem. In der zukünftigen Marken- und Projektstruktur bildet
+**in:si** den Informatikbereich von Simplicissima. Die allgemeine Lern- und
+Arbeitsumgebung ist als **in:si/suite** vorgesehen; PyKIM bleibt darin ein
+eigenständiges Python-Lernmodul, das auch außerhalb der Suite eingesetzt werden
+kann.
+
+```text
+Simplicissima         didaktisches Dach
+└── in:si             Informatikbereich
+    ├── in:si/suite   Lern- und Arbeitsumgebung
+    ├── PyKIM         Python-Lernmodul
+    └── Kurse         didaktische Lernpfade und Inhalte
+```
+
+## Projektperspektive: in:si/suite und PyKIM-Modul
 
 Die derzeitige PyKIM Suite verbindet noch Lernplattform, Kursverwaltung und
 Python-Pixelwelt in einer Anwendung. Für die weitere Entwicklung ist eine klare
@@ -94,12 +142,12 @@ Trennung vorgesehen:
 
 | Baustein | Zukünftige Verantwortung |
 |---|---|
-| **CS Suite** | Allgemeine Lernumgebung für unterschiedliche Themen der Informatik |
+| **in:si/suite** | Allgemeine Lernumgebung für unterschiedliche Themen der Informatik |
 | **PyKIM-Modul** | Installierbares Pythonmodul für Pixelwelt, Bewegung, Farbe, Audio und Tests |
 | **Kursrepositories** | Unabhängige Skripte, Aufgaben, Hinweise, Quellen und Trainerdefinitionen |
 | **Kurskatalog** | Auffindbarkeit und Installation frei verfügbarer Kurse |
 
-Die CS Suite soll damit nicht nur einen einzelnen Pythonkurs abbilden. Denkbare
+in:si/suite soll damit nicht nur einen einzelnen Pythonkurs abbilden. Denkbare
 Kurse können beispielsweise Grundlagen der Informatik, Algorithmen,
 Datenstrukturen, Webentwicklung, Datenbanken, Netzwerke oder andere
 Programmiersprachen behandeln. Aufgabentypen, Lernstand, Quellen, Hinweise und
@@ -108,7 +156,7 @@ werden als Module angebunden.
 
 PyKIM bleibt dabei erhalten. Es wird aus der Desktop-Anwendung herausgelöst und
 als eigenständiges Pythonpaket ausgebaut. Dadurch kann PyKIM sowohl innerhalb
-eines CS-Suite-Kurses als auch unabhängig davon in einer IDE, in eigenen
+eines in:si/suite-Kurses als auch unabhängig davon in einer IDE, in eigenen
 Unterrichtsmaterialien oder in anderen Pythonprojekten verwendet werden.
 
 ### Geplante Weiterentwicklung von PyKIM
@@ -889,7 +937,7 @@ wird mit dem zuletzt erfolgreich synchronisierten Stand gearbeitet.
 ## PyKIM Suite
 
 Dieser Abschnitt beschreibt die aktuelle Anwendung. Ihre allgemeinen
-Lernplattform-Funktionen bilden später den Kern der CS Suite; PyKIM-spezifische
+Lernplattform-Funktionen bilden später den Kern von in:si/suite; PyKIM-spezifische
 Welt- und Laufzeitfunktionen wandern in das eigenständige Pythonmodul.
 
 Start als Desktopanwendung:
@@ -968,7 +1016,7 @@ Kurzbeschreibung, Niveaustufe und Tags hinzu. Der Standardkurs verwendet zum
 Beispiel `Python`, `Programmiergrundlagen`, `PyKIM`, `Pyxel` und `OOP`.
 
 Der Katalog ist bereits als allgemeine Plattformfunktion angelegt. Mit der
-späteren Umbenennung zur CS Suite soll er auch Kurse aufnehmen, die PyKIM nicht
+späteren Umbenennung zu in:si/suite soll er auch Kurse aufnehmen, die PyKIM nicht
 verwenden und andere Themen oder Werkzeuge der Informatik bereitstellen.
 
 ### Portable Kursarchive und geplante Git-Quellen

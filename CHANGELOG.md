@@ -1,5 +1,44 @@
 # Änderungen
 
+## 0.5.5
+
+- Kursstudio zum Anlegen, Bearbeiten, Zuordnen, Prüfen und Vorschauen eigener
+  Skripte, Aufgaben und Trainerdaten ergänzt.
+- bestehende Ordner analysierbar gemacht und einen vollständigen Export als
+  portables Kursarchiv ergänzt.
+- ZIP-Kursimport mit Pfadvalidierung, Strukturprüfung und Konfliktbehandlung
+  eingeführt.
+- M@rkdown-Parser und -Validator für Aufgabenmetadaten, Hinweise, Quellen und
+  Tags ergänzt.
+- Kursupdates sichern lokale Schülerarbeit weiterhin getrennt von aktivierten
+  Kursinhalten; geplante Kompatibilitätsregeln sind dokumentiert.
+- App- und Favicon-Ressourcen in Desktop-Builds aufgenommen.
+
+## 0.5.4.1
+
+- Versions- und Downloadverweise für die korrigierten Desktop-Builds
+  vereinheitlicht.
+
+## 0.5.4
+
+- Zuordnungsaufgaben und verschiebbare Codeblöcke samt Ausführung und
+  automatischer Auswertung ergänzt.
+- gestufte Hinweise, Aufgabenquellen und lokale Erfassung genutzter Hinweise
+  eingeführt.
+- öffentlichen Kurskatalog mit Tags, Kurzbeschreibungen und Installation
+  frei verfügbarer Kurse ergänzt.
+- Update-Hinweis zu einem Dialog mit getrennten App- und Inhaltsupdates
+  ausgebaut.
+- Trainer für Code-, Antwort- und strukturbezogene Aufgaben erweitert.
+
+## 0.5.3
+
+- Windows-Desktopstart diagnostizierbar gemacht und einen Browser-Fallback
+  ergänzt, wenn das native Fenster nicht geöffnet werden kann.
+- kompatible eingebettete .NET-/pythonnet-Laufzeit festgelegt und im
+  Build-Workflow geprüft.
+- automatischen Windows-Starttest samt Diagnoseartefakten ergänzt.
+
 ## 0.5.2
 
 - Beispielgalerie um sichtbaren Laufstatus, Programmausgabe und Stop-Funktion ergänzt.
