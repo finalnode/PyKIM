@@ -352,6 +352,57 @@ ist immer ein kanonischer Farbname aus der Tabelle. Bei aktiver Animation wird
 das gelesene Feld kurz als Sensor markiert, ohne seine gespeicherte Farbe zu
 verändern.
 
+### Hintergrund und Hindernisse
+
+Die Welt kann eine eigene Hintergrundfarbe erhalten. Das Setzen der
+Hintergrundfarbe leert zugleich die bisherige Zeichnung:
+
+```python
+world.set_background("light_blue")
+```
+
+Eine oder mehrere Farben lassen sich als Hindernisse markieren. Pixel können
+diese Felder nicht betreten und bleiben bei einer längeren Bewegung direkt vor
+dem ersten Hindernis stehen:
+
+```python
+world.set_background("light_blue")
+world.rect(30, 10, 2, 40, "red")
+world.set_obstacle("red")
+
+set_position(20, 20)
+right(20)                 # KIM bleibt bei (29, 20) stehen
+
+if world.is_obstacle(30, 20):
+    print("Hier steht eine Wand.")
+```
+
+KIM und alle weiteren Pixel können sämtliche direkt angrenzenden Hindernisse
+auf einmal ermitteln. Das Ergebnis enthält die Richtungen `up`, `down`, `left`
+und `right`; ein leeres Tupel bedeutet, dass alle vier Nachbarfelder frei sind.
+Weltränder werden ebenfalls als Hindernisse gemeldet:
+
+```python
+richtungen = get_obstacles()       # zum Beispiel ("up", "right")
+richtungen = kim.get_obstacles()   # derselbe Sensor über das KIM-Objekt
+richtungen = mia.get_obstacles()   # relativ zur Position von MIA
+
+if "right" not in get_obstacles():
+    right()
+```
+
+Hindernisse sind bewusst farbbasiert: Wird ein rotes Hindernis mit einer
+anderen Farbe übermalt, ist das Feld wieder passierbar. Umgekehrt wird jedes
+neu rot gemalte Feld zu einem Hindernis. `set_position()` bleibt als
+Start- und Teleportwerkzeug verfügbar und darf eine Figur auch direkt auf ein
+Hindernis setzen.
+
+```python
+world.set_obstacle("red", "brown")
+world.remove_obstacle("brown")
+world.clear_obstacles()
+```
+
 ## Animation
 
 Ohne Animation erscheint die Welt direkt im Endzustand. Mit `animate()` werden
@@ -452,6 +503,7 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `paint(color=None)` | Feld malen und Spur aktivieren |
 | `paint_stop()` | Spur beenden |
 | `get_color(...)` | Farbe lesen |
+| `get_obstacles()` | Richtungen angrenzender Hindernisse ermitteln |
 | `hide()`, `show()` | Sichtbarkeit steuern |
 | `play_tone(...)`, `play_pause(...)` | Audioereignis einreihen |
 | `update()` | Hook pro Frame im interaktiven Modus |
@@ -465,6 +517,8 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `cells` | logische Farbmatrix |
 | `pixels` | Tupel aus KIM und allen weiteren Pixeln |
 | `frame_count` | aktueller Pyxel-Frame, außerhalb des Fensters `0` |
+| `background_color` | kanonischer Name der Hintergrundfarbe |
+| `obstacle_colors` | Tupel aller aktuell unpassierbaren Farben |
 | `new_pixel(name, x=0, y=0)` | normalen Pixel erzeugen |
 | `spawn(PixelClass, name, ...)` | eigene Pixel-Unterklasse erzeugen |
 | `animate(delay=0.1)` | Animation einschalten |
@@ -474,6 +528,12 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `parallel()` | parallelen Befehlsblock starten |
 | `cls(color="black")` | Anzeige bzw. Welt leeren |
 | `clear(color="black")` | Alias für `cls()` |
+| `set_background(color)` | Hintergrund setzen und Welt damit leeren |
+| `set_obstacle(*colors)` | Farben als Hindernisse markieren |
+| `remove_obstacle(*colors)` | einzelne Hindernisfarben entfernen |
+| `clear_obstacles()` | alle Hindernisfarben entfernen |
+| `is_obstacle(x, y)` | Hindernis an einer Position prüfen |
+| `get_obstacles(x, y)` | Hindernisrichtungen um eine Position ermitteln |
 | `pset(x, y, color)` | einen Weltpixel setzen |
 | `rect(x, y, width, height, color)` | gefülltes Rechteck zeichnen |
 | `text(x, y, value, color="white")` | Text in `draw()` zeichnen |

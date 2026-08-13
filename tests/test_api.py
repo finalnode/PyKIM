@@ -5,6 +5,7 @@ from pykim import (
     animate,
     down,
     get_color,
+    get_obstacles,
     get_position,
     get_x,
     get_y,
@@ -131,6 +132,127 @@ def test_world_drawing_helpers_work_without_a_running_window():
 
     pykim.world.cls("black")
     assert not any(any(row) for row in get_world_state())
+
+
+def test_world_background_color_fills_the_world_and_is_readable():
+    pykim.world.pset(2, 3, "red")
+
+    pykim.world.set_background("light_blue")
+
+    assert pykim.world.background_color == "light_blue"
+    assert get_color(2, 3) == "light_blue"
+    assert all(
+        color == 6 for row in get_world_state() for color in row
+    )
+
+
+def test_obstacle_color_stops_kim_before_the_first_matching_pixel():
+    set_position(10, 20)
+    pykim.world.pset(13, 20, "red")
+    pykim.world.set_obstacle("red")
+
+    right(8)
+
+    assert get_position() == (12, 20)
+    assert pykim.world.is_obstacle(13, 20)
+    assert pykim.world.obstacle_colors == ("red",)
+
+
+def test_get_obstacles_names_all_adjacent_obstacle_directions():
+    set_position(10, 20)
+    pykim.world.pset(10, 19, "red")
+    pykim.world.pset(11, 20, "brown")
+    pykim.world.set_obstacle("red", "brown")
+
+    assert get_obstacles() == ("up", "right")
+    assert pykim.kim.get_obstacles() == ("up", "right")
+
+
+def test_get_obstacles_returns_empty_tuple_when_all_neighbors_are_free():
+    set_position(10, 20)
+
+    assert get_obstacles() == ()
+
+
+@pytest.mark.parametrize(
+    ("position", "direction"),
+    [((10, 0), "up"), ((10, 119), "down"), ((0, 10), "left"), ((159, 10), "right")],
+)
+def test_get_obstacles_treats_world_edges_as_obstacles(position, direction):
+    set_position(*position)
+
+    assert direction in get_obstacles()
+
+
+def test_additional_pixel_reports_obstacles_relative_to_its_own_position():
+    set_position(10, 20)
+    mia = pykim.world.new_pixel("MIA", 30, 40)
+    pykim.world.pset(29, 40, "red")
+    pykim.world.set_obstacle("red")
+
+    assert get_obstacles() == ()
+    assert mia.get_obstacles() == ("left",)
+
+
+def test_obstacle_stops_painting_before_it_is_overwritten():
+    set_position(10, 20)
+    pykim.world.pset(13, 20, "red")
+    pykim.world.set_obstacle("red")
+    paint("purple")
+
+    right(8)
+
+    assert get_position() == (12, 20)
+    assert get_world_state()[20][10:14] == (2, 2, 2, 8)
+
+
+def test_obstacles_apply_to_additional_pixels():
+    mia = pykim.world.new_pixel("MIA", 10, 20)
+    pykim.world.pset(10, 23, "brown")
+    pykim.world.set_obstacle("brown")
+
+    mia.down(10)
+
+    assert mia.get_position() == (10, 22)
+
+
+def test_multiple_obstacle_colors_can_be_removed_or_cleared():
+    pykim.world.set_obstacle("red", "brown")
+    assert pykim.world.obstacle_colors == ("brown", "red")
+
+    pykim.world.remove_obstacle("red")
+    assert pykim.world.obstacle_colors == ("brown",)
+
+    pykim.world.clear_obstacles()
+    assert pykim.world.obstacle_colors == ()
+
+
+def test_obstacle_configuration_requires_at_least_one_color():
+    with pytest.raises(TypeError, match="mindestens eine Farbe"):
+        pykim.world.set_obstacle()
+    with pytest.raises(TypeError, match="mindestens eine Farbe"):
+        pykim.world.remove_obstacle()
+
+
+def test_set_position_can_place_kim_on_an_obstacle_as_a_start_tool():
+    pykim.world.pset(10, 20, "red")
+    pykim.world.set_obstacle("red")
+
+    set_position(10, 20)
+    right()
+
+    assert get_position() == (11, 20)
+
+
+def test_animation_records_only_steps_before_an_obstacle():
+    set_position(10, 20)
+    pykim.world.pset(13, 20, "red")
+    pykim.world.set_obstacle("red")
+    animate(0.1)
+
+    right(8)
+
+    assert pykim._animation_positions == [(10, 20), (11, 20), (12, 20)]
 
 
 def test_animate_records_every_movement_step():

@@ -95,15 +95,20 @@ class Pixel:
         if steps < 0:
             raise ValueError("steps muss mindestens 0 sein.")
         old_x, old_y = self._x, self._y
-        new_x, new_y = api._position(old_x + dx * steps, old_y + dy * steps)
-        if self._painting_path and steps > 0:
-            for distance in range(steps + 1):
+        api._position(old_x + dx * steps, old_y + dy * steps)
+        moved_steps = self.world._movement_distance(
+            old_x, old_y, dx, dy, steps
+        )
+        new_x = old_x + dx * moved_steps
+        new_y = old_y + dy * moved_steps
+        if self._painting_path and moved_steps > 0:
+            for distance in range(moved_steps + 1):
                 x = old_x + dx * distance
                 y = old_y + dy * distance
                 self.world.cells[y][x] = self._paint_color()
         if api._animation_delay_frames is not None:
             color = self._paint_color() if self._painting_path else None
-            for distance in range(1, steps + 1):
+            for distance in range(1, moved_steps + 1):
                 api._record_pixel_position(
                     self,
                     old_x + dx * distance,
@@ -190,6 +195,10 @@ class Pixel:
             )
         x, y = api._position(x, y)
         return api.COLORS[self.world.cells[y][x]]
+
+    def get_obstacles(self) -> tuple[str, ...]:
+        """Nenne die Richtungen angrenzender Hindernisse und Weltränder."""
+        return self.world.get_obstacles(self.get_x(), self.get_y())
 
     def play_tone(self, note: str | int, beats: int = 1) -> None:
         api.play_tone(note, beats)

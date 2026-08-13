@@ -113,6 +113,11 @@ def get_position() -> tuple[int, int]:
     return _x, _y
 
 
+def get_obstacles() -> tuple[str, ...]:
+    """Nenne die Richtungen angrenzender Hindernisse und Weltränder."""
+    return world.get_obstacles(_x, _y)
+
+
 def set_x(x: int) -> None:
     """Setze Kims x-Koordinate, ohne y zu verändern."""
     global _x
@@ -212,17 +217,19 @@ def _move(dx: int, dy: int, steps: int) -> None:
 
     # Erst das Ziel prüfen. Bei einem Fehler bleiben Position und Welt damit
     # vollständig unverändert.
-    new_x, new_y = _position(_x + dx * steps, _y + dy * steps)
+    _position(_x + dx * steps, _y + dy * steps)
+    moved_steps = world._movement_distance(_x, _y, dx, dy, steps)
+    new_x, new_y = _x + dx * moved_steps, _y + dy * moved_steps
 
-    if _painting_path and steps > 0:
-        for distance in range(steps + 1):
+    if _painting_path and moved_steps > 0:
+        for distance in range(moved_steps + 1):
             x = _x + dx * distance
             y = _y + dy * distance
             _pixels[y][x] = _paint_color()
 
     if _animation_delay_frames is not None:
         color = _paint_color() if _painting_path else None
-        for distance in range(1, steps + 1):
+        for distance in range(1, moved_steps + 1):
             _record_position(_x + dx * distance, _y + dy * distance, color)
 
     _x, _y = new_x, new_y
@@ -465,11 +472,11 @@ def _play_next_note(pyxel: object) -> None:
 
 def _draw_world(pyxel: object) -> None:
     """Zeichne den logischen Pixelzustand in den Pyxel-Framebuffer."""
-    pyxel.cls(0)
+    pyxel.cls(world._background_color)
     pixels = _animation_pixels if _animation_delay_frames is not None else _pixels
     for y, row in enumerate(pixels):
         for x, color in enumerate(row):
-            if color != 0:
+            if color != world._background_color:
                 _draw_cell(pyxel, x, y, color)
 
 
@@ -591,7 +598,7 @@ def _draw_start_sequence(
     pyxel: object, x: int, y: int, frame: int, duration: int = 45
 ) -> None:
     """Lasse maximale x- und y-Achsen zu Kims Startpixel schrumpfen."""
-    pyxel.cls(0)
+    pyxel.cls(world._background_color)
     color = (pyxel.frame_count // 5) % 15 + 1
     scale = max(0.0, 1 - frame / duration)
     _draw_axes(pyxel, x, y, scale, color)
@@ -599,7 +606,7 @@ def _draw_start_sequence(
 
 def _draw_start_sequences(pyxel: object, frame: int, duration: int = 45) -> None:
     """Zeige die schrumpfenden Startachsen aller sichtbaren Pixel zugleich."""
-    pyxel.cls(0)
+    pyxel.cls(world._background_color)
     scale = max(0.0, 1 - frame / duration)
     for index, pixel in enumerate(world.pixels):
         visible = (
@@ -683,7 +690,7 @@ def run(
             if draw is not None:
                 draw()
             else:
-                world.cls()
+                world.cls(world.background_color)
                 for pixel in world.pixels:
                     pixel.draw()
 
@@ -747,6 +754,8 @@ def _reset() -> None:
         world.extra_pixels.clear()
         world._backend = None
         world._zoom = 1
+        world._background_color = 0
+        world._obstacle_colors.clear()
         kim.visible = True
 
 
@@ -771,6 +780,7 @@ __all__ = [
     "animate",
     "down",
     "get_color",
+    "get_obstacles",
     "get_position",
     "get_x",
     "get_y",

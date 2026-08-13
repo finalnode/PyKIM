@@ -20,6 +20,8 @@ class World:
         self._parallel_events: dict[Pixel, list[dict[str, object]]] | None = None
         self._backend: object | None = None
         self._zoom = 1
+        self._background_color = 0
+        self._obstacle_colors: set[int] = set()
 
     @property
     def cells(self) -> list[list[int]]:
@@ -61,6 +63,70 @@ class World:
     @property
     def frame_count(self) -> int:
         return 0 if self._backend is None else self._backend.frame_count
+
+    @property
+    def background_color(self) -> str:
+        """Gib die aktuelle Hintergrundfarbe als kanonischen Farbnamen zurück."""
+        return api.COLORS[self._background_color]
+
+    @property
+    def obstacle_colors(self) -> tuple[str, ...]:
+        """Gib alle Hindernisfarben in Reihenfolge der Pyxel-Palette zurück."""
+        return tuple(
+            api.COLORS[color] for color in sorted(self._obstacle_colors)
+        )
+
+    def set_background(self, color: str | int) -> None:
+        """Setze die Hintergrundfarbe und leere die logische Welt damit."""
+        color_index = api._color(color)
+        self._background_color = color_index
+        for row in self.cells:
+            row[:] = [color_index] * api.WIDTH
+        if api._animation_delay_frames is not None:
+            api._animation_pixels = [row[:] for row in self.cells]
+
+    def set_obstacle(self, *colors: str | int) -> None:
+        """Markiere eine oder mehrere Farben als unpassierbar."""
+        if not colors:
+            raise TypeError("set_obstacle() benötigt mindestens eine Farbe.")
+        self._obstacle_colors.update(api._color(color) for color in colors)
+
+    def remove_obstacle(self, *colors: str | int) -> None:
+        """Mache eine oder mehrere Hindernisfarben wieder passierbar."""
+        if not colors:
+            raise TypeError("remove_obstacle() benötigt mindestens eine Farbe.")
+        for color in colors:
+            self._obstacle_colors.discard(api._color(color))
+
+    def clear_obstacles(self) -> None:
+        """Mache alle Farben wieder passierbar."""
+        self._obstacle_colors.clear()
+
+    def is_obstacle(self, x: int, y: int) -> bool:
+        """Prüfe, ob die Farbe an einer Position als Hindernis gilt."""
+        x, y = api._position(x, y)
+        return self.cells[y][x] in self._obstacle_colors
+
+    def get_obstacles(self, x: int, y: int) -> tuple[str, ...]:
+        """Nenne Hindernisse und Weltränder auf den vier Nachbarfeldern."""
+        x, y = api._position(x, y)
+        obstacles = []
+        for direction, (dx, dy) in api._DIRECTIONS.items():
+            neighbor_x, neighbor_y = x + dx, y + dy
+            if not (0 <= neighbor_x < api.WIDTH and 0 <= neighbor_y < api.HEIGHT):
+                obstacles.append(direction)
+            elif self.cells[neighbor_y][neighbor_x] in self._obstacle_colors:
+                obstacles.append(direction)
+        return tuple(obstacles)
+
+    def _movement_distance(
+        self, x: int, y: int, dx: int, dy: int, steps: int
+    ) -> int:
+        """Begrenze eine Bewegung auf das Feld vor dem ersten Hindernis."""
+        for distance in range(1, steps + 1):
+            if self.is_obstacle(x + dx * distance, y + dy * distance):
+                return distance - 1
+        return steps
 
     def cls(self, color: str | int = "black") -> None:
         """Leere die Anzeige; außerhalb von draw() auch die logische Welt."""

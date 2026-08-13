@@ -200,6 +200,18 @@ def test_kim_skips_the_background_color():
     assert fake.calls == [("pset", 10, 20, 2)]
 
 
+def test_draw_world_uses_configured_background_and_keeps_other_colors():
+    fake = FakePyxel()
+    pykim.world.set_background("light_blue")
+    pykim.world.pset(2, 3, "black")
+
+    pykim._draw_world(fake)
+
+    assert fake.calls[0] == ("cls", 6)
+    assert ("pset", 2, 3, 0) in fake.calls
+    assert not any(call == ("pset", 0, 0, 6) for call in fake.calls)
+
+
 def test_draws_multiple_pixels_in_the_same_world():
     fake = FakePyxel()
     set_x(10)
