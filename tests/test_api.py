@@ -3,12 +3,15 @@ import pykim
 
 from pykim import (
     animate,
+    collect,
+    count_color,
     down,
     get_color,
     get_obstacles,
     get_position,
     get_x,
     get_y,
+    items_left,
     left,
     paint,
     paint_path,
@@ -192,6 +195,28 @@ def test_additional_pixel_reports_obstacles_relative_to_its_own_position():
 
     assert get_obstacles() == ()
     assert mia.get_obstacles() == ("left",)
+
+
+def test_collect_returns_current_color_and_restores_background():
+    pykim.world.set_background("light_blue")
+    pykim.world.pset(10, 20, "red")
+    set_position(10, 20)
+
+    assert count_color("red") == 1
+    assert items_left("red")
+    assert collect() == "red"
+    assert get_color() == "light_blue"
+    assert count_color("red") == 0
+    assert not items_left("red")
+
+
+def test_additional_pixel_can_collect_from_its_own_position():
+    pykim.world.set_background("navy")
+    pykim.world.pset(30, 40, "yellow")
+    mia = pykim.world.new_pixel("MIA", 30, 40)
+
+    assert mia.collect() == "yellow"
+    assert mia.get_color() == "navy"
 
 
 def test_obstacle_stops_painting_before_it_is_overwritten():

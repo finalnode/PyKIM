@@ -8,11 +8,12 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
+import pykim
 import yaml
 
 from .authoring import audit_exercise
 from .builder import ExerciseBuilder
-from .models import Exercise
+from .models import Exercise, WorldSetup
 
 
 RULE_METHODS = {
@@ -25,6 +26,7 @@ RULE_FIELDS = {
     "pixels": {"cells", "paths", "checkerboard", "stairs", "exact"},
     "no-extra-pixels": {"cells", "paths", "checkerboard", "stairs"},
     "pixel-count": {"count"},
+    "color-count": {"color", "count"},
     "square": {"start", "side"},
     "position": {"position", "pixel"},
     "positions": {"positions"},
@@ -50,6 +52,34 @@ def _position(value, label: str = "Position") -> tuple[int, int]:
     ):
         raise ValueError(f"{label} muss als [x, y] mit ganzen Zahlen angegeben werden.")
     return value[0], value[1]
+
+
+def _world_setup(value: object) -> WorldSetup | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("world muss ein YAML-Objekt sein.")
+    unknown = set(value) - {"background", "start", "cells", "obstacles"}
+    if unknown:
+        raise ValueError(f"Unbekannte world-Felder: {', '.join(sorted(unknown))}.")
+    background = value.get("background", "black")
+    pykim._color(background)
+    start = _position(value.get("start", [0, 0]), "world.start")
+    pykim._position(*start)
+    cells = []
+    for item in value.get("cells", []):
+        if not isinstance(item, list) or len(item) != 3:
+            raise ValueError("world.cells benötigt Einträge [x, y, farbe].")
+        x, y = _position(item[:2], "world.cells")
+        pykim._position(x, y)
+        pykim._color(item[2])
+        cells.append((x, y, item[2]))
+    obstacles = value.get("obstacles", [])
+    if not isinstance(obstacles, list):
+        raise ValueError("world.obstacles muss eine Liste von Farben sein.")
+    for color in obstacles:
+        pykim._color(color)
+    return WorldSetup(background, start, tuple(cells), tuple(obstacles))
 
 
 def _feedback(rule: dict) -> dict[str, str]:
@@ -142,6 +172,11 @@ def _apply_rule(builder: ExerciseBuilder, rule: dict) -> None:
         if not isinstance(count, int) or isinstance(count, bool) or count < 0:
             raise ValueError("pixel-count.count muss eine nichtnegative ganze Zahl sein.")
         builder.expect_pixel_count(count, **feedback)
+    elif kind == "color-count":
+        count = rule.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise ValueError("color-count.count muss eine nichtnegative ganze Zahl sein.")
+        builder.expect_color_count(rule.get("color"), count, **feedback)
     elif kind == "square":
         builder.expect_square(_position(rule.get("start")), rule.get("side"))
     elif kind == "position":
@@ -200,7 +235,7 @@ def _apply_rule(builder: ExerciseBuilder, rule: dict) -> None:
 def exercise_from_data(data: dict) -> Exercise:
     if not isinstance(data, dict):
         raise ValueError("Eine Aufgabe muss ein YAML-Objekt sein.")
-    allowed = {"id", "title", "tests", "optimization"}
+    allowed = {"id", "title", "tests", "optimization", "world"}
     unknown = set(data) - allowed
     if unknown:
         raise ValueError(f"Unbekannte Aufgabenfelder: {', '.join(sorted(unknown))}.")
@@ -219,7 +254,11 @@ def exercise_from_data(data: dict) -> Exercise:
     digest = hashlib.sha256(
         json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
-    return replace(exercise, definition_hash=digest)
+    return replace(
+        exercise,
+        definition_hash=digest,
+        world_setup=_world_setup(data.get("world")),
+    )
 
 
 def load_exercises(path: str | Path) -> dict[str, Exercise]:

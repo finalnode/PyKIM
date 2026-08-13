@@ -391,6 +391,46 @@ if "right" not in get_obstacles():
     right()
 ```
 
+### Gegenstände einsammeln
+
+`collect()` entfernt die Farbe an KIMs aktueller Position, stellt dort die
+Hintergrundfarbe wieder her und gibt den Namen der eingesammelten Farbe zurück.
+Mit `count_color()` und `items_left()` lassen sich Sammelaufgaben steuern:
+
+```python
+while items_left("red"):
+    right()
+    if get_color() == "red":
+        eingesammelt = collect()
+
+print(count_color("red"))  # 0
+```
+
+Zusätzliche Figuren sammeln relativ zu ihrer eigenen Position mit
+`mia.collect()`. Vorgefertigte Aufgabenspielfelder werden sicher und
+deklarativ in den Trainerdaten beschrieben. Der automatisch erzeugte Starter
+ruft `prepare("aufgaben-id")` vor dem Schülercode auf:
+
+```yaml
+world:
+  background: light_blue
+  start: [10, 20]
+  cells:
+    - [12, 20, red]
+    - [15, 20, red]
+    - [19, 20, red]
+  obstacles: [brown]
+tests:
+  - type: color-count
+    color: red
+    count: 0
+```
+
+Damit gehört der Aufbau des Spielfelds zur Aufgabe und muss von Lernenden
+nicht abgetippt werden. `world` akzeptiert ausschließlich Hintergrund,
+Startposition, Farbfelder und Hindernisfarben; ausführbarer Python-Code ist in
+den Trainerdaten weiterhin nicht erlaubt.
+
 Hindernisse sind bewusst farbbasiert: Wird ein rotes Hindernis mit einer
 anderen Farbe übermalt, ist das Feld wieder passierbar. Umgekehrt wird jedes
 neu rot gemalte Feld zu einem Hindernis. `set_position()` bleibt als
@@ -504,6 +544,7 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `paint_stop()` | Spur beenden |
 | `get_color(...)` | Farbe lesen |
 | `get_obstacles()` | Richtungen angrenzender Hindernisse ermitteln |
+| `collect()` | aktuelle Farbe einsammeln und Hintergrund freilegen |
 | `hide()`, `show()` | Sichtbarkeit steuern |
 | `play_tone(...)`, `play_pause(...)` | Audioereignis einreihen |
 | `update()` | Hook pro Frame im interaktiven Modus |
@@ -534,6 +575,7 @@ erzeugt, nicht durch einen direkten Konstruktoraufruf.
 | `clear_obstacles()` | alle Hindernisfarben entfernen |
 | `is_obstacle(x, y)` | Hindernis an einer Position prüfen |
 | `get_obstacles(x, y)` | Hindernisrichtungen um eine Position ermitteln |
+| `count_color(color)` | Felder einer Farbe zählen |
 | `pset(x, y, color)` | einen Weltpixel setzen |
 | `rect(x, y, width, height, color)` | gefülltes Rechteck zeichnen |
 | `text(x, y, value, color="white")` | Text in `draw()` zeichnen |

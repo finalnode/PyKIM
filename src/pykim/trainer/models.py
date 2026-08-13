@@ -5,6 +5,16 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class WorldSetup:
+    """Deklarativer, vor dem Schülercode geladener Weltzustand."""
+
+    background: str | int = "black"
+    start: tuple[int, int] = (0, 0)
+    cells: tuple[tuple[int, int, str | int], ...] = ()
+    obstacles: tuple[str | int, ...] = ()
+
+
+@dataclass(frozen=True)
 class RuleDefinition:
     """Menschenlesbare Beschreibung eines Trainer-Prüfbausteins."""
 
@@ -63,3 +73,4 @@ class Exercise:
     checker: Callable[..., CheckReport]
     rules: tuple[RuleDefinition, ...] = ()
     definition_hash: str = ""
+    world_setup: WorldSetup | None = None

@@ -49,7 +49,7 @@ def _painted_cells() -> dict[Position, int]:
         (x, y): color
         for y, row in enumerate(pykim.world.cells)
         for x, color in enumerate(row)
-        if color != 0
+        if color != pykim.world._background_color
     }
 
 
@@ -236,6 +236,33 @@ class ExerciseBuilder:
         return self.add_result(
             result,
             rule="pixel-count",
+            success=success,
+            failure=failure or f"Die Anzahl soll genau {count} sein.",
+            hint=hint,
+        )
+
+    def expect_color_count(
+        self,
+        color: Color,
+        count: int,
+        *,
+        success: str = "Die Anzahl der verbleibenden Farbfelder stimmt.",
+        failure: str | None = None,
+        hint: str = "Prüfe, welche Felder gesammelt oder verändert werden sollen.",
+    ) -> "ExerciseBuilder":
+        color_index = pykim._color(color)
+
+        def result(_source: str) -> CheckResult:
+            actual = sum(row.count(color_index) for row in pykim.world.cells)
+            message = failure or (
+                f"Erwartet sind {count} Felder der Farbe {pykim.COLORS[color_index]}; "
+                f"vorhanden sind {actual}."
+            )
+            return CheckResult(actual == count, success, message, hint)
+
+        return self.add_result(
+            result,
+            rule="color-count",
             success=success,
             failure=failure or f"Die Anzahl soll genau {count} sein.",
             hint=hint,

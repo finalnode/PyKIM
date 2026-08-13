@@ -33,6 +33,7 @@ from pykim.guide.course import (
     get_ide_preference,
     get_student_name,
     reset_exercise_file,
+    starter_source,
     set_course_directory,
     set_ide_preference,
     get_runtime_preference,
@@ -1718,6 +1719,15 @@ def test_exercise_file_finds_the_generated_starter(tmp_path, monkeypatch):
 
     assert exercise_file("treppe-5") == course / "Aufgaben" / "imperativ" / "treppe_5.py"
     assert exercise_file("gibt-es-nicht") is None
+
+
+def test_starter_prepares_declarative_task_world_before_student_code():
+    source = starter_source("rote-pixel-sammeln")
+
+    assert 'prepare("rote-pixel-sammeln")' in source
+    assert source.index('prepare("rote-pixel-sammeln")') < source.index(
+        "# Schreibe deine Lösung hier."
+    )
 
 
 def test_system_status_reports_versions_and_tools(monkeypatch):

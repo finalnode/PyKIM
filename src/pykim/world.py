@@ -119,6 +119,11 @@ class World:
                 obstacles.append(direction)
         return tuple(obstacles)
 
+    def count_color(self, color: str | int) -> int:
+        """Zähle alle Weltfelder mit der angegebenen Farbe."""
+        color_index = api._color(color)
+        return sum(row.count(color_index) for row in self.cells)
+
     def _movement_distance(
         self, x: int, y: int, dx: int, dy: int, steps: int
     ) -> int:

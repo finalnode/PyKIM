@@ -118,6 +118,39 @@ def get_obstacles() -> tuple[str, ...]:
     return world.get_obstacles(_x, _y)
 
 
+def collect() -> str:
+    """Sammle die Farbe unter KIM ein und gib ihren Namen zurück."""
+    return kim.collect()
+
+
+def count_color(color: str | int) -> int:
+    """Zähle Felder einer Farbe in der Welt."""
+    return world.count_color(color)
+
+
+def items_left(color: str | int) -> bool:
+    """Prüfe, ob mindestens ein Feld der Farbe übrig ist."""
+    return count_color(color) > 0
+
+
+def prepare(exercise_name: str) -> None:
+    """Lade das in sicheren Trainerdaten definierte Aufgabenspielfeld."""
+    if not isinstance(exercise_name, str) or not exercise_name:
+        raise TypeError("prepare() benötigt eine Aufgabenkennung.")
+    from pykim.trainer.exercises import get_exercise
+
+    setup = get_exercise(exercise_name).world_setup
+    if setup is None:
+        return
+    _reset()
+    world.set_background(setup.background)
+    for x, y, color in setup.cells:
+        world.pset(x, y, color)
+    if setup.obstacles:
+        world.set_obstacle(*setup.obstacles)
+    set_position(*setup.start)
+
+
 def set_x(x: int) -> None:
     """Setze Kims x-Koordinate, ohne y zu verändern."""
     global _x
@@ -778,6 +811,8 @@ kim = Pixel(world, "KIM", default=True)
 
 __all__ = [
     "animate",
+    "collect",
+    "count_color",
     "down",
     "get_color",
     "get_obstacles",
@@ -785,12 +820,14 @@ __all__ = [
     "get_x",
     "get_y",
     "hide",
+    "items_left",
     "left",
     "paint",
     "paint_stop",
     "Pixel",
     "play_pause",
     "play_tone",
+    "prepare",
     "right",
     "run",
     "set_color",

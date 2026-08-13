@@ -625,6 +625,93 @@ def test_yaml_trainer_rejects_unknown_top_level_fields():
         })
 
 
+def test_yaml_trainer_parses_a_safe_world_setup():
+    from pykim.trainer.definitions import exercise_from_data
+
+    exercise = exercise_from_data({
+        "id": "sammeln",
+        "title": "Rote Pixel sammeln",
+        "world": {
+            "background": "light_blue",
+            "start": [10, 20],
+            "cells": [[12, 20, "red"], [14, 20, "red"]],
+            "obstacles": ["brown"],
+        },
+        "tests": [{"type": "color-count", "color": "red", "count": 0}],
+    })
+
+    assert exercise.world_setup is not None
+    assert exercise.world_setup.background == "light_blue"
+    assert exercise.world_setup.start == (10, 20)
+    assert exercise.world_setup.cells == (
+        (12, 20, "red"),
+        (14, 20, "red"),
+    )
+    assert exercise.world_setup.obstacles == ("brown",)
+
+
+def test_prepare_loads_the_declarative_world(monkeypatch):
+    from pykim.trainer.definitions import exercise_from_data
+
+    exercise = exercise_from_data({
+        "id": "sammeln",
+        "title": "Rote Pixel sammeln",
+        "world": {
+            "background": "light_blue",
+            "start": [10, 20],
+            "cells": [[12, 20, "red"], [14, 20, "red"]],
+        },
+        "tests": [{"type": "color-count", "color": "red", "count": 0}],
+    })
+    monkeypatch.setattr(
+        "pykim.trainer.exercises.get_exercise", lambda name: exercise
+    )
+
+    pykim.prepare("sammeln")
+
+    assert pykim.world.background_color == "light_blue"
+    assert pykim.get_position() == (10, 20)
+    assert pykim.count_color("red") == 2
+
+
+@pytest.mark.parametrize(
+    "world",
+    (
+        {"start": [160, 20]},
+        {"cells": [[10, 120, "red"]]},
+        {"background": "unbekannt"},
+        {"obstacles": ["unbekannt"]},
+        {"python": "print('niemals ausführen')"},
+    ),
+)
+def test_yaml_world_rejects_invalid_or_executable_data(world):
+    from pykim.trainer.definitions import exercise_from_data
+
+    with pytest.raises(ValueError):
+        exercise_from_data({
+            "id": "unsichere-welt",
+            "title": "Unsichere Welt",
+            "world": world,
+            "tests": [{"type": "color-count", "color": "red", "count": 0}],
+        })
+
+
+def test_color_count_trainer_checks_remaining_items():
+    from pykim.trainer.definitions import exercise_from_data
+
+    exercise = exercise_from_data({
+        "id": "sammeln",
+        "title": "Rote Pixel sammeln",
+        "tests": [{"type": "color-count", "color": "red", "count": 0}],
+    })
+    pykim.world.pset(10, 20, "red")
+    assert not exercise.checker("").successful
+
+    pykim.set_position(10, 20)
+    pykim.collect()
+    assert exercise.checker("").successful
+
+
 def test_yaml_answer_trainer_is_valid_but_not_executable(tmp_path):
     from pykim.trainer.definitions import load_exercises
 

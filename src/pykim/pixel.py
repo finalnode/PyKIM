@@ -200,6 +200,21 @@ class Pixel:
         """Nenne die Richtungen angrenzender Hindernisse und Weltränder."""
         return self.world.get_obstacles(self.get_x(), self.get_y())
 
+    def collect(self) -> str:
+        """Sammle die Farbe am aktuellen Feld ein und lege Hintergrund frei."""
+        x, y = self.get_position()
+        color = self.world.cells[y][x]
+        self.world.cells[y][x] = self.world._background_color
+        if api._animation_delay_frames is not None:
+            if self.world._capture_parallel(
+                self, paint=(x, y, self.world._background_color)
+            ):
+                return api.COLORS[color]
+            api._record_pixel_position(
+                self, x, y, self.world._background_color
+            )
+        return api.COLORS[color]
+
     def play_tone(self, note: str | int, beats: int = 1) -> None:
         api.play_tone(note, beats)
 
