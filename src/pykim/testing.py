@@ -29,12 +29,12 @@ def get_painted_pixels() -> set[tuple[int, int]]:
 
 
 def get_pending_tones() -> tuple[int, ...]:
-    return tuple(note for note, _ in pykim._notes)
+    return tuple(note for note, _ in pykim.runtime.notes)
 
 
 def get_pending_audio_events() -> tuple[tuple[int, int], ...]:
     """Gib Tonhöhe und Länge aller noch abzuspielenden Ereignisse zurück."""
-    return tuple(pykim._notes)
+    return tuple(pykim.runtime.notes)
 
 
 __all__ = [

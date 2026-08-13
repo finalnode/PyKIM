@@ -106,7 +106,7 @@ class Pixel:
                 x = old_x + dx * distance
                 y = old_y + dy * distance
                 self.world.cells[y][x] = self._paint_color()
-        if api._animation_delay_frames is not None:
+        if api.runtime.animation_delay_frames is not None:
             color = self._paint_color() if self._painting_path else None
             for distance in range(1, moved_steps + 1):
                 api._record_pixel_position(
@@ -205,7 +205,7 @@ class Pixel:
         x, y = self.get_position()
         color = self.world.cells[y][x]
         self.world.cells[y][x] = self.world._background_color
-        if api._animation_delay_frames is not None:
+        if api.runtime.animation_delay_frames is not None:
             if self.world._capture_parallel(
                 self, paint=(x, y, self.world._background_color)
             ):

@@ -289,6 +289,12 @@ from pykim import kim, world
 - `world` ist die gemeinsame Welt aller Pixel.
 - Freie Befehle wie `right()` steuern dasselbe Objekt wie `kim.right()`.
 
+Der veränderliche Zustand von Position, Weltzellen, Audio und Animation liegt
+gebündelt in der Standardinstanz `runtime`. Die einfache API bleibt dadurch
+unverändert, während der Kern schrittweise von früheren unabhängigen
+Modulzuständen entkoppelt wird. `runtime`, `world` und `kim` gehören immer
+zusammen; normaler Unterrichtscode muss `runtime` nicht direkt verwenden.
+
 ## Imperative API
 
 Der Einsteigerweg verwendet:

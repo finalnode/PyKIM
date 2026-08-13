@@ -46,6 +46,30 @@ def test_position_and_movement():
     assert get_position() == (9, 22)
 
 
+def test_default_runtime_owns_mutable_imperative_state():
+    set_position(12, 34)
+    set_color("orange")
+    paint()
+    play_tone("C4")
+
+    assert (pykim.runtime.x, pykim.runtime.y) == (12, 34)
+    assert pykim.runtime.selected_color == 9
+    assert pykim.runtime.cells[34][12] == 9
+    assert list(pykim.runtime.notes) == [(60, 1)]
+    assert pykim.runtime.world is pykim.world
+    assert pykim.runtime.kim is pykim.kim
+
+
+def test_world_cells_can_belong_to_an_independent_runtime():
+    other_runtime = pykim.Runtime(pykim.WIDTH, pykim.HEIGHT, pykim.DEFAULT_COLOR)
+    other_world = pykim.World(other_runtime)
+
+    other_world.pset(12, 34, "orange")
+
+    assert other_runtime.cells[34][12] == 9
+    assert pykim.runtime.cells[34][12] == 0
+
+
 def test_pixel_position_properties_replace_getters_in_oop_code():
     mia = pykim.world.new_pixel("MIA", 10, 20)
     assert mia.get_position() == (10, 20)
@@ -277,7 +301,7 @@ def test_animation_records_only_steps_before_an_obstacle():
 
     right(8)
 
-    assert pykim._animation_positions == [(10, 20), (11, 20), (12, 20)]
+    assert pykim.runtime.animation_positions == [(10, 20), (11, 20), (12, 20)]
 
 
 def test_animate_records_every_movement_step():
@@ -286,8 +310,8 @@ def test_animate_records_every_movement_step():
     animate(0.1)
     right(3)
 
-    assert pykim._animation_delay_frames == 3
-    assert pykim._animation_positions == [
+    assert pykim.runtime.animation_delay_frames == 3
+    assert pykim.runtime.animation_positions == [
         (10, 20),
         (11, 20),
         (12, 20),
@@ -306,8 +330,8 @@ def test_invalid_animation_delay(bad):
 )
 def test_speed_sets_animation_delay(value, frames):
     speed(value)
-    assert pykim._animation_delay_frames == frames
-    assert pykim._animation_positions == [(0, 0)]
+    assert pykim.runtime.animation_delay_frames == frames
+    assert pykim.runtime.animation_positions == [(0, 0)]
 
 
 def test_speed_100_disables_animation():
@@ -316,8 +340,8 @@ def test_speed_100_disables_animation():
 
     speed(100)
 
-    assert pykim._animation_delay_frames is None
-    assert pykim._animation_positions == []
+    assert pykim.runtime.animation_delay_frames is None
+    assert pykim.runtime.animation_positions == []
 
 
 @pytest.mark.parametrize("bad", [0, 101, -1, 1.5, "50", True])
@@ -464,7 +488,7 @@ def test_invalid_direction_and_signature():
 def test_tones(note, number):
     play_tone(note)
     assert get_pending_tones() == (number,)
-    assert list(pykim._notes) == [(number, 1)]
+    assert list(pykim.runtime.notes) == [(number, 1)]
 
 
 def test_tone_length_and_pause():

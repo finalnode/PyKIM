@@ -3,11 +3,14 @@
 import inspect
 from contextlib import contextmanager
 from collections.abc import Callable, Iterator
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import pykim as api
 
 from .pixel import Pixel
+
+if TYPE_CHECKING:
+    from .runtime import Runtime
 
 PixelType = TypeVar("PixelType", bound=Pixel)
 
@@ -15,7 +18,8 @@ PixelType = TypeVar("PixelType", bound=Pixel)
 class World:
     """Gemeinsame Farbfläche, Ausgabe und Verwaltung aller Pixel."""
 
-    def __init__(self) -> None:
+    def __init__(self, runtime: "Runtime | None" = None) -> None:
+        self.runtime = api.runtime if runtime is None else runtime
         self.extra_pixels: list[Pixel] = []
         self._parallel_events: dict[Pixel, list[dict[str, object]]] | None = None
         self._backend: object | None = None
@@ -25,11 +29,15 @@ class World:
 
     @property
     def cells(self) -> list[list[int]]:
-        return api._pixels
+        return self.runtime.cells
 
     @property
     def pixels(self) -> tuple[Pixel, ...]:
-        return (api.kim, *self.extra_pixels)
+        return (
+            tuple(self.extra_pixels)
+            if self.runtime.kim is None
+            else (self.runtime.kim, *self.extra_pixels)
+        )
 
     def new_pixel(self, name: str, x: int = 0, y: int = 0) -> Pixel:
         return self.spawn(Pixel, name, x, y)
@@ -82,8 +90,8 @@ class World:
         self._background_color = color_index
         for row in self.cells:
             row[:] = [color_index] * api.WIDTH
-        if api._animation_delay_frames is not None:
-            api._animation_pixels = [row[:] for row in self.cells]
+        if self.runtime.animation_delay_frames is not None:
+            self.runtime.animation_pixels = [row[:] for row in self.cells]
 
     def set_obstacle(self, *colors: str | int) -> None:
         """Markiere eine oder mehrere Farben als unpassierbar."""
@@ -249,13 +257,13 @@ class World:
     def _flush_parallel(self) -> None:
         events_by_pixel = self._parallel_events or {}
         self._parallel_events = None
-        if not events_by_pixel or api._animation_delay_frames is None:
+        if not events_by_pixel or self.runtime.animation_delay_frames is None:
             return
 
         frame_count = max(map(len, events_by_pixel.values()))
         for frame_index in range(frame_count):
-            positions = api._animation_actor_positions[-1].copy()
-            visibility = api._animation_actor_visibility[-1].copy()
+            positions = self.runtime.animation_actor_positions[-1].copy()
+            visibility = self.runtime.animation_actor_visibility[-1].copy()
             paints: list[tuple[int, int, int]] = []
             sensor = None
 
@@ -272,11 +280,13 @@ class World:
                 if event["sensor"] is not None:
                     sensor = event["sensor"]
 
-            api._animation_positions.append(positions[api.kim])
-            api._animation_actor_positions.append(positions)
-            api._animation_actor_visibility.append(visibility)
-            api._animation_paints.append(paints)
-            api._animation_sensors.append(sensor)
+            if self.runtime.kim is None:
+                raise RuntimeError("Die Welt ist noch nicht an ihre Runtime gebunden.")
+            self.runtime.animation_positions.append(positions[self.runtime.kim])
+            self.runtime.animation_actor_positions.append(positions)
+            self.runtime.animation_actor_visibility.append(visibility)
+            self.runtime.animation_paints.append(paints)
+            self.runtime.animation_sensors.append(sensor)
 
     @contextmanager
     def parallel(self) -> Iterator[None]:

@@ -10,6 +10,9 @@
   und Ausgabegrenzen für integrierte Programmläufe.
 - aktuellen Schutzumfang und die noch fehlende garantierte OS-Sandbox sichtbar
   im Systemcheck und in `SECURITY.md` dokumentiert.
+- veränderlichen Kernzustand für Position, Welt, Audio und Animation in einer
+  gebundenen `Runtime`-Standardinstanz zusammengeführt, ohne die imperative API
+  zu verändern.
 
 ## 0.5.5
 
