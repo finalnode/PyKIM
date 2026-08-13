@@ -15,7 +15,9 @@ def anyio_backend():
 @pytest.mark.nicegui_main_file("tests/ui_main.py")
 async def test_student_can_open_overview_tasks_and_script(user):
     await user.open("/")
-    await user.should_see("Mein Lernstand")
+    await user.should_see("UI-Standardkurs")
+    user.find("Öffnen").click()
+    await user.should_see("Mein Lernstand", retries=50)
 
     user.find("Aufgaben").click()
     await user.should_see("Aufgaben und Testfälle")

@@ -1549,6 +1549,16 @@ pytest -m e2e
 
 Manuelle Plattformtests stehen in `QUALITAETSSICHERUNG.md`.
 
+### Architektur der Desktop-Lernumgebung
+
+`src/pykim/guide/app.py` ist bewusst nur der Application Composer: Er verbindet
+NiceGUI, den expliziten `AppContext`, den Desktop-Lebenszyklus und den
+Workspace. Kursauswahl, Setup, Werkzeuge und Updates, Aufgaben, Abgabe sowie
+die übrigen Ansichten liegen in getrennten `*_view.py`-Modulen. Umfangreiche
+Views werden erst beim tatsächlichen App-Start importiert. Architekturtests
+begrenzen die Größe von Composer und Workspace, damit neue Funktionen nicht
+erneut in einer zentralen `main()` zusammenwachsen.
+
 ### Test-Helfer
 
 `pykim.testing` stellt bereit:

@@ -7,6 +7,9 @@
   technischen Namen `insi`.
 - `insi` als neuen Kommandozeileneinstieg ergänzt; `pykim-guide`, bestehende
   Kursformate und lokale Speicherorte bleiben kompatibel.
+- den bisherigen 2.500-Zeilen-UI-Einstieg in einen kleinen Application Composer,
+  einen expliziten `AppContext` und getrennte Kurs-, Setup-, Werkzeug-, Aufgaben-
+  und Abgabeansichten zerlegt; Architekturgrenzen werden durch Tests geschützt.
 - farbbasierte Hindernisse, Hintergrundfarben, Nachbarschaftserkennung und
   vorbereitete Spielfelder ergänzt.
 - einsammelbare Farbfelder samt automatisch prüfbaren Sammelaufgaben ergänzt.
