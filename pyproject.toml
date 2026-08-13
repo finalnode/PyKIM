@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "PyKIM"
-version = "0.5.4.1"
+version = "0.5.5"
 description = "A small, Pyxel-based Python learning environment"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -56,6 +56,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 pykim = [
+  "guide/assets/*.png",
   "guide/content-manifest.json",
   "guide/course_catalog.json",
   "guide/Skripte/imperativ/*.md",

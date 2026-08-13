@@ -2,6 +2,7 @@ import json
 import ast
 import hashlib
 import io
+import stat
 import threading
 import time
 import zipfile
@@ -13,6 +14,10 @@ from types import SimpleNamespace
 import pykim
 import pytest
 from pykim.guide.app import (
+    apply_macos_app_icon,
+    app_icon_path,
+    browser_favicon,
+    configure_native_app_icon,
     course_name_confirmation_matches,
     parse_arguments,
     prepare_windows_browser_fallback,
@@ -101,7 +106,9 @@ from pykim.guide.library import (
     render_task_markdown,
     task_assignment,
     task_document,
+    task_documents,
     task_hints,
+    task_tags,
     task_names,
     task_sources,
 )
@@ -119,9 +126,27 @@ from pykim.guide.updates import (
 )
 from pykim.guide.course_setup import (
     course_setup_info,
+    install_new_course_archive,
     install_new_course_setup,
     sync_installed_course_content,
 )
+from pykim.guide.course_archive import (
+    build_course_archive,
+    course_content_source,
+    parse_course_archive,
+)
+from pykim.guide.course_builder_view import (
+    analyze_course_directory,
+    course_documents,
+    course_source_counts,
+    create_portable_course,
+    ensure_course_source,
+    import_course_candidates,
+    load_course_document,
+    save_course_assignment,
+    save_course_markdown,
+)
+from pykim.guide.markedown import parse_markedown, validate_markedown
 from pykim.guide.course_catalog import load_course_catalog, parse_course_catalog
 from pykim.guide.system import (
     execute_student_program,
@@ -148,6 +173,12 @@ from pykim.trainer.authoring import generate_exercise_source
 def test_guide_starts_as_desktop_by_default_and_supports_browser_fallback():
     assert not parse_arguments([]).browser
     assert parse_arguments(["--browser"]).browser
+    assert app_icon_path() != "🤖"
+    assert browser_favicon().startswith("data:image/png;base64,")
+    assert not apply_macos_app_icon("🤖")
+    native = SimpleNamespace(start_args={})
+    assert configure_native_app_icon(native, Path(app_icon_path()))
+    assert native.start_args["icon"].endswith("app-icon-master.png")
 
 
 def test_windows_browser_fallback_opens_only_without_native_window():
@@ -359,6 +390,270 @@ def test_uploaded_setup_creates_and_selects_a_managed_course(tmp_path, monkeypat
     ]
 
 
+def portable_course_archive(*, prefix: str = "") -> bytes:
+    setup = {
+        "format": "pykim-course-setup-v1",
+        "name": "python-11a.pykim-setup",
+        "teacher": "Frau Beispiel",
+        "school": "OSZ KIM",
+        "course": "Python 11A",
+        "repository": "https://github.com/example/course.git",
+        "branch": "main",
+        "scripts_path": "Skripte",
+        "assignments_path": "Aufgaben",
+        "trainers_path": "Trainer",
+    }
+    target = io.BytesIO()
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            f"{prefix}python-11a.pykim-setup",
+            json.dumps(setup, ensure_ascii=False),
+        )
+        archive.writestr(
+            f"{prefix}Skripte/imperativ/01_start.md", "# Start\n"
+        )
+        archive.writestr(
+            f"{prefix}Aufgaben/imperativ/quadrat.md",
+            "# Quadrat\n\nZeichne ein Quadrat.\n",
+        )
+        archive.writestr(
+            f"{prefix}Trainer/quadrat.yml",
+            "format: 1\nid: quadrat\ntitle: Quadrat\ntests:\n"
+            "  - type: square\n    start: [50, 50]\n    side: 5\n",
+        )
+        archive.writestr(f"{prefix}Skripte/_entwurf.md", "# Unsichtbar\n")
+        archive.writestr(f"{prefix}README.md", "Nicht Teil des Kursinhalts.\n")
+    return target.getvalue()
+
+
+def test_portable_course_archive_accepts_repository_style_wrapper():
+    bundle = parse_course_archive(portable_course_archive(prefix="course-main/"))
+
+    assert bundle.setup.course == "Python 11A"
+    assert bundle.revision.startswith("archive-")
+    assert set(bundle.files) == {
+        "Skripte/imperativ/01_start.md",
+        "Aufgaben/imperativ/quadrat.md",
+        "Trainer/quadrat.yml",
+    }
+
+
+def test_portable_course_archive_ignores_macos_metadata():
+    original = portable_course_archive(prefix="course-main/")
+    target = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(original)) as source, zipfile.ZipFile(
+        target, "w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
+        for member in source.infolist():
+            archive.writestr(member.filename, source.read(member))
+        archive.writestr(
+            "__MACOSX/course-main/._python-11a.pykim-setup",
+            b"AppleDouble metadata",
+        )
+
+    bundle = parse_course_archive(target.getvalue())
+
+    assert bundle.setup.course == "Python 11A"
+
+
+def test_course_archive_builder_uses_only_visible_learning_content(tmp_path):
+    source = tmp_path / "source"
+    setup = tmp_path / "python-11a.pykim-setup"
+    original = portable_course_archive()
+    with zipfile.ZipFile(io.BytesIO(original)) as archive:
+        for member in archive.infolist():
+            if member.filename.endswith(".pykim-setup"):
+                setup.write_bytes(archive.read(member))
+                continue
+            target = source / member.filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(archive.read(member))
+
+    built = parse_course_archive(build_course_archive(source, setup))
+
+    assert built.setup.course == "Python 11A"
+    assert "Skripte/_entwurf.md" not in built.files
+    assert "README.md" not in built.files
+
+
+def test_course_builder_creates_setup_and_importable_zip(tmp_path):
+    source = ensure_course_source(tmp_path / "Mein Kurs")
+    (source / "Skripte" / "start.md").write_text("# Start\n", encoding="utf-8")
+    (source / "Aufgaben" / "quadrat.md").write_text("# Quadrat\n", encoding="utf-8")
+    (source / "Trainer" / "quadrat.yml").write_text(
+        "format: 1\nid: quadrat\ntitle: Quadrat\ntests:\n"
+        "  - type: square\n    start: [50, 50]\n    side: 5\n",
+        encoding="utf-8",
+    )
+
+    setup, archive = create_portable_course(
+        source,
+        teacher="Frau Beispiel",
+        school="OSZ KIM",
+        course="Mein Kurs",
+        repository="https://github.com/example/mein-kurs.git",
+    )
+
+    assert setup.parent == source
+    assert archive.is_file()
+    assert parse_course_archive(archive.read_bytes()).setup.course == "Mein Kurs"
+    assert course_source_counts(source) == {
+        "scripts": 1,
+        "assignments": 1,
+        "trainers": 1,
+    }
+
+
+def test_course_builder_can_author_a_fully_local_course(tmp_path):
+    source = ensure_course_source(tmp_path / "Lokaler Kurs")
+    script = save_course_markdown(
+        source,
+        "Skripte",
+        "01-start",
+        "# Start\n\n```python\nfrom pykim import *\n```",
+    )
+    draft = AuthorDraft(
+        "quadrat",
+        "format: 1\nexercises:\n  - id: quadrat\n    title: Quadrat\n"
+        "    tests:\n      - type: square\n        start: [50, 50]\n"
+        "        side: 5\n",
+        "# Quadrat\n@difficulty:einfach\n\nZeichne ein Quadrat.\n\n"
+        "## Anforderungen\n\n- Verwende vier gleich lange Seiten.\n",
+    )
+    markdown, trainer = save_course_assignment(source, draft)
+
+    setup, archive = create_portable_course(
+        source,
+        teacher="Frau Lokal",
+        school="Offline-Schule",
+        course="Lokaler Kurs",
+    )
+    bundle = parse_course_archive(archive.read_bytes())
+
+    assert script.is_file() and markdown.is_file() and trainer.is_file()
+    assert course_documents(source, "Skripte") == ("01-start",)
+    assert load_course_document(source, "Skripte", "01-start").startswith("# Start")
+    assert bundle.setup.repository == ""
+    assert setup.parent == source
+    assert set(bundle.files) == {
+        "Skripte/imperativ/01-start.md",
+        "Aufgaben/imperativ/quadrat.md",
+        "Trainer/quadrat.yml",
+    }
+
+
+def test_portable_course_can_contain_only_scripts(tmp_path):
+    source = tmp_path / "Nur Skript"
+    (source / "Skripte" / "imperativ").mkdir(parents=True)
+    (source / "Skripte" / "imperativ" / "start.md").write_text(
+        "# Start\n\nEin reiner Lesekurs.\n", encoding="utf-8"
+    )
+
+    setup, archive = create_portable_course(
+        source,
+        teacher="Frau Flexibel",
+        school="Offline-Schule",
+        course="Nur Skript",
+    )
+    bundle = parse_course_archive(archive.read_bytes())
+
+    assert setup.is_file()
+    assert set(bundle.files) == {"Skripte/imperativ/start.md"}
+
+
+def test_existing_course_files_are_suggested_and_copied_by_user_mapping(tmp_path):
+    source = tmp_path / "Materialsammlung"
+    source.mkdir()
+    (source / "Kapitel.md").write_text("# Schleifen\n\nEin Kapitel.\n", encoding="utf-8")
+    (source / "Reflexion.txt").write_text(
+        "# Reflexion\n@difficulty:einfach\n\nWas hast du gelernt?\n",
+        encoding="utf-8",
+    )
+    (source / "Pruefung.yaml").write_text(
+        "format: 1\nid: test\ntitle: Test\nmode: answer\n",
+        encoding="utf-8",
+    )
+
+    candidates = analyze_course_directory(source)
+    suggestions = {item.relative_path: item.suggested_kind for item in candidates}
+    imported = import_course_candidates(source, suggestions)
+
+    assert suggestions == {
+        "Kapitel.md": "script",
+        "Pruefung.yaml": "trainer",
+        "Reflexion.txt": "task",
+    }
+    assert {path.relative_to(source).as_posix() for path in imported} == {
+        "Skripte/imperativ/Kapitel.md",
+        "Aufgaben/imperativ/Reflexion.md",
+        "Trainer/Pruefung.yml",
+    }
+    assert (source / "Kapitel.md").is_file()
+
+
+def test_portable_course_archive_rejects_unsafe_paths():
+    target = io.BytesIO()
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr("../ausbruch.txt", "nicht erlaubt")
+        archive.writestr("course.pykim-setup", "{}")
+
+    with pytest.raises(ValueError, match="unsicheren Dateipfad"):
+        parse_course_archive(target.getvalue())
+
+
+def test_portable_course_archive_rejects_symbolic_links():
+    target = io.BytesIO()
+    link = zipfile.ZipInfo("course-main/verknuepfung")
+    link.create_system = 3
+    link.external_attr = (stat.S_IFLNK | 0o777) << 16
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr(link, "../../private")
+        archive.writestr("course-main/course.pykim-setup", "{}")
+
+    with pytest.raises(ValueError, match="symbolischen Links"):
+        parse_course_archive(target.getvalue())
+
+
+def test_archive_import_is_offline_and_name_collisions_create_a_second_course(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
+    data = portable_course_archive(prefix="course-main/")
+
+    first_info, first = install_new_course_archive(
+        data, base_directory=tmp_path / "courses"
+    )
+    first_task = first / "Aufgaben" / "imperativ" / "quadrat.py"
+    first_task.write_text("# persönliche Lösung\n", encoding="utf-8")
+    second_info, second = install_new_course_archive(
+        data, base_directory=tmp_path / "courses"
+    )
+
+    assert first_info == second_info
+    assert first.name == "python-11a"
+    assert second.name == "python-11a-2"
+    assert first_task.read_text(encoding="utf-8") == "# persönliche Lösung\n"
+    assert course_content_source(first)["type"] == "archive"
+    assert course_content_source(second)["type"] == "archive"
+    set_course_directory(first)
+    assert active_content_root(PACKAGED_CONTENT_ROOT).name.startswith("archive-")
+    result = sync_installed_course_content(first)
+    assert not result.checked_online
+    assert "kein Online-Abgleich" in result.message
+
+    # Der Archivimport lädt die globalen Trainerregister neu. Für die folgenden
+    # Tests stellen wir deshalb den mitgelieferten Inhalt ausdrücklich wieder her.
+    clear_course_selection()
+    monkeypatch.setenv("PYKIM_CONTENT_DIR", str(PACKAGED_CONTENT_ROOT))
+    from pykim.trainer.activities import refresh_activities
+    from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.exercises import refresh_exercises
+
+    refresh_exercises()
+    refresh_activities()
+    refresh_assignments()
+
+
 def test_course_deletion_uses_system_trash_and_forgets_course(tmp_path, monkeypatch):
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     course = tmp_path / "course"
@@ -487,6 +782,7 @@ def test_task_block_annotations_are_hidden_from_assignment_text():
 def test_task_hints_and_sources_are_parsed_but_hidden_from_assignment():
     content = """# Aufgabe
 @difficulty:mittel
+@tags: schleifen, pixel, schleifen
 @source: CS Circles | https://example.test/task
 
 Ordne den Code.
@@ -500,8 +796,64 @@ Ordne den Code.
         "Beginne mit dem Import.",
         "Der Funktionsaufruf steht am Ende.",
     )
+    assert task_tags(content) == ("schleifen", "pixel")
     assert task_sources(content)[0].label == "CS Circles"
     assert task_sources(content)[0].url == "https://example.test/task"
+
+
+def test_markedown_parser_reports_annotations_and_line_specific_errors():
+    valid = """# Aufgabe
+@difficulty:mittel
+@tags: schleifen, pixel
+@hint: Prüfe deine Startposition, bevor du beginnst.
+@source: Eigene Aufgabe | https://example.test/aufgabe
+
+Löse die Aufgabe.
+
+@block:start step=1
+```python
+from pykim import *
+```
+"""
+    document = parse_markedown(valid, kind="task")
+
+    assert document.valid
+    assert [item.name for item in document.annotations] == [
+        "difficulty",
+        "tags",
+        "hint",
+        "source",
+        "block",
+    ]
+    assert document.code_blocks[0].language == "python"
+
+    invalid = "# Fehler\n@tags: Python, python\n@unknown: wert\n```python\n"
+    issues = validate_markedown(invalid, kind="task")
+
+    assert {issue.code for issue in issues} >= {
+        "tags",
+        "unknown-annotation",
+        "unclosed-code",
+        "missing-difficulty",
+    }
+    assert all(issue.line >= 1 for issue in issues)
+
+
+def test_packaged_learning_content_is_valid_markedown():
+    issues = []
+    for paradigm in ("imperativ", "oop"):
+        for chapter in script_chapters(paradigm):
+            issues.extend(
+                (chapter.path.name, issue)
+                for issue in validate_markedown(chapter.content, kind="script")
+            )
+        for task in task_documents(paradigm):
+            issues.extend(
+                (task.path.name, issue)
+                for issue in validate_markedown(task.content, kind="task")
+            )
+
+    assert issues == []
 
 
 def test_markdown_library_covers_all_trainers_and_both_learning_paths():
@@ -748,7 +1100,12 @@ def test_author_workspace_saves_both_files_with_overwrite_protection(tmp_path):
         "entwurf-test", "Entwurf Test", ("pixels", "loop"), optimal_lines=8
     )
     markdown = assignment_markdown(
-        "Entwurf Test", "Zeichne ein Muster.", "Male einen Punkt.\nNutze eine Schleife.", "mittel"
+        "Entwurf Test",
+        "Zeichne ein Muster.",
+        "Male einen Punkt.\nNutze eine Schleife.",
+        "mittel",
+        hints=("Beginne klein.", "Nutze eine Schleife."),
+        tags=("pixel", "schleifen"),
     )
     draft = AuthorDraft("entwurf-test", trainer, markdown)
 
@@ -758,6 +1115,8 @@ def test_author_workspace_saves_both_files_with_overwrite_protection(tmp_path):
 
     assert trainer_path.read_text(encoding="utf-8") == trainer
     assert markdown_path.read_text(encoding="utf-8") == markdown
+    assert "@tags: pixel, schleifen" in markdown
+    assert markdown.count("@hint:") == 2
     assert len(draft.content_hash) == 64
     with pytest.raises(FileExistsError):
         save_author_draft(tmp_path, draft, paradigm="imperativ")

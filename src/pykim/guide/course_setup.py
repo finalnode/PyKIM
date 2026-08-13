@@ -62,13 +62,17 @@ def setup_info(data: bytes | str | Path) -> CourseSetup:
         raise ValueError("Die PyKIM-Setupdatei ist unvollständig.")
     if document.get("format") != SETUP_FORMAT:
         raise ValueError("Die Datei ist keine unterstützte PyKIM-Setupdatei.")
-    if not all(isinstance(document.get(key), str) and document[key].strip() for key in required):
+    nonempty = required - {"repository"}
+    if (
+        not all(isinstance(document.get(key), str) for key in required)
+        or not all(document[key].strip() for key in nonempty)
+    ):
         raise ValueError("Die PyKIM-Setupdatei enthält leere Angaben.")
     name = document["name"].strip()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+\.pykim-setup", name):
         raise ValueError("Der Name der Setupdatei ist ungültig.")
     repository = document["repository"].strip()
-    if not re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", repository):
+    if repository and not re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", repository):
         raise ValueError("Das Kursrepository muss eine öffentliche GitHub-HTTPS-Adresse sein.")
     branch = document["branch"].strip()
     if not re.fullmatch(r"[A-Za-z0-9._/-]+", branch) or ".." in branch.split("/"):
@@ -104,13 +108,53 @@ def _write_course_setup(data: bytes, course: str | Path) -> None:
     os.replace(temporary_path, target)
 
 
+def _managed_course_directory(
+    info: CourseSetup,
+    base_directory: str | Path | None,
+    *,
+    collision: str,
+) -> Path:
+    if collision not in {"reuse", "copy"}:
+        raise ValueError("Unbekannte Behandlung eines vorhandenen Kurses.")
+    base = (
+        Path(base_directory).expanduser().resolve()
+        if base_directory is not None
+        else Path.home() / "PyKIM-Kurse"
+    )
+    candidate = (base / Path(info.name).stem).resolve()
+    if collision == "reuse" or not candidate.exists():
+        return candidate
+    index = 2
+    while True:
+        alternative = candidate.with_name(f"{candidate.name}-{index}")
+        if not alternative.exists():
+            return alternative
+        index += 1
+
+
+def course_import_target(
+    info: CourseSetup,
+    base_directory: str | Path | None = None,
+) -> Path:
+    """Liefere den regulären Zielordner, um Namenskollisionen vorab anzuzeigen."""
+    return _managed_course_directory(info, base_directory, collision="reuse")
+
+
 def install_course_setup(data: bytes, course: str | Path) -> CourseSetup:
     """Lese, synchronisiere und installiere eine Kurs-Setupdatei."""
     info = setup_info(data)
+    if not info.repository:
+        raise ValueError(
+            "Diese lokale Setupdatei gehört in ein Kurs-ZIP und besitzt keine "
+            "Onlinequelle. Importiere stattdessen das exportierte ZIP."
+        )
     from .updates import sync_certificate_content
 
     sync_certificate_content(info)
     _write_course_setup(data, course)
+    from .course_archive import write_course_content_source
+
+    write_course_content_source(course, "repository")
     from .course import provision_course_exercises
 
     provision_course_exercises(course)
@@ -121,15 +165,18 @@ def install_new_course_setup(
     data: bytes,
     *,
     base_directory: str | Path | None = None,
+    collision: str = "reuse",
 ) -> tuple[CourseSetup, Path]:
     """Lege aus einer hochgeladenen Setupdatei einen lokal bekannten Kurs an."""
     info = setup_info(data)
-    base = (
-        Path(base_directory).expanduser().resolve()
-        if base_directory is not None
-        else Path.home() / "PyKIM-Kurse"
+    if not info.repository:
+        raise ValueError(
+            "Diese lokale Setupdatei gehört in ein Kurs-ZIP und besitzt keine "
+            "Onlinequelle. Importiere stattdessen das exportierte ZIP."
+        )
+    course = _managed_course_directory(
+        info, base_directory, collision=collision
     )
-    course = (base / Path(info.name).stem).resolve()
 
     # Erst vollständig synchronisieren; ein ungültiger oder nicht erreichbarer
     # Kurs wird dadurch nicht als halbfertiger Eintrag registriert.
@@ -137,6 +184,9 @@ def install_new_course_setup(
 
     sync_certificate_content(info)
     _write_course_setup(data, course)
+    from .course_archive import write_course_content_source
+
+    write_course_content_source(course, "repository")
 
     from .course import create_course, provision_course_exercises
 
@@ -150,6 +200,70 @@ def install_new_course_setup(
     refresh_assignments()
     provision_course_exercises(course)
     return info, course
+
+
+def install_new_course_archive(
+    data: bytes,
+    *,
+    base_directory: str | Path | None = None,
+    collision: str = "copy",
+) -> tuple[CourseSetup, Path]:
+    """Installiere einen geprüften ZIP-Snapshot vollständig ohne Netzwerk."""
+    from .course_archive import (
+        install_course_archive_content,
+        parse_course_archive,
+        write_course_content_source,
+    )
+
+    bundle = parse_course_archive(data)
+    course = _managed_course_directory(
+        bundle.setup, base_directory, collision=collision
+    )
+    install_course_archive_content(bundle)
+    _write_course_setup(bundle.setup_data, course)
+    write_course_content_source(
+        course, "archive", content_version=bundle.revision
+    )
+
+    from .course import create_course, provision_course_exercises
+
+    create_course(course)
+    from pykim.trainer.activities import refresh_activities
+    from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.exercises import refresh_exercises
+
+    refresh_exercises()
+    refresh_activities()
+    refresh_assignments()
+    provision_course_exercises(course)
+    return bundle.setup, course
+
+
+def install_course_archive(data: bytes, course: str | Path) -> CourseSetup:
+    """Aktiviere einen ZIP-Snapshot in einem bestehenden Student Workspace."""
+    from .course_archive import (
+        install_course_archive_content,
+        parse_course_archive,
+        write_course_content_source,
+    )
+
+    bundle = parse_course_archive(data)
+    install_course_archive_content(bundle)
+    _write_course_setup(bundle.setup_data, course)
+    write_course_content_source(
+        course, "archive", content_version=bundle.revision
+    )
+    from .course import provision_course_exercises
+
+    from pykim.trainer.activities import refresh_activities
+    from pykim.trainer.assignments import refresh_assignments
+    from pykim.trainer.exercises import refresh_exercises
+
+    refresh_exercises()
+    refresh_activities()
+    refresh_assignments()
+    provision_course_exercises(course)
+    return bundle.setup
 
 
 def sync_installed_course_content(
@@ -168,6 +282,17 @@ def sync_installed_course_content(
     info = course_setup_info(selected)
     if info is None:
         return TrainerVerification(False, False, "Keine Kurs-Setupdatei installiert.")
+
+    from .course_archive import course_content_source
+
+    source = course_content_source(selected)
+    if source.get("type") == "archive":
+        activate_installed_course_content(selected)
+        return TrainerVerification(
+            False,
+            False,
+            "Lokales Kursarchiv ist aktiv; es ist kein Online-Abgleich nötig.",
+        )
 
     previous = active_content_root(PACKAGED_CONTENT_ROOT)
     target = sync_certificate_content(info, timeout=timeout)
@@ -217,7 +342,7 @@ def generate_course_setup(
     teacher: str,
     school: str,
     course: str,
-    repository: str,
+    repository: str = "",
     branch: str = "main",
     scripts_path: str = "Skripte",
     assignments_path: str = "Aufgaben",

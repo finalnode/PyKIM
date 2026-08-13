@@ -1,6 +1,6 @@
 # <img src="packaging/macos/assets/app-icon-master.png" alt="PyKIM-Logo" width="72" align="center"> PyKIM
 
-PyKIM 0.5.4.1 ist eine deutschsprachige Python-Lernumgebung auf Basis von
+PyKIM 0.5.5 ist eine deutschsprachige Python-Lernumgebung auf Basis von
 [Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
 bewegt sich durch eine 160 × 120 Pixel große Welt, liest und verändert Farben,
 zeichnet Spuren und spielt Töne. Dieselben Grundlagen lassen sich zuerst mit
@@ -16,14 +16,14 @@ verwenden.
 
 ## PyKIM Suite herunterladen
 
-> **Desktop-Version 0.5.4.1 – fertige Builds für alle unterstützten Systeme**
+> **Desktop-Version 0.5.5 – fertige Builds für alle unterstützten Systeme**
 
 | Betriebssystem | Architektur | Download |
 |---|---|---|
-| Windows | x86_64 | **[Windows-App herunterladen (.zip)](https://github.com/finalnode/PyKIM/releases/download/v0.5.4.1/PyKIM-Suite-0.5.4.1-windows-x86_64.zip)** |
-| macOS | Apple Silicon (`arm64`) | **[macOS-App für M1/M2/M3/M4 herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.4.1/PyKIM-Suite-0.5.4.1-macos-arm64.dmg)** |
-| macOS | Intel (`x86_64`) | **[macOS-App für Intel herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.4.1/PyKIM-Suite-0.5.4.1-macos-x86_64.dmg)** |
-| Linux | x86_64 | **[Linux-App herunterladen (.tar.gz)](https://github.com/finalnode/PyKIM/releases/download/v0.5.4.1/PyKIM-Suite-0.5.4.1-linux-x86_64.tar.gz)** |
+| Windows | x86_64 | **[Windows-App herunterladen (.zip)](https://github.com/finalnode/PyKIM/releases/download/v0.5.5/PyKIM-Suite-0.5.5-windows-x86_64.zip)** |
+| macOS | Apple Silicon (`arm64`) | **[macOS-App für M1/M2/M3/M4 herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.5/PyKIM-Suite-0.5.5-macos-arm64.dmg)** |
+| macOS | Intel (`x86_64`) | **[macOS-App für Intel herunterladen (.dmg)](https://github.com/finalnode/PyKIM/releases/download/v0.5.5/PyKIM-Suite-0.5.5-macos-x86_64.dmg)** |
+| Linux | x86_64 | **[Linux-App herunterladen (.tar.gz)](https://github.com/finalnode/PyKIM/releases/download/v0.5.5/PyKIM-Suite-0.5.5-linux-x86_64.tar.gz)** |
 
 **Direkt mit dem Beispielkurs starten:**
 
@@ -31,7 +31,7 @@ verwenden.
 - **[Inhalte des Beispielkurses ansehen](https://github.com/finalnode/PyKIM_Kurs)** – Skripte, Aufgaben und automatische Trainer
 
 Die Builds werden durch GitHub Actions geprüft und anschließend dauerhaft im
-[GitHub Release v0.5.4.1](https://github.com/finalnode/PyKIM/releases/tag/v0.5.4.1)
+[GitHub Release v0.5.5](https://github.com/finalnode/PyKIM/releases/tag/v0.5.5)
 bereitgestellt. Die Apps sind derzeit noch nicht signiert oder notarisiert.
 
 Zum Projekt gehören zwei eng verbundene Teile:
@@ -869,21 +869,93 @@ Der Katalog ist bereits als allgemeine Plattformfunktion angelegt. Mit der
 späteren Umbenennung zur CS Suite soll er auch Kurse aufnehmen, die PyKIM nicht
 verwenden und andere Themen oder Werkzeuge der Informatik bereitstellen.
 
-### Geplante portable Kursquellen
+### Portable Kursarchive und geplante Git-Quellen
 
-In kommenden Versionen soll die Suite Kurse nicht nur aus GitHub beziehen.
-Geplant sind sowohl Git-Repositories unabhängig von Anbieter oder Hoster –
-einschließlich selbst betriebener Git-Server – als auch portable Kursarchive.
-Ein Archiv soll einen vollständigen, direkt importierbaren Kursstand enthalten,
-sodass zum Einrichten weder ein Git-Client noch eine Internetverbindung nötig
-ist.
+Die Kursauswahl akzeptiert neben `.pykim-setup`-Dateien auch portable ZIP-
+Archive. Ein solches Archiv enthält genau eine Setupdatei sowie die sichtbaren
+Markdown- und Trainerdateien aus `Skripte/`, `Aufgaben/` und `Trainer/`. Ein
+gemeinsamer Oberordner, wie ihn Repository-Downloads häufig verwenden, ist
+zulässig. Dateien und Ordner, deren Name mit `_` beginnt, werden wie beim
+Repositoryimport ignoriert.
 
-Damit sollen Lernende App, Kursarchive und ihre Arbeitsordner auf einem mit
-exFAT formatierten USB-Stick mitnehmen und unter Windows, macOS und Linux
-vollständig offline arbeiten können. Kursformat und Dateipfade sollen dabei
-keine betriebssystemspezifischen Annahmen voraussetzen. Synchronisation und ein
-Online-Kurskatalog bleiben optionale Komfortfunktionen, aber keine Voraussetzung
-für die Arbeit mit einem lokal bereitgestellten Kurs.
+Über **Kurs erstellen** in der Kursauswahl öffnet sich die kleine, in die Suite
+integrierte **PyKIM Kurswerkstatt**. Sie legt bei Bedarf `Skripte/`, `Aufgaben/`
+und `Trainer/` an. Skriptkapitel können dort vollständig als Markdown geschrieben
+werden. Für PyKIM-Aufgaben erzeugt die Werkstatt Aufgaben-Markdown und eine
+gekoppelte, deklarative Trainer-YAML aus sicheren Prüfbausteinen; beide Dateien
+können anschließend direkt weiterbearbeitet und gemeinsam validiert gespeichert
+werden.
+
+Die Arbeitsoberfläche verwendet dabei dieselbe Grundidee wie ein geöffneter
+Kurs: Eine dynamische Inhaltsliste zeigt Skripte und Aufgaben nach Lernweg, der
+gewählte Titel öffnet sich im Editor und kann jederzeit in eine Vorschau
+umgeschaltet werden. Die Vorschau nutzt dieselbe Markdown-Aufbereitung wie die
+spätere Lernendenansicht und zeigt bei Aufgaben zusätzlich Hinweise, Quellen,
+Tags und die konfigurierten automatischen Tests. Hinweise werden als wiederholte
+`@hint:`-Zeilen gespeichert; Aufgabentags stehen kompakt in
+`@tags: schleifen, pixel, ...`.
+
+Diese Erweiterung des normalen Markdown heißt im Projekt **M@rkdown**. Ein
+eigener Parser erkennt Annotationen und Codeblöcke, während der Validator unter
+anderem unbekannte oder falsch platzierte Annotationen, ungültige Tags und
+Quellen, doppelte Angaben sowie nicht geschlossene Codeblöcke mit konkreter
+Zeilennummer meldet. Kurswerkstatt, Vorschau und Speichern verwenden denselben
+Validator, damit fehlerhafte Autorenmetadaten nicht erst bei Lernenden auffallen.
+
+Ein Repository ist dafür nicht erforderlich. Die Werkstatt erzeugt mit einem
+Klick sowohl die Setupdatei im Kursstamm als auch ein importierbares Offline-ZIP.
+Ein rein lokaler Kurs trägt keine Onlinequelle und wird nach dem ZIP-Import auch
+nicht synchronisiert. Optional kann eine GitHub-Adresse eingetragen und der
+vollständige Kursordner als Repository veröffentlicht werden. Liegt die
+Setupdatei im Kursstamm, ist dann auch ein direkt beim Git-Hoster
+heruntergeladenes Repository-ZIP als Kurs importierbar. Weitere Git-Anbieter
+bleiben wie unten beschrieben eine geplante Ausbaustufe.
+
+Ein Kurs muss dabei nicht dem vollständigen PyKIM-Standardkurs entsprechen. Er
+kann ausschließlich aus Skriptkapiteln, ausschließlich aus freien Aufgaben oder
+aus einer beliebigen Mischung bestehen. Freie Aufgaben erhalten in der Suite
+ein speicherbares Antwortfeld und benötigen keine Trainerdatei. Nur wenn eine
+Aufgabe automatisch geprüft werden soll, werden Aufgaben-Markdown und
+Trainer-YAML als gekoppeltes Paar angelegt. Für den Export genügt mindestens
+eine sichtbare Skript-, Aufgaben- oder Trainerdatei.
+
+Wird ein bereits gefüllter Ordner als Kursprojekt geöffnet, kann die Werkstatt
+dessen Markdown-, Text- und YAML-Dateien analysieren. Sie schlägt anhand von
+Dateiformat, M@rkdown-Annotationen und Inhalt eine Zuordnung als Skript, freie
+Aufgabe, Trainer oder „Ignorieren“ vor. Jede Zuordnung kann vor der Übernahme
+geändert werden. Die einsortierten Kursdateien werden als Kopien angelegt; die
+ursprüngliche Materialsammlung wird nicht gelöscht oder überschrieben.
+
+Perspektivisch sollen die Bedienung der Suite und das Erstellen eigener Kurse
+selbst über frei verfügbare Kurse vermittelt werden: ein Einstiegskurs für die
+Suite sowie ein Kurs „Eigene Kurse erstellen“, der die Kurswerkstatt praktisch
+begleitet.
+
+Das ZIP wird vollständig lokal geprüft, gehasht und versioniert installiert.
+Pfadtraversal, symbolische Links, verschlüsselte ZIP-Einträge, mehrdeutige
+Groß-/Kleinschreibung, zu viele Dateien und entpackt zu große Archive werden
+abgewiesen. Nach erfolgreichem Import ist kein Git-Client und keine
+Internetverbindung erforderlich; beim Öffnen eines Archivkurses findet kein
+Online-Abgleich statt.
+
+Lehrkräfte erzeugen ein passendes Archiv aus einem Kursordner und dessen
+Setupdatei mit:
+
+```bash
+python tools/build_course_archive.py /pfad/zum/PyKIM_Kurs \
+  examples/course-setups/pykim-standardkurs.pykim-setup \
+  --output pykim-standardkurs.zip
+```
+
+Existiert der reguläre Zielordner bereits, fragt die Suite, ob der Kursstand den
+bestehenden Kurs aktualisieren oder als separater Kurs angelegt werden soll.
+Die sichere Voreinstellung ist ein zweiter Ordner mit einer fortlaufenden
+Endung wie `-2`; Schülerlösungen und Projekte werden dabei nicht überschrieben.
+
+Damit können Lernende App, Kursarchiv und Arbeitsordner auf einem mit exFAT
+formatierten USB-Stick mitnehmen und unter Windows, macOS und Linux vollständig
+offline arbeiten. Als weitere Ausbaustufe sind Git-Repositories unabhängig von
+Anbieter oder Hoster einschließlich selbst betriebener Git-Server vorgesehen.
 
 ### Heutige Trennung von Kursquelle und Student Workspace
 
@@ -1343,7 +1415,7 @@ Das ZIP enthält den vollständigen Ordner `PyKIM Suite`. Nach dem Entpacken wir
 `PyKIM Suite.exe` gestartet. Beispiel:
 
 ```text
-dist/releases/windows/PyKIM-Suite-0.5.4.1-windows-x86_64.zip
+dist/releases/windows/PyKIM-Suite-0.5.5-windows-x86_64.zip
 ```
 
 Unter Windows gehören zwei `PyKIM Suite.exe`-Prozesse zum normalen nativen
@@ -1375,7 +1447,7 @@ Nach dem Entpacken wird die Suite gestartet mit:
 Das Release-Archiv heißt beispielsweise:
 
 ```text
-dist/releases/linux/PyKIM-Suite-0.5.4.1-linux-x86_64.tar.gz
+dist/releases/linux/PyKIM-Suite-0.5.5-linux-x86_64.tar.gz
 ```
 
 ### macOS
@@ -1408,7 +1480,7 @@ python tools/build_macos_dmg.py --rebuild-app
 Der Dateiname enthält Version und Architektur, beispielsweise:
 
 ```text
-PyKIM-Suite-0.5.4.1-macos-x86_64.dmg
+PyKIM-Suite-0.5.5-macos-x86_64.dmg
 ```
 
 Der Build muss auf derselben macOS-Architektur wie das Ziel erzeugt werden.
@@ -1460,14 +1532,14 @@ Git-Historie committed.
 
 Jeder Build prüft den enthaltenen Python-Runner; unter Windows wird zusätzlich
 kontrolliert, ob die gebaute App tatsächlich ein sichtbares Fenster erzeugt.
-Erst danach wird das Artefakt hochgeladen. Ein Tag nach dem Schema `v0.5.4.1`
+Erst danach wird das Artefakt hochgeladen. Ein Tag nach dem Schema `v0.5.5`
 startet dieselbe Matrix und erstellt
 anschließend ein GitHub Release beziehungsweise ergänzt ein bereits vorhandenes
 Release um alle vier Dateien:
 
 ```bash
-git tag v0.5.4.1
-git push origin v0.5.4.1
+git tag v0.5.5
+git push origin v0.5.5
 ```
 
 Die Versionsnummer im Tag muss der Version in `pyproject.toml` und

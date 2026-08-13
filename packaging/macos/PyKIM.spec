@@ -28,6 +28,10 @@ hiddenimports += collect_submodules("pykim.trainer.exercises")
 
 datas += collect_data_files("pykim", include_py_files=False)
 datas += collect_data_files("pykim.examples", include_py_files=True)
+datas.append((
+    str(project / "packaging" / "macos" / "assets" / "app-icon-master.png"),
+    "pykim/guide/assets",
+))
 hiddenimports += ["pykim.examples"]
 hiddenimports += [
     "engineio.async_drivers.aiohttp",

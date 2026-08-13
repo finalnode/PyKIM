@@ -62,12 +62,15 @@ def parse_course_catalog(data: bytes) -> tuple[CatalogCourse, ...]:
         ):
             raise ValueError("Der Kurskatalog enthält ungültige oder doppelte Einträge.")
         setup_data = json.dumps(entry["setup"], ensure_ascii=False).encode("utf-8")
+        parsed_setup = setup_info(setup_data)
+        if not parsed_setup.repository:
+            raise ValueError("Ein öffentlicher Kurs benötigt ein GitHub-Repository.")
         result.append(CatalogCourse(
             identifier,
             entry["description"].strip(),
             entry["level"].strip(),
             tuple(tag.strip() for tag in entry["tags"]),
-            setup_info(setup_data),
+            parsed_setup,
             setup_data,
         ))
         seen.add(identifier)

@@ -1,6 +1,7 @@
 """NiceGUI-Prototyp für Setup, Aufgabenübersicht und Dokubuch."""
 
 import argparse
+import base64
 import asyncio
 import json
 import platform
@@ -14,11 +15,21 @@ from pykim.trainer.activities import get_activity
 from pykim.trainer.assignments import get_assignment
 from .course_setup import (
     activate_installed_course_content,
+    course_import_target,
     course_setup_info,
+    install_course_archive,
     install_course_setup,
+    install_new_course_archive,
     install_new_course_setup,
+    setup_info,
     sync_installed_course_content,
 )
+from .course_archive import (
+    MAX_ARCHIVE_SIZE,
+    course_content_source,
+    parse_course_archive,
+)
+from .course_studio_view import register_course_studio_page
 # Der verschlüsselte Abgabeexport ist vorerst ausgeblendet und bleibt als
 # getrennte technische Vorarbeit erhalten; er ist kein Teil der Kurs-Setupdatei.
 from pykim.submission.export import (
@@ -163,6 +174,54 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(arguments)
 
 
+def app_icon_path() -> Path | str:
+    """Nutze im Checkout das echte PyKIM-Icon und sonst den Emoji-Fallback."""
+    project_icon = (
+        Path(__file__).resolve().parents[3]
+        / "packaging"
+        / "macos"
+        / "assets"
+        / "app-icon-master.png"
+    )
+    bundled_icon = Path(__file__).resolve().parent / "assets" / "app-icon.png"
+    if bundled_icon.is_file():
+        return bundled_icon
+    return project_icon if project_icon.is_file() else "🤖"
+
+
+def browser_favicon() -> str:
+    """Bette das kleine Icon direkt ein und umgehe den aggressiven Favicon-Cache."""
+    favicon = Path(__file__).resolve().parent / "assets" / "app-icon-64.png"
+    if not favicon.is_file():
+        return "🤖"
+    encoded = base64.b64encode(favicon.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def apply_macos_app_icon(icon: Path | str) -> bool:
+    """Setze auch beim Start aus dem Quellcode das macOS-Dock-Icon."""
+    if not isinstance(icon, Path) or not icon.is_file():
+        return False
+    try:
+        from AppKit import NSApplication, NSImage
+
+        image = NSImage.alloc().initWithContentsOfFile_(str(icon))
+        if image is None:
+            return False
+        NSApplication.sharedApplication().setApplicationIconImage_(image)
+        return True
+    except Exception:
+        return False
+
+
+def configure_native_app_icon(native_config, icon: Path | str) -> bool:
+    """Reiche das Icon an den separaten pywebview/Cocoa-Prozess weiter."""
+    if not isinstance(icon, Path) or not icon.is_file():
+        return False
+    native_config.start_args["icon"] = str(icon)
+    return True
+
+
 def main(
     *,
     show: bool = True,
@@ -180,6 +239,9 @@ def main(
         ) from None
 
     register_script_api(nicegui_app)
+    register_course_studio_page(
+        ui, nicegui_app, nicegui_run, desktop=desktop
+    )
 
     course_sync_state: dict[str, object] = {
         "result": None,
@@ -194,6 +256,88 @@ def main(
         dirty_exercises: set[str] = set()
         # Farben des OSZ KIM: kräftiges Orange, technisches Grau und Weiß.
         configure_theme(ui)
+
+        async def confirm_external_course_import(
+            course_name: str = "der ausgewählte Kurs",
+            source: str = "",
+        ) -> bool:
+            """Hole vor dem Einrichten einer externen Kursquelle Zustimmung ein."""
+            with ui.dialog() as security_dialog, ui.card().classes("w-full max-w-xl"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("security", color="warning", size="md")
+                    ui.label("Externe Kursquelle importieren?").classes(
+                        "text-xl font-bold"
+                    )
+                ui.label(course_name).classes("font-bold")
+                if source:
+                    ui.label(source).classes("text-sm text-grey-7 break-all")
+                ui.label(
+                    "Die Suite prüft Struktur und Trainerdateien beim Import. "
+                    "Python-Programme aus Kursen laufen derzeit jedoch noch nicht "
+                    "auf jedem Betriebssystem in einer garantierten OS-Sandbox."
+                )
+                ui.label(
+                    "Erst beim späteren, bewussten Start eines Programms kann dessen "
+                    "Code mit deinen Benutzerrechten auf Dateien, Netzwerk oder "
+                    "weitere Systemfunktionen zugreifen. Importiere deshalb nur "
+                    "Kurse aus einer Quelle, der du vertraust."
+                ).classes("text-warning")
+                trust = ui.checkbox(
+                    "Ich vertraue der Quelle und möchte den Kurs importieren."
+                )
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button(
+                        "Abbrechen",
+                        on_click=lambda: security_dialog.submit(False),
+                    ).props("flat")
+                    confirm_button = ui.button(
+                        "Kurs importieren",
+                        icon="download",
+                        on_click=lambda: security_dialog.submit(True),
+                    ).props("color=warning")
+                    confirm_button.disable()
+                trust.on_value_change(
+                    lambda event: (
+                        confirm_button.enable()
+                        if event.value
+                        else confirm_button.disable()
+                    )
+                )
+            return bool(await security_dialog)
+
+        async def choose_course_collision(info) -> str | None:
+            """Frage bei einem belegten Ziel nach Kopie, Update oder Abbruch."""
+            target = course_import_target(info)
+            if not target.exists():
+                return "reuse"
+            with ui.dialog() as collision_dialog, ui.card().classes("w-full max-w-xl"):
+                ui.label("Kurs ist bereits vorhanden").classes("text-xl font-bold")
+                ui.label(
+                    f"Der reguläre Kursordner „{target.name}“ existiert bereits."
+                )
+                ui.label(
+                    "Als zweiten Kurs anlegen bewahrt beide Kursstände getrennt. "
+                    "Beim Aktualisieren bleiben vorhandene Schülerlösungen, Projekte "
+                    "und Lernstände erhalten; nur die aktive Kursquelle wird ersetzt."
+                ).classes("text-sm text-grey-7")
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button(
+                        "Abbrechen",
+                        on_click=lambda: collision_dialog.submit(None),
+                    ).props("flat")
+                    ui.button(
+                        "Bestehenden aktualisieren",
+                        icon="sync",
+                        on_click=lambda: collision_dialog.submit("reuse"),
+                    ).props("outline color=warning")
+                    ui.button(
+                        "Als zweiten Kurs anlegen",
+                        icon="content_copy",
+                        on_click=lambda: collision_dialog.submit("copy"),
+                    ).props("color=primary")
+            result = await collision_dialog
+            return result if result in {"reuse", "copy"} else None
+
         if not course_selection_state["confirmed"]:
             async def select_course(course: Path, card, button, sync_activity) -> None:
                 card.classes(add="pykim-course-opening")
@@ -224,6 +368,12 @@ def main(
                 with ui.row().classes("w-full items-baseline gap-3"):
                     ui.label("PyKIM Suite").classes("text-2xl font-bold text-primary")
                     ui.label("Kurs auswählen").classes("text-lg text-grey-7")
+                    ui.space()
+                    ui.button(
+                        "Kurs erstellen",
+                        icon="inventory_2",
+                        on_click=lambda: ui.navigate.to("/course-builder"),
+                    ).props("flat")
                 known_courses = get_course_directories()
                 for course in known_courses:
                     try:
@@ -387,16 +537,48 @@ def main(
                     with ui.column().classes("grow gap-0"):
                         ui.label("Kurs hinzufügen").classes("font-bold")
                         ui.label(
-                            "Eine .pykim-setup-Datei der Lehrkraft auswählen."
+                            "Eine .pykim-setup-Datei oder ein portables Kurs-ZIP auswählen."
                         ).classes("text-sm text-grey-7")
 
                     async def upload_new_course(event) -> None:
-                        course_import_activity.set_visibility(True)
                         course_upload.disable()
                         try:
+                            data = await event.file.read()
+                            filename = event.file.name or "Ausgewählte Kursdatei"
+                            is_archive = filename.casefold().endswith(".zip")
+                            if is_archive:
+                                bundle = await nicegui_run.io_bound(
+                                    parse_course_archive, data
+                                )
+                                info = bundle.setup
+                                source = f"Lokales ZIP-Archiv · {filename}"
+                            elif filename.casefold().endswith(".pykim-setup"):
+                                info = setup_info(data)
+                                source = info.repository
+                            else:
+                                raise ValueError(
+                                    "Wähle eine .pykim-setup- oder .zip-Datei."
+                                )
+                            course_import_activity.set_visibility(False)
+                            if not await confirm_external_course_import(
+                                info.course, source
+                            ):
+                                course_upload.reset()
+                                ui.notify("Kursimport abgebrochen.", type="info")
+                                return
+                            collision = await choose_course_collision(info)
+                            if collision is None:
+                                course_upload.reset()
+                                ui.notify("Kursimport abgebrochen.", type="info")
+                                return
+                            course_import_activity.set_visibility(True)
+                            installer = (
+                                install_new_course_archive
+                                if is_archive
+                                else install_new_course_setup
+                            )
                             info, course = await nicegui_run.io_bound(
-                                install_new_course_setup,
-                                await event.file.read(),
+                                installer, data, collision=collision
                             )
                             course_selection_state["confirmed"] = True
                             ui.notify(
@@ -420,20 +602,20 @@ def main(
                     def reject_course_import() -> None:
                         course_import_activity.set_visibility(False)
                         ui.notify(
-                            "Die Setupdatei konnte nicht hochgeladen werden.",
+                            "Die Kursdatei konnte nicht hochgeladen werden.",
                             type="negative",
                         )
 
                     with ui.column().classes("w-72 items-stretch gap-2"):
                         course_upload = ui.upload(
-                            label="Setupdatei auswählen",
+                            label="Setupdatei oder Kurs-ZIP auswählen",
                             on_begin_upload=begin_course_import,
                             on_upload=upload_new_course,
                             on_rejected=reject_course_import,
                             auto_upload=True,
                             max_files=1,
-                            max_file_size=1_000_000,
-                        ).props("accept=.pykim-setup flat bordered").classes("w-full")
+                            max_file_size=MAX_ARCHIVE_SIZE,
+                        ).props("accept=.pykim-setup,.zip flat bordered").classes("w-full")
                         with ui.column().classes(
                             "w-full gap-1 rounded border p-3 bg-orange-1"
                         ) as course_import_activity:
@@ -444,8 +626,8 @@ def main(
                                 "indeterminate rounded"
                             )
                             ui.label(
-                                "Setupdatei und Kursinhalt werden geprüft und von "
-                                "GitHub geladen. Der erste Import kann etwas dauern."
+                                "Kursdatei und Inhalte werden geprüft und eingerichtet. "
+                                "Bei Online-Kursen kann der erste Import etwas dauern."
                             ).classes("text-xs text-grey-7")
                         course_import_activity.set_visibility(False)
 
@@ -528,11 +710,24 @@ def main(
                                             status=install_status,
                                         ) -> None:
                                             button.disable()
-                                            status.set_visibility(True)
                                             try:
+                                                if not await confirm_external_course_import(
+                                                    item.setup.course,
+                                                    item.setup.repository,
+                                                ):
+                                                    button.enable()
+                                                    return
+                                                collision = await choose_course_collision(
+                                                    item.setup
+                                                )
+                                                if collision is None:
+                                                    button.enable()
+                                                    return
+                                                status.set_visibility(True)
                                                 info, _course = await nicegui_run.io_bound(
                                                     install_new_course_setup,
                                                     item.setup_data,
+                                                    collision=collision,
                                                 )
                                                 course_selection_state["confirmed"] = True
                                                 course_sync_state.update(
@@ -987,11 +1182,11 @@ def main(
                 ui.button("Kursordner anlegen oder ergänzen", on_click=setup, icon="create_new_folder")
 
                 ui.separator()
-                ui.label("Kurs-Setupdatei und Lerninhalte").classes("text-xl font-bold")
+                ui.label("Kursdatei und Lerninhalte").classes("text-xl font-bold")
                 ui.label(
-                    "Die Setupdatei legt Kurs, Repository, Branch und Inhaltspfade fest. "
-                    "Beim Import lädt die Suite den geprüften Kursinhalt und aktiviert "
-                    "ihn direkt. Sie enthält keine Schlüssel oder Verschlüsselungsdaten."
+                    "Eine Setupdatei lädt den Kurs aus seinem Repository. Ein portables "
+                    "Kurs-ZIP enthält denselben geprüften Stand für die vollständig "
+                    "offline nutzbare Einrichtung."
                 ).classes("text-sm text-grey-7")
                 setup_certificate_status = ui.column().classes("w-full gap-1")
 
@@ -1008,18 +1203,50 @@ def main(
                             ui.label("Noch keine Kurs-Setupdatei importiert.").classes("text-grey-7")
                         else:
                             ui.label(f"Kurs: {info.course}").classes("font-bold")
-                            ui.label(f"{info.repository} · {info.branch}")
+                            source = course_content_source(course)
+                            if source.get("type") == "archive":
+                                ui.label("Quelle: lokales Kurs-ZIP · offline")
+                            else:
+                                ui.label(f"{info.repository} · {info.branch}")
 
-                async def import_setup_certificate(data: bytes) -> None:
+                async def import_setup_certificate(
+                    data: bytes,
+                    filename: str = "course.pykim-setup",
+                ) -> None:
                     course = Path(path.value).expanduser().resolve()
                     if not course.is_dir():
                         ui.notify("Lege zuerst den Kursordner an.", type="warning")
                         return
+                    is_archive = filename.casefold().endswith(".zip")
+                    if is_archive:
+                        bundle = await nicegui_run.io_bound(parse_course_archive, data)
+                        candidate = bundle.setup
+                        source = f"Lokales ZIP-Archiv · {filename}"
+                    elif filename.casefold().endswith(".pykim-setup"):
+                        candidate = setup_info(data)
+                        source = candidate.repository
+                    else:
+                        ui.notify(
+                            "Wähle eine .pykim-setup- oder .zip-Datei.",
+                            type="negative",
+                        )
+                        return
+                    if not await confirm_external_course_import(
+                        candidate.course,
+                        source,
+                    ):
+                        ui.notify("Kursimport abgebrochen.", type="info")
+                        return
                     certificate_activity.set_visibility(True)
                     certificate_button.disable()
                     try:
+                        installer = (
+                            install_course_archive
+                            if is_archive
+                            else install_course_setup
+                        )
                         info = await nicegui_run.io_bound(
-                            install_course_setup, data, course
+                            installer, data, course
                         )
                         render_setup_certificate()
                         from pykim.trainer.activities import refresh_activities
@@ -1048,32 +1275,42 @@ def main(
                     )
                     if selected:
                         certificate_path = Path(selected[0])
-                        if certificate_path.suffix != ".pykim-setup":
-                            ui.notify("Wähle eine .pykim-setup-Datei.", type="negative")
+                        if not (
+                            certificate_path.name.casefold().endswith(".pykim-setup")
+                            or certificate_path.suffix.casefold() == ".zip"
+                        ):
+                            ui.notify(
+                                "Wähle eine .pykim-setup- oder .zip-Datei.",
+                                type="negative",
+                            )
                             return
-                        await import_setup_certificate(certificate_path.read_bytes())
+                        await import_setup_certificate(
+                            certificate_path.read_bytes(), certificate_path.name
+                        )
 
                 async def upload_setup_certificate(event) -> None:
-                    await import_setup_certificate(await event.file.read())
+                    await import_setup_certificate(
+                        await event.file.read(), event.file.name
+                    )
 
                 with ui.row().classes("items-center gap-2"):
                     if desktop:
                         certificate_button = ui.button(
-                            "Kurs-Setupdatei auswählen",
+                            "Setupdatei oder Kurs-ZIP auswählen",
                             on_click=choose_setup_certificate,
                             icon="settings_suggest",
                         ).props("outline")
                     else:
                         certificate_button = ui.upload(
-                            label="Kurs-Setupdatei auswählen",
+                            label="Setupdatei oder Kurs-ZIP auswählen",
                             on_upload=upload_setup_certificate,
                             auto_upload=True,
-                            max_file_size=1_000_000,
-                        ).props("accept=.pykim-setup")
+                            max_file_size=MAX_ARCHIVE_SIZE,
+                        ).props("accept=.pykim-setup,.zip")
                     with ui.column().classes("gap-1") as certificate_activity:
                         with ui.row().classes("items-center gap-2"):
                             ui.spinner(size="sm", color="primary")
-                            ui.label("Kursinhalt wird von GitHub geladen …")
+                            ui.label("Kursinhalt wird geprüft und eingerichtet …")
                         ui.linear_progress(value=None, color="primary").props(
                             "indeterminate rounded"
                         ).classes("w-72")
@@ -2302,6 +2539,9 @@ def main(
     nicegui_app.on_shutdown(execution_manager.stop_all)
     nicegui_app.on_shutdown(script_example_manager.stop_all)
     port = None
+    icon = app_icon_path()
+    if desktop and platform.system() == "Darwin":
+        configure_native_app_icon(nicegui_app.native, icon)
     if desktop and platform.system() == "Windows":
         from nicegui.native.event_manager import event_manager
         from nicegui.native.native_mode import find_open_port
@@ -2313,7 +2553,7 @@ def main(
         )
     ui.run(
         title=f"PyKIM Suite {pykim.__version__}",
-        favicon="🤖",
+        favicon=browser_favicon(),
         host="127.0.0.1",
         port=port,
         reload=False,

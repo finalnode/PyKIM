@@ -39,6 +39,10 @@ elif system == "Linux":
 
 datas += collect_data_files("pykim", include_py_files=False)
 datas += collect_data_files("pykim.examples", include_py_files=True)
+datas.append((
+    str(project / "packaging" / "macos" / "assets" / "app-icon-master.png"),
+    "pykim/guide/assets",
+))
 
 wheelhouse = project / "dist" / "wheelhouse"
 if wheelhouse.is_dir():

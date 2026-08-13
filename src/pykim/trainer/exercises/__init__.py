@@ -10,9 +10,10 @@ def _discover_exercises() -> dict[str, Exercise]:
     from pykim.guide.updates import active_content_root
 
     packaged_root = Path(__file__).resolve().parents[2] / "guide"
-    bundled = packaged_root / "Trainer" / "definitions.yml"
     updated = active_content_root(packaged_root) / "Trainer"
-    return load_exercises(updated if list(updated.glob("*.yml")) else bundled)
+    # Ein bewusst trainerloser Kurs darf nicht auf die eingebauten PyKIM-
+    # Aufgaben zurückfallen. Nur der tatsächlich aktive Inhaltsstand zählt.
+    return load_exercises(updated) if updated.is_dir() else {}
 
 
 _EXERCISES = _discover_exercises()

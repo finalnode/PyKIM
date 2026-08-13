@@ -3,7 +3,7 @@
 import re
 from collections import deque
 
-__version__ = "0.5.4.1"
+__version__ = "0.5.5"
 
 WIDTH = 160
 HEIGHT = 120

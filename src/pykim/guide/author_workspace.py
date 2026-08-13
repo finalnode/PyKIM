@@ -11,6 +11,7 @@ from pykim.trainer.exercises import get_exercise
 from pykim.trainer.definitions import exercise_from_data
 
 from .library import task_document
+from .markedown import validate_markedown
 
 
 @dataclass(frozen=True)
@@ -30,14 +31,26 @@ def assignment_markdown(
     summary: str,
     requirements: str,
     difficulty: str,
+    *,
+    hints: tuple[str, ...] | list[str] = (),
+    tags: tuple[str, ...] | list[str] = (),
 ) -> str:
     bullets = [line.strip().removeprefix("- ") for line in requirements.splitlines() if line.strip()]
     if not bullets:
         bullets = ["Beschreibe hier das überprüfbare Ziel."]
+    metadata = [f"@difficulty:{difficulty}"]
+    clean_tags = tuple(
+        dict.fromkeys(
+            tag.strip().casefold().replace(" ", "-") for tag in tags if tag.strip()
+        )
+    )
+    if clean_tags:
+        metadata.append("@tags: " + ", ".join(clean_tags))
+    metadata.extend(f"@hint: {hint.strip()}" for hint in hints if hint.strip())
     return "\n".join(
         [
             f"# {title.strip()}",
-            f"@difficulty:{difficulty}",
+            *metadata,
             "",
             summary.strip(),
             "",
@@ -70,6 +83,10 @@ def validate_author_draft(draft: AuthorDraft) -> tuple[str, ...]:
         issues.append("Im Markdown fehlt @difficulty:.")
     if not any(line.startswith("- ") for line in lines):
         issues.append("Im Markdown fehlt mindestens eine überprüfbare Anforderung.")
+    issues.extend(
+        f"M@rkdown Zeile {issue.line}: {issue.message}"
+        for issue in validate_markedown(draft.assignment_markdown, kind="task")
+    )
     return tuple(issues)
 
 

@@ -20,6 +20,10 @@ def _refresh_remote_trainers() -> None:
         course = get_course_directory()
         if course is None:
             return
+        from pykim.guide.course_archive import course_content_source
+
+        if course_content_source(course).get("type") == "archive":
+            return
         setup = course_setup_info(course)
         if setup is None:
             return

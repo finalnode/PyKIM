@@ -23,6 +23,10 @@ _TASK_HINT = re.compile(
     r"^@hint:[ \t]*(?P<body>.+?)[ \t]*$",
     flags=re.MULTILINE,
 )
+_TASK_TAGS = re.compile(
+    r"^@tags:[ \t]*(?P<body>.+?)[ \t]*$",
+    flags=re.MULTILINE,
+)
 
 
 @dataclass(frozen=True)
@@ -128,7 +132,9 @@ def task_assignment(name: str) -> TaskAssignment:
     document = task_document(name)
     if document is None:
         raise ValueError(f"Für {name!r} fehlt die Aufgabenstellung.")
-    metadata_content = _TASK_HINT.sub("", _ANNOTATED_TASK_BLOCK.sub("", document.content))
+    metadata_content = _TASK_TAGS.sub(
+        "", _TASK_HINT.sub("", _ANNOTATED_TASK_BLOCK.sub("", document.content))
+    )
     lines = metadata_content.splitlines()
     difficulty = next(
         (
@@ -140,7 +146,9 @@ def task_assignment(name: str) -> TaskAssignment:
     )
     body_lines = [
         line for line in lines
-        if not line.startswith("@difficulty:") and not line.startswith("@source:")
+        if not line.startswith("@difficulty:")
+        and not line.startswith("@source:")
+        and not line.startswith("@tags:")
     ]
     summary = next(
         (
@@ -170,6 +178,8 @@ def render_task_markdown(content: str) -> str:
             continue
         if line.startswith("@source:"):
             continue
+        if line.startswith("@tags:"):
+            continue
         if not heading_hidden and line.startswith("# "):
             heading_hidden = True
             continue
@@ -184,6 +194,17 @@ def task_hints(content: str) -> tuple[str, ...]:
         for match in _TASK_HINT.finditer(content)
         if match.group("body").strip()
     )
+
+
+def task_tags(content: str) -> tuple[str, ...]:
+    """Lese eindeutige Aufgabentags aus ``@tags: a, b, c``."""
+    tags: list[str] = []
+    for match in _TASK_TAGS.finditer(content):
+        for value in match.group("body").split(","):
+            tag = value.strip()
+            if tag and tag not in tags:
+                tags.append(tag)
+    return tuple(tags)
 
 
 def task_sources(content: str) -> tuple[TaskSource, ...]:

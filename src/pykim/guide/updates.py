@@ -160,11 +160,26 @@ def active_content_root(packaged_root: Path) -> Path:
     course_specific = False
     try:
         from .course import get_course_directory
+        from .course_archive import course_content_source
         from .course_setup import course_setup_info
 
         course = get_course_directory()
         setup = course_setup_info(course) if course is not None else None
         if setup is not None:
+            source = course_content_source(course)
+            archive_version = source.get("content_version")
+            if source.get("type") == "archive" and archive_version:
+                marker_data = {"content_version": archive_version}
+                version = str(marker_data["content_version"])
+                root = content_directory() / "versions" / version
+                manifest = json.loads(
+                    (root / "content-manifest.json").read_text(encoding="utf-8")
+                )
+                if root.is_dir() and isinstance(manifest, dict):
+                    if root not in _VALIDATED_CONTENT_ROOTS:
+                        _validate_content(root, manifest)
+                        _VALIDATED_CONTENT_ROOTS.add(root)
+                    return root
             marker = _course_active_marker(setup)
             course_specific = True
     except (OSError, ValueError):
@@ -354,12 +369,10 @@ def _course_content_paths(tree: object, configuration) -> set[str]:
             if name.startswith(root + "/") and name.endswith(suffix):
                 result.add(name)
                 break
-    if not any(name.startswith(configuration.scripts_path.rstrip("/") + "/") for name in result):
-        raise ValueError("Das Repository enthält keine sichtbaren Skripte.")
-    if not any(name.startswith(configuration.assignments_path.rstrip("/") + "/") for name in result):
-        raise ValueError("Das Repository enthält keine sichtbaren Aufgaben.")
-    if not any(name.startswith(configuration.trainers_path.rstrip("/") + "/") for name in result):
-        raise ValueError("Das Repository enthält keine sichtbaren Trainer.")
+    if not result:
+        raise ValueError(
+            "Das Repository enthält weder sichtbare Skripte noch Aufgaben oder Trainer."
+        )
     return result
 
 
@@ -442,21 +455,25 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
         timeout,
     )
     raw = f"https://raw.githubusercontent.com/{repository}/{revision}"
-    trainer_hashes = json.loads(
-        _download(f"{raw}/.pykim/trainer-hashes.json", timeout).decode("utf-8")
-    )
-    trainer_entries = _hash_entries(trainer_hashes)
     trainer_prefix = configuration.trainers_path.rstrip("/") + "/"
-    if set(trainer_entries) != {
-        name for name in trainer_entries if name.startswith(trainer_prefix)
-    }:
-        raise ValueError("Die Trainer-Hashliste enthält fremde Dateien.")
     content_paths = _course_content_paths(tree, configuration)
     discovered_trainers = {
         name for name in content_paths if name.startswith(trainer_prefix)
     }
-    if set(trainer_entries) != discovered_trainers:
-        raise ValueError("Trainer-Hashliste und sichtbare Trainerdateien passen nicht zusammen.")
+    trainer_entries = {}
+    if discovered_trainers:
+        trainer_hashes = json.loads(
+            _download(f"{raw}/.pykim/trainer-hashes.json", timeout).decode("utf-8")
+        )
+        trainer_entries = _hash_entries(trainer_hashes)
+        if set(trainer_entries) != {
+            name for name in trainer_entries if name.startswith(trainer_prefix)
+        }:
+            raise ValueError("Die Trainer-Hashliste enthält fremde Dateien.")
+        if set(trainer_entries) != discovered_trainers:
+            raise ValueError(
+                "Trainer-Hashliste und sichtbare Trainerdateien passen nicht zusammen."
+            )
     if len(content_paths) > MAX_CONTENT_FILES:
         raise ValueError("Der Remote-Inhalt enthält zu viele Dateien.")
 
@@ -517,11 +534,13 @@ def sync_certificate_content(configuration, timeout: float = 20.0) -> Path:
             from pykim.trainer.definitions import load_exercises
             from pykim.trainer.activities import load_activities
 
-            load_exercises(staging / configuration.trainers_path)
-            load_activities(
-                staging / configuration.trainers_path,
-                staging / configuration.assignments_path,
-            )
+            trainer_directory = staging / configuration.trainers_path
+            if trainer_directory.is_dir():
+                load_exercises(trainer_directory)
+                load_activities(
+                    trainer_directory,
+                    staging / configuration.assignments_path,
+                )
             (staging / "content-manifest.json").write_text(
                 json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
             )
