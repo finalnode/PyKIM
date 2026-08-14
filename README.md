@@ -16,6 +16,27 @@ Seit Version 0.6.0 werden PyKIM und in:si unabhängig veröffentlicht. PyKIM
 enthält ausschließlich Pixelwelt, Laufzeit und Trainerkern; Desktop-App,
 Kursverwaltung und Autorenwerkzeuge gehören zu in:si.
 
+## Funktionsumfang in Version 0.6.0
+
+- einsteigerfreundliche Befehle für Bewegung, Position, Farben und Malspuren;
+- eine objektorientierte API mit `World`, `Pixel` und eigenen
+  Pixel-Unterklassen;
+- eine Pixelwelt mit 160 × 120 Feldern und der 16-farbigen Pyxel-Palette;
+- Farbsensoren für das aktuelle, ein benachbartes oder ein frei angegebenes
+  Feld;
+- farbbasierte Hindernisse, Weltranderkennung und Sammelobjekte;
+- mehrere Figuren sowie gemeinsam animierte Bewegungen über
+  `world.parallel()`;
+- Töne, Pausen, regelbare Animation und eigene `update()`-/`draw()`-Hooks;
+- voneinander unabhängige `Runtime`-Instanzen für Anwendungen und Tests;
+- fachliche Prüfmodelle und eine optionale Trainer-Provider-Schnittstelle für
+  Lernplattformen wie [in:si](https://github.com/finalnode/insi);
+- ausführbare Beispiele und automatisierte Tests für Kern- und Weltlogik.
+
+PyKIM enthält bewusst **keine** Desktop-Oberfläche, Kursverwaltung,
+Schülerkonten oder konkreten Kursfortschritt. Diese Aufgaben übernimmt eine
+Host-Anwendung; das Pythonmodul bleibt dadurch auch eigenständig nutzbar.
+
 ## Installation
 
 ```bash
@@ -78,10 +99,10 @@ run()
 | Funktion | Wirkung |
 |---|---|
 | `set_color(color)` | aktuelle Farbe wählen |
-| `paint(color=None)` | aktuelles Feld malen |
-| `paint_start(color=None)` | Malspur einschalten |
+| `paint(color=None)` | aktuelles Feld malen und Malspur einschalten |
+| `paint_start(color=None)` | kompatibler Alias für `paint()` |
 | `paint_stop()` | Malspur ausschalten |
-| `paint_path(color=None)` | Malspur einschalten und Startfeld malen |
+| `paint_path(color=None)` | kompatibler Alias für `paint()` |
 | `get_color(...)` | Farbe am aktuellen, benachbarten oder angegebenen Feld lesen |
 | `count_color(color)` | Felder einer Farbe zählen |
 
@@ -92,15 +113,26 @@ PyKIM verwendet die 16 Farben der Pyxel-Standardpalette, beispielsweise
 ### Welten, Hindernisse und Sammelobjekte
 
 ```python
-world.background("dark_blue")
-world.obstacle_color("red")
+world.set_background("dark_blue")
+world.set_obstacle("red")
 
-if obstacle("right"):
+if "right" in get_obstacles():
     down()
 
-collect("yellow")
-print(items_left("yellow"))
+collected_color = collect()
+print(collected_color)
+print(items_left("yellow"))  # Liegt noch ein gelbes Feld in der Welt?
 ```
+
+| Funktion | Wirkung |
+|---|---|
+| `world.set_background(color)` | Hintergrund setzen und Welt leeren |
+| `world.set_obstacle(*colors)` | Farben als unpassierbar markieren |
+| `world.remove_obstacle(*colors)` | einzelne Hindernisfarben wieder freigeben |
+| `world.clear_obstacles()` | alle Hindernisfarben freigeben |
+| `get_obstacles()` | angrenzende Hindernisse und Weltränder als Richtungen lesen |
+| `collect()` | Farbe unter KIM einsammeln und ihren Namen zurückgeben |
+| `items_left(color)` | prüfen, ob ein Feld dieser Farbe übrig ist |
 
 Hindernisse werden über eine definierte Farbe markiert. KIM kann benachbarte
 Felder prüfen, ohne die Weltlogik an eine bestimmte Labyrinthdarstellung zu
@@ -113,8 +145,8 @@ Aufgaben, Spielen und automatischen Tests gleich verwendet werden.
 |---|---|
 | `play_tone(note, beats=1)` | Note wie `"C4"` abspielen |
 | `play_pause(beats=1)` | Pause einfügen |
-| `speed(value)` | Animationsgeschwindigkeit setzen |
-| `animate(enabled=True)` | schrittweise Animation schalten |
+| `speed(value)` | Animationsgeschwindigkeit von 1 bis 100 setzen |
+| `animate(delay=0.1)` | schrittweise Animation mit Verzögerung aktivieren |
 | `run(check=None)` | Welt starten; optional einen extern bereitgestellten Trainer auswerten |
 
 ## Objektorientierte API
