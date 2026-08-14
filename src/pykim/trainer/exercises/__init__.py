@@ -1,16 +1,12 @@
 """Registry der sicher aus YAML geladenen PyKIM-Aufgaben."""
 
-from pathlib import Path
-
 from pykim.trainer.definitions import load_exercises
+from pykim.trainer.content import trainer_content_root
 from pykim.trainer.models import Exercise
 
 
-def _discover_exercises() -> dict[str, Exercise]:
-    from pykim.guide.updates import active_content_root
-
-    packaged_root = Path(__file__).resolve().parents[2] / "guide"
-    updated = active_content_root(packaged_root) / "Trainer"
+def _discover_exercises(content_root=None, trainers_path: str = "Trainer") -> dict[str, Exercise]:
+    updated = (content_root or trainer_content_root()) / trainers_path
     # Ein bewusst trainerloser Kurs darf nicht auf die eingebauten PyKIM-
     # Aufgaben zurückfallen. Nur der tatsächlich aktive Inhaltsstand zählt.
     return load_exercises(updated) if updated.is_dir() else {}
@@ -19,10 +15,10 @@ def _discover_exercises() -> dict[str, Exercise]:
 _EXERCISES = _discover_exercises()
 
 
-def refresh_exercises() -> tuple[str, ...]:
+def refresh_exercises(content_root=None, trainers_path: str = "Trainer") -> tuple[str, ...]:
     """Lade die Trainerdefinitionen nach einer Inhaltssynchronisation neu."""
     global _EXERCISES
-    _EXERCISES = _discover_exercises()
+    _EXERCISES = _discover_exercises(content_root, trainers_path)
     return exercise_names()
 
 
