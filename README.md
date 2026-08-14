@@ -1,4 +1,4 @@
-# <img src="packaging/macos/assets/app-icon-master.png" alt="PyKIM-Logo" width="72" align="center"> PyKIM
+# <img src="insi/packaging/macos/assets/app-icon-master.png" alt="in:si-Logo" width="72" align="center"> in:si / PyKIM
 
 PyKIM 0.5.5 ist eine deutschsprachige Python-Lernumgebung auf Basis von
 [Pyxel](https://github.com/kitao/pyxel). Eine kleine Pixel-Figur namens KIM
@@ -161,6 +161,31 @@ als eigenständiges Pythonpaket ausgebaut. Dadurch kann PyKIM sowohl innerhalb
 eines in:si-Kurses als auch unabhängig davon in einer IDE, in eigenen
 Unterrichtsmaterialien oder in anderen Pythonprojekten verwendet werden.
 
+### Technischer Schwerpunkt für 0.6.0
+
+Der nächste Release konzentriert sich bewusst auf die technische Grundlage.
+Zum verbindlichen Umfang gehören:
+
+- eine Umgebungsprüfung vor Kursstart und Programmausführung;
+- reproduzierbare, pro Betriebssystem und Architektur neu erzeugte virtuelle
+  Python-Umgebungen; Quellcode, Daten und Lockdateien bleiben portabel, eine
+  bestehende `.venv` wird nicht zwischen Windows, macOS und Linux kopiert;
+- echte lokale Mehrbenutzerprofile mit getrennten Lernständen und Workspaces;
+- absturzsichere, atomare Schreibvorgänge und Wiederherstellung für lokale und
+  exFAT-basierte USB-Arbeitsordner;
+- nachvollziehbares Vertrauen für Kurse und Pakete einschließlich Herkunft,
+  Prüfsummen, Berechtigungen und sichtbarer Warnungen;
+- Kompatibilitätsprüfungen vor Installation, Öffnen und Aktualisieren;
+- versionierte, getestete und vorab gesicherte Daten- und Kursmigrationen;
+- datensparsame Voreinstellungen und eine verständliche Datenschutzübersicht;
+- verpflichtende Angaben zu Lizenz, Quellen und verantwortlicher Person oder
+  Organisation eines Kurses.
+
+Kompetenzmodelle, Peer-Review, weitergehende Kollaboration und andere
+didaktische Ausbaustufen bleiben wichtig, gehören aber bewusst in **Future**.
+Dieser Release stabilisiert zuerst die technische Basis, auf der solche
+Kursmechanismen später verlässlich aufbauen können.
+
 ### Geplante Weiterentwicklung von PyKIM
 
 Die Pixelwelt soll schrittweise über reine Zeichen- und Bewegungsaufgaben
@@ -178,6 +203,13 @@ den Weg zum Algorithmus nachvollziehbar und testbar machen.
 
 Diese Bausteine gehören zur geplanten PyKIM-Modul-Roadmap und sind noch nicht
 Bestandteil der stabilen API.
+
+Ebenfalls für eine spätere PyKIM-Version vorgesehen ist eine validierte
+Sprachmap für die Lern-API. Kurse oder Sprachpakete können damit kanonische
+Befehle wie `right`, `paint` oder `get_position` mit lokalen Aliasen wie
+`rechts`, `male` oder `position_lesen` anbieten. Kollisionsprüfung und eine
+eindeutige Rückführung auf die kanonische API halten Trainer und Projekte
+kompatibel; Python-Schlüsselwörter selbst bleiben unverändert.
 
 Die Umstellung erfolgt schrittweise. Der sichtbare App-Name lautet **in:si**,
 technische Desktop-Artefakte heißen `insi`; das Pythonmodul, vorhandene
@@ -948,11 +980,10 @@ Dieser Abschnitt beschreibt die aktuelle Anwendung. Ihre allgemeinen
 Lernplattform-Funktionen bilden später den Kern von in:si; PyKIM-spezifische
 Welt- und Laufzeitfunktionen wandern in das eigenständige Pythonmodul.
 
-Start als Desktopanwendung über den neuen oder den kompatiblen alten Befehl:
+Start als Desktopanwendung:
 
 ```bash
 insi
-pykim-guide
 ```
 
 Alternativ im Browserfenster:
@@ -1019,7 +1050,7 @@ validiert: unterstützt werden ausschließlich öffentliche GitHub-Repositories
 mit sicheren Branch- und Inhaltspfaden.
 
 Neue freie Kurse werden in
-[`src/pykim/guide/course_catalog.json`](src/pykim/guide/course_catalog.json)
+[`insi/src/insi/course_catalog.json`](insi/src/insi/course_catalog.json)
 eingetragen. Zur normalen Setupkonfiguration kommen nur Kennung,
 Kurzbeschreibung, Niveaustufe und Tags hinzu. Der Standardkurs verwendet zum
 Beispiel `Python`, `Programmiergrundlagen`, `PyKIM`, `Pyxel` und `OOP`.
@@ -1520,8 +1551,9 @@ python -m pip install -e .
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e '.[guide]'
-pykim-guide
+python -m pip install -e .
+python -m pip install -e ./insi
+insi
 ```
 
 Unter Windows wird die Umgebung so aktiviert:
@@ -1534,6 +1566,7 @@ Unter Windows wird die Umgebung so aktiviert:
 
 ```bash
 python -m pip install -e '.[test]'
+python -m pip install -e './insi[test]'
 pytest
 ```
 
@@ -1543,7 +1576,7 @@ Kursdateien, Erweiterungen, Projekte, Laufzeiten und Suite-Helfer.
 NiceGUI-E2E-Test separat:
 
 ```bash
-python -m pip install -e '.[e2e]'
+python -m pip install -e './insi[test]'
 pytest -m e2e
 ```
 
@@ -1551,13 +1584,19 @@ Manuelle Plattformtests stehen in `QUALITAETSSICHERUNG.md`.
 
 ### Architektur der Desktop-Lernumgebung
 
-`src/pykim/guide/app.py` ist bewusst nur der Application Composer: Er verbindet
+`insi/src/insi/app.py` ist bewusst nur der Application Composer: Er verbindet
 NiceGUI, den expliziten `AppContext`, den Desktop-Lebenszyklus und den
 Workspace. Kursauswahl, Setup, Werkzeuge und Updates, Aufgaben, Abgabe sowie
 die übrigen Ansichten liegen in getrennten `*_view.py`-Modulen. Umfangreiche
 Views werden erst beim tatsächlichen App-Start importiert. Architekturtests
 begrenzen die Größe von Composer und Workspace, damit neue Funktionen nicht
 erneut in einer zentralen `main()` zusammenwachsen.
+
+Die Anwendung lebt bereits im eigenen Python-Paket `insi`, während die
+Pixelwelt und ihre fachlichen APIs unter `pykim` bleiben. Beide Pakete werden
+vorerst gemeinsam aus diesem Repository ausgeliefert. Der frühere
+Suite-Namespace `pykim.guide` wurde entfernt. Die Anwendung lebt
+vollständig unter `insi`; das Paket `pykim` bleibt dadurch unabhängig.
 
 ### Test-Helfer
 
@@ -1732,7 +1771,8 @@ git push origin v0.5.5
 ```
 
 Die Versionsnummer im Tag muss der Version in `pyproject.toml` und
-`pykim.__version__` entsprechen; der Workflow bricht bei einer Abweichung ab.
+den Versionsangaben von PyKIM und in:si entsprechen; der Workflow bricht bei
+einer Abweichung ab.
 Signierung, Apple-Notarisierung und ein
 Windows-Code-Signing-Zertifikat sind bewusst noch nicht automatisiert; dafür
 wären Repository-Secrets und die jeweiligen Herstellerkonten erforderlich.

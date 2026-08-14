@@ -12,7 +12,7 @@ def main() -> int:
     if platform.system() != "Darwin":
         raise SystemExit("Das macOS-Icon kann nur unter macOS erzeugt werden.")
     project = Path(__file__).resolve().parents[1]
-    assets = project / "packaging" / "macos" / "assets"
+    assets = project / "insi" / "packaging" / "macos" / "assets"
     source = assets / "app-icon-master.png"
     target = assets / "app-icon.icns"
     if not source.is_file():

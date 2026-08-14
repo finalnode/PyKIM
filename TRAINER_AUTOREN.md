@@ -5,7 +5,7 @@ Funktionen und keinen Python-Import. Die Suite übersetzt ausschließlich bekann
 Prüftypen in ihre fest eingebaute Prüfmaschine.
 
 Alle mitgelieferten Definitionen stehen momentan in
-`src/pykim/guide/Trainer/definitions.yml`:
+`insi/src/insi/Trainer/definitions.yml`:
 
 ```yaml
 format: 1
@@ -179,6 +179,6 @@ diesen Typ in YAML verwenden. Beliebiger Python-Code, Lambdas oder dynamische
 Imports gehören nicht in Trainingsdaten.
 
 Die Aufgabenstellung bleibt als gleichnamige Markdown-Datei unter
-`src/pykim/guide/Aufgaben/imperativ/` oder `Aufgaben/oop/`. Das Autorenwerkzeug
+`insi/src/insi/Aufgaben/imperativ/` oder `Aufgaben/oop/`. Das Autorenwerkzeug
 der Suite erzeugt und validiert YAML und Markdown gemeinsam und speichert
 Entwürfe unter `.pykim/author_drafts/` im Kursordner.

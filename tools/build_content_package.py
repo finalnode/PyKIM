@@ -14,7 +14,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--version", default="2026.08.1")
     options = parser.parse_args(arguments)
     project = Path(__file__).resolve().parents[1]
-    guide = project / "src" / "pykim" / "guide"
+    guide = project / "src" / "insi"
     paths = sorted(
         [
             path

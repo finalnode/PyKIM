@@ -1,4 +1,4 @@
-"""Prüfe, ob Release-Tag und beide PyKIM-Versionsquellen übereinstimmen."""
+"""Prüfe den gemeinsamen Release-Tag gegen PyKIM und in:si."""
 
 from __future__ import annotations
 
@@ -30,17 +30,22 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("tag", help="Git-Tag, beispielsweise v0.5.2")
     options = parser.parse_args(arguments)
     project = Path(__file__).resolve().parents[1]
-    with (project / "pyproject.toml").open("rb") as source:
-        project_version = str(tomllib.load(source)["project"]["version"])
-    runtime_version = source_version(project / "src" / "pykim" / "__init__.py")
+    versions = {}
+    for name, metadata, runtime in (
+        ("PyKIM", project / "pyproject.toml", project / "src" / "pykim" / "__init__.py"),
+        ("in:si", project / "insi" / "pyproject.toml", project / "insi" / "src" / "insi" / "__init__.py"),
+    ):
+        with metadata.open("rb") as source:
+            versions[f"{name} metadata"] = str(tomllib.load(source)["project"]["version"])
+        versions[f"{name} runtime"] = source_version(runtime)
     tag_version = options.tag.removeprefix("v")
-    if len({project_version, runtime_version, tag_version}) != 1:
+    if len({*versions.values(), tag_version}) != 1:
         raise SystemExit(
-            "Versionskonflikt: "
-            f"Tag={tag_version}, pyproject.toml={project_version}, "
-            f"pykim.__version__={runtime_version}"
+            "Versionskonflikt: " + ", ".join(
+                [f"Tag={tag_version}", *(f"{key}={value}" for key, value in versions.items())]
+            )
         )
-    print(f"Releaseversion {project_version} ist konsistent.")
+    print(f"Releaseversion {tag_version} ist konsistent.")
     return 0
 
 

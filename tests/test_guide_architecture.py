@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pykim.guide.context import (
+from insi.context import (
     AppContext,
     CourseSelectionState,
     CourseSyncState,
@@ -13,7 +13,7 @@ from pykim.guide.context import (
 
 
 PROJECT = Path(__file__).resolve().parents[1]
-GUIDE = PROJECT / "src" / "pykim" / "guide"
+GUIDE = PROJECT / "insi" / "src" / "insi"
 
 
 def test_app_is_a_small_application_composer():
@@ -70,3 +70,16 @@ def test_context_state_rejects_unknown_compatibility_keys():
     with pytest.raises(KeyError):
         CourseSyncState().update(unknown=True)
 
+
+def test_pykim_package_contains_no_insi_guide_namespace():
+    assert not (PROJECT / "src" / "pykim" / "guide").exists()
+
+
+def test_pykim_core_does_not_depend_on_insi_application():
+    core = PROJECT / "src" / "pykim"
+    offenders = []
+    for path in core.rglob("*.py"):
+        if "from insi" in path.read_text(encoding="utf-8"):
+            offenders.append(path.relative_to(core).as_posix())
+
+    assert offenders == []

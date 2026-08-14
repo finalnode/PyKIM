@@ -8,6 +8,8 @@ import re
 
 import yaml
 
+from .content import trainer_content_root
+
 
 @dataclass(frozen=True)
 class MatchingPair:
@@ -185,20 +187,25 @@ def load_activities(
     return result
 
 
-def _discover() -> dict[str, Activity]:
-    from pykim.guide.updates import active_content_root
-
-    packaged = Path(__file__).resolve().parents[1] / "guide"
-    active = active_content_root(packaged)
-    return load_activities(active / "Trainer", active / "Aufgaben")
+def _discover(
+    content_root=None,
+    trainers_path: str = "Trainer",
+    assignments_path: str = "Aufgaben",
+) -> dict[str, Activity]:
+    active = content_root or trainer_content_root()
+    return load_activities(active / trainers_path, active / assignments_path)
 
 
 _ACTIVITIES = _discover()
 
 
-def refresh_activities() -> tuple[str, ...]:
+def refresh_activities(
+    content_root=None,
+    trainers_path: str = "Trainer",
+    assignments_path: str = "Aufgaben",
+) -> tuple[str, ...]:
     global _ACTIVITIES
-    _ACTIVITIES = _discover()
+    _ACTIVITIES = _discover(content_root, trainers_path, assignments_path)
     return activity_names()
 
 

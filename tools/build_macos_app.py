@@ -19,6 +19,7 @@ def main(arguments: list[str] | None = None) -> int:
     if platform.system() != "Darwin":
         raise SystemExit("Der macOS-App-Build muss unter macOS ausgeführt werden.")
     project = Path(__file__).resolve().parents[1]
+    app_project = project / "insi"
     if os.environ.get("PYKIM_MACOS_BUILD_ENV") != "1":
         environment = project / "build" / "macos-venv"
         python = environment / "bin" / "python"
@@ -26,7 +27,11 @@ def main(arguments: list[str] | None = None) -> int:
             subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
         subprocess.run([str(python), "-m", "pip", "install", "--upgrade", "pip"], check=True)
         subprocess.run(
-            [str(python), "-m", "pip", "install", "-e", f"{project}[build]"],
+            [str(python), "-m", "pip", "install", "-e", str(project)],
+            check=True,
+        )
+        subprocess.run(
+            [str(python), "-m", "pip", "install", "-e", f"{app_project}[build]"],
             check=True,
         )
         child_environment = os.environ.copy()
@@ -63,7 +68,7 @@ def main(arguments: list[str] | None = None) -> int:
     ]
     if not options.skip_clean:
         command.append("--clean")
-    command.append(str(project / "packaging" / "macos" / "PyKIM.spec"))
+    command.append(str(app_project / "packaging" / "macos" / "PyKIM.spec"))
     subprocess.run(command, cwd=project, check=True)
     application = project / "dist" / "macos" / "insi.app"
     if not application.is_dir():

@@ -28,6 +28,7 @@ def main(arguments: list[str] | None = None) -> int:
         raise SystemExit("Dieser Build ist nur für Windows und Linux vorgesehen.")
 
     project = Path(__file__).resolve().parents[1]
+    app_project = project / "insi"
     platform_name = system.lower()
     if os.environ.get("PYKIM_DESKTOP_BUILD_ENV") != "1":
         environment = project / "build" / f"{platform_name}-venv"
@@ -36,7 +37,11 @@ def main(arguments: list[str] | None = None) -> int:
             subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
         subprocess.run([str(python), "-m", "pip", "install", "--upgrade", "pip"], check=True)
         subprocess.run(
-            [str(python), "-m", "pip", "install", "-e", f"{project}[build]"],
+            [str(python), "-m", "pip", "install", "-e", str(project)],
+            check=True,
+        )
+        subprocess.run(
+            [str(python), "-m", "pip", "install", "-e", f"{app_project}[build]"],
             check=True,
         )
         child_environment = os.environ.copy()
@@ -73,7 +78,7 @@ def main(arguments: list[str] | None = None) -> int:
     ]
     if not options.skip_clean:
         command.append("--clean")
-    command.append(str(project / "packaging" / "desktop" / "PyKIM.spec"))
+    command.append(str(app_project / "packaging" / "desktop" / "PyKIM.spec"))
     subprocess.run(command, cwd=project, check=True)
 
     application = destination / "insi"

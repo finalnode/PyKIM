@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pykim
 import pytest
-from pykim.guide.app import (
+from insi.app import (
     apply_macos_app_icon,
     app_icon_path,
     browser_favicon,
@@ -22,8 +22,8 @@ from pykim.guide.app import (
     parse_arguments,
     prepare_windows_browser_fallback,
 )
-from pykim.guide.content import PYODIDE_PLAYGROUND
-from pykim.guide.course import (
+from insi.content import PYODIDE_PLAYGROUND
+from insi.course import (
     clear_course_selection,
     create_course,
     provision_course_exercises,
@@ -40,14 +40,14 @@ from pykim.guide.course import (
     set_runtime_preference,
     trash_course,
 )
-from pykim.guide.ide import (
+from insi.ide import (
     configure_thonny,
     configure_vscode,
     discover_ides,
     launch_ide,
     thonny_profile_directory,
 )
-from pykim.guide.runtime import (
+from insi.runtime import (
     RuntimeCandidate,
     discover_runtimes,
     inspect_runtime,
@@ -59,7 +59,7 @@ from pykim.guide.runtime import (
     repair_runtime,
     runtime_diagnostics,
 )
-from pykim.guide.progress import (
+from insi.progress import (
     load_progress,
     clear_exercise_progress,
     record_attempt,
@@ -69,27 +69,27 @@ from pykim.guide.progress import (
     save_revealed_hint_count,
     revealed_hint_count,
 )
-from pykim.guide.execution import ExecutionManager, ScriptExampleManager
-from pykim.guide.script_quality import (
+from insi.execution import ExecutionManager, ScriptExampleManager
+from insi.script_quality import (
     annotated_script_blocks,
     classify_script_block,
     run_headless,
 )
-from pykim.guide.author_workspace import (
+from insi.author_workspace import (
     AuthorDraft,
     assignment_markdown,
     load_published_draft,
     save_author_draft,
     validate_author_draft,
 )
-from pykim.guide.examples import (
+from insi.examples import (
     copy_example_to_course,
     example_programs,
     launch_example,
     start_example,
 )
-from pykim.guide.pyxel_examples_view import copy_pyxel_example_to_course
-from pykim.guide.projects import (
+from insi.pyxel_examples_view import copy_pyxel_example_to_course
+from insi.projects import (
     create_project,
     launch_project,
     load_project,
@@ -99,7 +99,7 @@ from pykim.guide.projects import (
     save_project_text,
     student_projects,
 )
-from pykim.guide.library import (
+from insi.library import (
     PACKAGED_CONTENT_ROOT,
     script_chapters,
     script_code_examples,
@@ -113,7 +113,7 @@ from pykim.guide.library import (
     task_names,
     task_sources,
 )
-from pykim.guide.updates import (
+from insi.updates import (
     _course_active_marker,
     active_content_root,
     check_app_update,
@@ -125,18 +125,18 @@ from pykim.guide.updates import (
     verify_certificate_trainers,
     verify_certificate_authorization,
 )
-from pykim.guide.course_setup import (
+from insi.course_setup import (
     course_setup_info,
     install_new_course_archive,
     install_new_course_setup,
     sync_installed_course_content,
 )
-from pykim.guide.course_archive import (
+from insi.course_archive import (
     build_course_archive,
     course_content_source,
     parse_course_archive,
 )
-from pykim.guide.course_builder_view import (
+from insi.course_builder_view import (
     analyze_course_directory,
     course_documents,
     course_source_counts,
@@ -147,9 +147,9 @@ from pykim.guide.course_builder_view import (
     save_course_assignment,
     save_course_markdown,
 )
-from pykim.guide.markedown import parse_markedown, validate_markedown
-from pykim.guide.course_catalog import load_course_catalog, parse_course_catalog
-from pykim.guide.system import (
+from insi.markedown import parse_markedown, validate_markedown
+from insi.course_catalog import load_course_catalog, parse_course_catalog
+from insi.system import (
     execute_student_program,
     execute_script_example,
     github_version,
@@ -166,7 +166,8 @@ from pykim.guide.system import (
     system_status,
     system_user_name,
 )
-from pykim.trainer.assignments import ASSIGNMENTS, get_assignment
+from insi.sources import source_references
+from insi.assignments import ASSIGNMENTS, get_assignment
 from pykim.trainer.models import CheckReport, CheckResult, OptimizationResult
 from pykim.trainer.authoring import generate_exercise_source
 
@@ -179,7 +180,7 @@ def test_guide_starts_as_desktop_by_default_and_supports_browser_fallback():
     assert not apply_macos_app_icon("🤖")
     native = SimpleNamespace(start_args={})
     assert configure_native_app_icon(native, Path(app_icon_path()))
-    assert native.start_args["icon"].endswith("app-icon-master.png")
+    assert native.start_args["icon"].endswith("insi/assets/app-icon.png")
 
 
 def test_windows_browser_fallback_opens_only_without_native_window():
@@ -226,17 +227,57 @@ def test_runtime_version_matches_project_metadata():
 
     with (Path(__file__).parents[1] / "pyproject.toml").open("rb") as source:
         assert pykim.__version__ == tomllib.load(source)["project"]["version"]
+    import insi
+
+    with (Path(__file__).parents[1] / "insi" / "pyproject.toml").open("rb") as source:
+        assert insi.__version__ == tomllib.load(source)["project"]["version"]
 
 
 def test_published_example_course_setup_is_valid():
     setup = Path(__file__).parents[1] / "examples" / "course-setups" / (
         "pykim-standardkurs.pykim-setup"
     )
-    from pykim.guide.course_setup import setup_info
+    from insi.course_setup import setup_info
 
     parsed = setup_info(setup)
     assert parsed.course == "PyKIM Standardkurs"
     assert parsed.repository == "https://github.com/finalnode/PyKIM_Kurs.git"
+
+
+def test_footer_sources_collect_software_course_and_assignment_sources(
+    tmp_path, monkeypatch
+):
+    content = tmp_path / "content"
+    assignments = content / "Aufgaben" / "imperativ"
+    assignments.mkdir(parents=True)
+    (assignments / "mit-quelle.md").write_text(
+        "# Aufgabe\n@source: CS Circles | https://example.test/task\n",
+        encoding="utf-8",
+    )
+    (assignments / "_entwurf.md").write_text(
+        "# Entwurf\n@source: Versteckt | https://example.test/hidden\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PYKIM_CONTENT_DIR", str(content))
+    setup_path = Path(__file__).parents[1] / "examples" / "course-setups" / (
+        "pykim-standardkurs.pykim-setup"
+    )
+    from insi.course_setup import setup_info
+
+    references = source_references(setup_info(setup_path))
+
+    assert any(item.kind == "software" for item in references)
+    assert any(item.kind == "license" for item in references)
+    assert any(
+        item.kind == "course"
+        and item.url == "https://github.com/finalnode/PyKIM_Kurs"
+        for item in references
+    )
+    assert any(
+        item.label == "CS Circles" and item.url == "https://example.test/task"
+        for item in references
+    )
+    assert all(item.label != "Versteckt" for item in references)
 
 
 def test_packaged_course_catalog_contains_the_public_standard_course():
@@ -336,7 +377,7 @@ def test_each_selected_course_uses_its_own_cached_content(tmp_path, monkeypatch)
         roots.append(root)
 
     monkeypatch.setattr(
-        "pykim.guide.course_setup.course_setup_info",
+        "insi.course_setup.course_setup_info",
         lambda course: setups[courses.index(Path(course))],
     )
     for course, expected in zip(courses, roots):
@@ -359,18 +400,17 @@ def test_uploaded_setup_creates_and_selects_a_managed_course(tmp_path, monkeypat
         "trainers_path": "Trainer",
     }).encode()
     calls = []
+    target = tmp_path / "content"
     monkeypatch.setattr(
-        "pykim.guide.updates.sync_certificate_content",
-        lambda info: calls.append(info.repository),
+        "insi.updates.sync_certificate_content",
+        lambda info: calls.append(info.repository) or target,
     )
     monkeypatch.setattr(
-        "pykim.trainer.exercises.refresh_exercises", lambda: calls.append("exercises")
+        "insi.registries.activate_content_registries",
+        lambda root, **paths: calls.append(("registries", root, paths)),
     )
     monkeypatch.setattr(
-        "pykim.trainer.assignments.refresh_assignments", lambda: calls.append("assignments")
-    )
-    monkeypatch.setattr(
-        "pykim.guide.course.provision_course_exercises",
+        "insi.course.provision_course_exercises",
         lambda course: calls.append(Path(course)),
     )
 
@@ -385,8 +425,11 @@ def test_uploaded_setup_creates_and_selects_a_managed_course(tmp_path, monkeypat
     assert get_course_directory() == course
     assert calls == [
         "https://github.com/example/course.git",
-        "exercises",
-        "assignments",
+        (
+            "registries",
+            target,
+            {"trainers_path": "Trainer", "assignments_path": "Aufgaben"},
+        ),
         course,
     ]
 
@@ -673,7 +716,7 @@ def test_archive_import_is_offline_and_name_collisions_create_a_second_course(
     clear_course_selection()
     monkeypatch.setenv("PYKIM_CONTENT_DIR", str(PACKAGED_CONTENT_ROOT))
     from pykim.trainer.activities import refresh_activities
-    from pykim.trainer.assignments import refresh_assignments
+    from insi.assignments import refresh_assignments
     from pykim.trainer.exercises import refresh_exercises
 
     refresh_exercises()
@@ -717,29 +760,30 @@ def test_startup_sync_uses_repository_from_installed_course_setup(tmp_path, monk
     target = tmp_path / "config" / "content" / "versions" / ("a" * 40)
     course.mkdir()
     target.mkdir(parents=True)
-    setup = object()
+    setup = SimpleNamespace(
+        trainers_path="Trainer",
+        assignments_path="Aufgaben",
+    )
     calls = []
 
     monkeypatch.setattr(
-        "pykim.guide.course_setup.course_setup_info", lambda selected: setup
+        "insi.course_setup.course_setup_info", lambda selected: setup
     )
     monkeypatch.setattr(
-        "pykim.guide.updates.active_content_root", lambda _packaged: tmp_path / "old"
+        "insi.updates.active_content_root", lambda _packaged: tmp_path / "old"
     )
     monkeypatch.setattr(
-        "pykim.guide.updates.sync_certificate_content",
+        "insi.updates.sync_certificate_content",
         lambda configuration, timeout=20.0: calls.append(
             (configuration, timeout)
         ) or target,
     )
     monkeypatch.setattr(
-        "pykim.trainer.exercises.refresh_exercises", lambda: calls.append("exercises")
+        "insi.registries.activate_content_registries",
+        lambda root, **paths: calls.append(("registries", root, paths)),
     )
     monkeypatch.setattr(
-        "pykim.trainer.assignments.refresh_assignments", lambda: calls.append("assignments")
-    )
-    monkeypatch.setattr(
-        "pykim.guide.course.provision_course_exercises",
+        "insi.course.provision_course_exercises",
         lambda selected: calls.append(("provision", selected)),
     )
 
@@ -748,8 +792,11 @@ def test_startup_sync_uses_repository_from_installed_course_setup(tmp_path, monk
     assert result.checked_online and result.updated
     assert calls == [
         (setup, 7.0),
-        "exercises",
-        "assignments",
+        (
+            "registries",
+            tmp_path / "old",
+            {"trainers_path": "Trainer", "assignments_path": "Aufgaben"},
+        ),
         ("provision", course.resolve()),
     ]
 
@@ -958,7 +1005,7 @@ def test_content_update_is_hash_checked_and_activated_atomically(tmp_path, monke
             return archive
 
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
-    monkeypatch.setattr("pykim.guide.updates.urlopen", lambda request, timeout: Response())
+    monkeypatch.setattr("insi.updates.urlopen", lambda request, timeout: Response())
 
     installed = install_content_update(manifest)
 
@@ -979,7 +1026,7 @@ def test_content_update_rejects_changed_archive(tmp_path, monkeypatch):
         def read(self):
             return b"manipuliert"
 
-    monkeypatch.setattr("pykim.guide.updates.urlopen", lambda request, timeout: Response())
+    monkeypatch.setattr("insi.updates.urlopen", lambda request, timeout: Response())
     with pytest.raises(ValueError, match="Prüfsumme"):
         install_content_update(
             {
@@ -1018,7 +1065,7 @@ def test_content_update_falls_back_to_hash_checked_raw_files(tmp_path, monkeypat
         return Response()
 
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
-    monkeypatch.setattr("pykim.guide.updates.urlopen", open_with_failed_archive)
+    monkeypatch.setattr("insi.updates.urlopen", open_with_failed_archive)
 
     installed = install_content_update(manifest)
 
@@ -1067,7 +1114,7 @@ def test_script_example_uses_unbuffered_python(monkeypatch):
         calls.append((command, kwargs))
         return Completed()
 
-    monkeypatch.setattr("pykim.guide.system.subprocess.run", run)
+    monkeypatch.setattr("insi.system.subprocess.run", run)
 
     result = execute_script_example("print(28)\nprint(19)")
 
@@ -1269,11 +1316,11 @@ def test_project_launch_uses_selected_runtime_and_project_working_directory(
     python = tmp_path / "runtime" / "python"
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.runtime.selected_runtime",
+        "insi.runtime.selected_runtime",
         lambda course=None: RuntimeCandidate(str(python), "3.13", "Test", True, True, True),
     )
     monkeypatch.setattr(
-        "pykim.guide.projects.subprocess.Popen",
+        "insi.projects.subprocess.Popen",
         lambda command, cwd=None, env=None, **_options: calls.append(
             (command, cwd, env)
         ),
@@ -1306,7 +1353,7 @@ def test_all_packaged_examples_run_headless():
 def test_running_example_explicitly_disables_progress(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.examples.subprocess.Popen",
+        "insi.examples.subprocess.Popen",
         lambda command, **kwargs: calls.append((command, kwargs)),
     )
 
@@ -1318,7 +1365,7 @@ def test_running_example_explicitly_disables_progress(monkeypatch):
 def test_gallery_example_uses_observable_execution_manager(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.examples.script_example_manager.start",
+        "insi.examples.script_example_manager.start",
         lambda source: calls.append(source) or "job-123",
     )
 
@@ -1380,8 +1427,8 @@ def test_course_setup_creates_all_starters_and_preserves_student_work(
 
 
 def test_system_user_name_falls_back_to_login(monkeypatch):
-    monkeypatch.setattr("pykim.guide.system.getpass.getuser", lambda: "ada")
-    monkeypatch.setattr("pykim.guide.system.platform.system", lambda: "Windows")
+    monkeypatch.setattr("insi.system.getpass.getuser", lambda: "ada")
+    monkeypatch.setattr("insi.system.platform.system", lambda: "Windows")
 
     assert system_user_name() == "ada"
 
@@ -1396,9 +1443,9 @@ def test_system_file_opening_uses_platform_launcher(
     target = tmp_path / "aufgabe.py"
     target.write_text("print('ok')", encoding="utf-8")
     calls = []
-    monkeypatch.setattr("pykim.guide.system.platform.system", lambda: platform_name)
+    monkeypatch.setattr("insi.system.platform.system", lambda: platform_name)
     monkeypatch.setattr(
-        "pykim.guide.system.subprocess.Popen",
+        "insi.system.subprocess.Popen",
         lambda command, cwd=None: calls.append(command),
     )
 
@@ -1473,8 +1520,8 @@ def test_runtime_discovery_scans_conda_pyenv_and_uv(tmp_path, monkeypatch):
     for executable in expected:
         executable.parent.mkdir(parents=True, exist_ok=True)
         executable.write_text("", encoding="utf-8")
-    monkeypatch.setattr("pykim.guide.runtime.Path.home", lambda: home)
-    monkeypatch.setattr("pykim.guide.runtime.platform.system", lambda: "Linux")
+    monkeypatch.setattr("insi.runtime.Path.home", lambda: home)
+    monkeypatch.setattr("insi.runtime.platform.system", lambda: "Linux")
     monkeypatch.delenv("CONDA_PREFIX", raising=False)
     monkeypatch.delenv("VIRTUAL_ENV", raising=False)
 
@@ -1494,12 +1541,12 @@ def test_provisioned_runtime_installs_package_and_becomes_preferred(tmp_path, mo
     calls = []
     ready = RuntimeCandidate(str(python), "3.13.1", "PyKIM-Kursumgebung", True, True, True)
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
-    monkeypatch.setattr("pykim.guide.runtime.create_managed_runtime", lambda *args: ready)
-    monkeypatch.setattr("pykim.guide.runtime._package_source", lambda: source)
-    monkeypatch.setattr("pykim.guide.runtime.bundled_wheelhouse", lambda: None)
-    monkeypatch.setattr("pykim.guide.runtime.inspect_runtime", lambda *args: ready)
+    monkeypatch.setattr("insi.runtime.create_managed_runtime", lambda *args: ready)
+    monkeypatch.setattr("insi.runtime._package_source", lambda: source)
+    monkeypatch.setattr("insi.runtime.bundled_wheelhouse", lambda: None)
+    monkeypatch.setattr("insi.runtime.inspect_runtime", lambda *args: ready)
     monkeypatch.setattr(
-        "pykim.guide.runtime.subprocess.run",
+        "insi.runtime.subprocess.run",
         lambda command, **kwargs: calls.append((command, kwargs)),
     )
 
@@ -1520,13 +1567,13 @@ def test_runtime_install_uses_bundled_wheels_offline(tmp_path, monkeypatch):
     python.write_text("", encoding="utf-8")
     calls = []
     monkeypatch.setenv("PYKIM_WHEELHOUSE", str(wheelhouse))
-    monkeypatch.setattr("pykim.guide.runtime._package_source", lambda: source)
+    monkeypatch.setattr("insi.runtime._package_source", lambda: source)
     monkeypatch.setattr(
-        "pykim.guide.runtime.subprocess.run",
+        "insi.runtime.subprocess.run",
         lambda command, **kwargs: calls.append((command, kwargs)),
     )
 
-    from pykim.guide.runtime import _install_runtime_packages
+    from insi.runtime import _install_runtime_packages
     _install_runtime_packages(python)
 
     assert bundled_wheelhouse() == wheelhouse
@@ -1574,12 +1621,12 @@ def test_launch_vscode_configures_workspace_before_opening(tmp_path, monkeypatch
     python.write_text("", encoding="utf-8")
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.ide.discover_ides",
-        lambda: {"vscode": __import__("pykim.guide.ide", fromlist=["IDEInstallation"]).IDEInstallation(
+        "insi.ide.discover_ides",
+        lambda: {"vscode": __import__("insi.ide", fromlist=["IDEInstallation"]).IDEInstallation(
             "vscode", "Visual Studio Code", "/usr/bin/code"
         )},
     )
-    monkeypatch.setattr("pykim.guide.ide.subprocess.Popen", lambda command: calls.append(command))
+    monkeypatch.setattr("insi.ide.subprocess.Popen", lambda command: calls.append(command))
 
     launch_ide(tmp_path, "vscode", python=python)
 
@@ -1613,13 +1660,13 @@ def test_launch_thonny_passes_dedicated_user_directory(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
-        "pykim.guide.ide.discover_ides",
-        lambda: {"thonny": __import__("pykim.guide.ide", fromlist=["IDEInstallation"]).IDEInstallation(
+        "insi.ide.discover_ides",
+        lambda: {"thonny": __import__("insi.ide", fromlist=["IDEInstallation"]).IDEInstallation(
             "thonny", "Thonny", "/usr/bin/thonny"
         )},
     )
     monkeypatch.setattr(
-        "pykim.guide.ide.subprocess.Popen",
+        "insi.ide.subprocess.Popen",
         lambda command, env=None: calls.append((command, env)),
     )
 
@@ -1688,37 +1735,6 @@ def test_trainer_records_an_attempt_when_course_is_configured(
     assert progress["attempts"][0]["successful"]
 
 
-def test_trainer_check_verifies_setup_repository_first(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-    from pykim.guide.updates import TrainerVerification
-    from pykim.trainer import runner
-
-    course = tmp_path / "course"
-    course.mkdir()
-    setup = SimpleNamespace(repository="https://github.com/example/course.git")
-    calls = []
-    monkeypatch.setenv("PYKIM_COURSE_DIR", str(course))
-    monkeypatch.setattr(
-        "pykim.guide.course_setup.course_setup_info",
-        lambda _course: setup,
-    )
-    monkeypatch.setattr(
-        "pykim.guide.course_setup.verify_installed_course_setup",
-        lambda _course, allow_offline: (
-            setup,
-            TrainerVerification(True, False),
-        ),
-    )
-    monkeypatch.setattr(
-        "pykim.guide.updates.verify_certificate_trainers",
-        lambda configuration: calls.append(configuration) or TrainerVerification(True, False),
-    )
-
-    runner._refresh_remote_trainers()
-
-    assert calls == [setup]
-
-
 def test_record_attempt_is_disabled_without_a_configured_course(
     tmp_path, monkeypatch
 ):
@@ -1762,7 +1778,7 @@ def test_starter_prepares_declarative_task_world_before_student_code():
 
 
 def test_system_status_reports_versions_and_tools(monkeypatch):
-    monkeypatch.setattr("pykim.guide.system.shutil.which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr("insi.system.shutil.which", lambda name: f"/bin/{name}")
 
     status = system_status()
 
@@ -1774,11 +1790,11 @@ def test_system_status_reports_versions_and_tools(monkeypatch):
 def test_launch_pyxel_editor_uses_official_edit_command(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.system.shutil.which",
+        "insi.system.shutil.which",
         lambda name: "/usr/local/bin/pyxel" if name == "pyxel" else None,
     )
     monkeypatch.setattr(
-        "pykim.guide.system.subprocess.Popen",
+        "insi.system.subprocess.Popen",
         lambda command, cwd=None: calls.append((command, cwd)),
     )
     resource = tmp_path / "assets" / "game.pyxres"
@@ -1799,14 +1815,14 @@ def test_pyxel_tools_use_bundled_python_without_global_command(tmp_path, monkeyp
     example = examples / "01_hello.py"
     example.write_text("import pyxel", encoding="utf-8")
     monkeypatch.setattr(pyxel, "__file__", str(package / "__init__.py"))
-    monkeypatch.setattr("pykim.guide.system.shutil.which", lambda _name: None)
+    monkeypatch.setattr("insi.system.shutil.which", lambda _name: None)
     monkeypatch.setattr(
-        "pykim.guide.system.python_command",
+        "insi.system.python_command",
         lambda: ["/Applications/insi.app/Contents/MacOS/insi-python", "--pykim-python"],
     )
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.system.subprocess.Popen",
+        "insi.system.subprocess.Popen",
         lambda command, cwd=None: calls.append((command, cwd)),
     )
     resource = tmp_path / "assets" / "game.pyxres"
@@ -1827,7 +1843,7 @@ def test_pyxel_tools_use_bundled_python_without_global_command(tmp_path, monkeyp
 
 
 def test_frozen_python_runner_keeps_windows_executable_suffix(tmp_path, monkeypatch):
-    from pykim.guide.interpreter import command_for
+    from insi.interpreter import command_for
 
     suite = tmp_path / "insi.exe"
     runner = tmp_path / "insi-python.exe"
@@ -1850,12 +1866,12 @@ def test_list_and_launch_installed_pyxel_example(tmp_path, monkeypatch):
     second.write_text("import pyxel", encoding="utf-8")
     monkeypatch.setattr(pyxel, "__file__", str(package / "__init__.py"))
     monkeypatch.setattr(
-        "pykim.guide.system.shutil.which",
+        "insi.system.shutil.which",
         lambda name: "/usr/local/bin/pyxel" if name == "pyxel" else None,
     )
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.system.subprocess.Popen",
+        "insi.system.subprocess.Popen",
         lambda command, cwd=None: calls.append((command, cwd)),
     )
 
@@ -1906,7 +1922,7 @@ def test_github_version_reads_remote_pyproject(monkeypatch):
         def read(self):
             return b'[project]\nname = "PyKIM"\nversion = "9.9.9"\n'
 
-    monkeypatch.setattr("pykim.guide.system.urlopen", lambda request, timeout: Response())
+    monkeypatch.setattr("insi.system.urlopen", lambda request, timeout: Response())
 
     info = github_version()
 
@@ -1915,9 +1931,9 @@ def test_github_version_reads_remote_pyproject(monkeypatch):
 
 
 def test_release_update_selects_matching_macos_architecture(monkeypatch):
-    monkeypatch.setattr("pykim.guide.updates.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("insi.updates.platform.machine", lambda: "x86_64")
     monkeypatch.setattr(
-        "pykim.guide.updates._json_url",
+        "insi.updates._json_url",
         lambda url, timeout: {
             "tag_name": "v9.9.9",
             "html_url": "https://example.invalid/release",
@@ -1948,7 +1964,7 @@ def test_content_update_compares_bundled_manifest(tmp_path, monkeypatch):
     )
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
-        "pykim.guide.updates._json_url",
+        "insi.updates._json_url",
         lambda url, timeout: {
             "content_version": "2026.08.2",
             "minimum_app_version": "0.2.0",
@@ -1985,7 +2001,7 @@ def repository_api(revision, files):
 
 
 def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, monkeypatch):
-    from pykim.submission.crypto import ContentConfiguration
+    from insi.submission.crypto import ContentConfiguration
 
     files = {
         "Skripte/imperativ/01_start.md": b"# Start\n",
@@ -2008,7 +2024,7 @@ def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, mo
     revision = "a" * 40
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
-        "pykim.guide.updates._json_url",
+        "insi.updates._json_url",
         repository_api(revision, files),
     )
 
@@ -2017,7 +2033,7 @@ def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, mo
             return json.dumps(index).encode("utf-8")
         return files[next(name for name in files if url.endswith("/" + name))]
 
-    monkeypatch.setattr("pykim.guide.updates._download", download)
+    monkeypatch.setattr("insi.updates._download", download)
     configuration = ContentConfiguration(
         "https://github.com/finalnode/PyKIM_Kurs.git",
         "main",
@@ -2039,13 +2055,13 @@ def test_certificate_content_sync_downloads_individual_hashed_files(tmp_path, mo
 
 
 def test_certificate_authorization_uses_same_named_repository_hash(monkeypatch):
-    from pykim.submission.crypto import ContentConfiguration
+    from insi.submission.crypto import ContentConfiguration
 
     certificate = b'{"format":"test-certificate"}'
     expected = hashlib.sha256(certificate).hexdigest()
     requested = []
     monkeypatch.setattr(
-        "pykim.guide.updates._download",
+        "insi.updates._download",
         lambda url, _timeout: requested.append(url) or f"sha256:{expected}\n".encode("ascii"),
     )
     configuration = ContentConfiguration(
@@ -2067,10 +2083,10 @@ def test_certificate_authorization_uses_same_named_repository_hash(monkeypatch):
 
 
 def test_certificate_authorization_rejects_unlisted_certificate(monkeypatch):
-    from pykim.submission.crypto import ContentConfiguration
+    from insi.submission.crypto import ContentConfiguration
 
     monkeypatch.setattr(
-        "pykim.guide.updates._download",
+        "insi.updates._download",
         lambda *_args: b"sha256:" + b"0" * 64,
     )
     configuration = ContentConfiguration(
@@ -2087,7 +2103,7 @@ def test_certificate_authorization_rejects_unlisted_certificate(monkeypatch):
 
 
 def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, monkeypatch):
-    from pykim.submission.crypto import ContentConfiguration
+    from insi.submission.crypto import ContentConfiguration
 
     files = {
         "Skripte/imperativ/01_start.md": b"# Start\n",
@@ -2108,7 +2124,7 @@ def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, m
     revision = "b" * 40
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
-        "pykim.guide.updates._json_url", repository_api(revision, files)
+        "insi.updates._json_url", repository_api(revision, files)
     )
 
     def download(url, _timeout):
@@ -2116,7 +2132,7 @@ def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, m
             return json.dumps(index).encode("utf-8")
         return files[next(name for name in files if url.endswith("/" + name))]
 
-    monkeypatch.setattr("pykim.guide.updates._download", download)
+    monkeypatch.setattr("insi.updates._download", download)
     configuration = ContentConfiguration(
         "https://github.com/finalnode/PyKIM_Kurs.git",
         "main",
@@ -2134,7 +2150,7 @@ def test_trainer_verification_ignores_remote_assignment_only_changes(tmp_path, m
 
 
 def test_trainer_verification_replaces_changed_trainer_data(tmp_path, monkeypatch):
-    from pykim.submission.crypto import ContentConfiguration
+    from insi.submission.crypto import ContentConfiguration
 
     old_trainer = (
         b"format: 1\nid: quadrat-5\ntitle: Quadrat\ntests:\n"
@@ -2161,7 +2177,7 @@ def test_trainer_verification_replaces_changed_trainer_data(tmp_path, monkeypatc
     current_revision = [next(revisions)]
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
-        "pykim.guide.updates._json_url",
+        "insi.updates._json_url",
         repository_api(lambda: current_revision[0], files),
     )
 
@@ -2170,7 +2186,7 @@ def test_trainer_verification_replaces_changed_trainer_data(tmp_path, monkeypatc
             return json.dumps(index()).encode("utf-8")
         return files[next(name for name in files if url.endswith("/" + name))]
 
-    monkeypatch.setattr("pykim.guide.updates._download", download)
+    monkeypatch.setattr("insi.updates._download", download)
     configuration = ContentConfiguration(
         "https://github.com/finalnode/PyKIM_Kurs.git",
         "main",
@@ -2199,7 +2215,7 @@ def test_missing_first_release_is_treated_as_current(tmp_path, monkeypatch):
     )
     monkeypatch.setenv("PYKIM_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(
-        "pykim.guide.updates._json_url",
+        "insi.updates._json_url",
         lambda url, timeout: (_ for _ in ()).throw(
             HTTPError(url, 404, "Not Found", None, None)
         ),
@@ -2221,13 +2237,13 @@ def test_run_student_program_is_limited_to_python_files_in_course(
     task.write_text("print('ok')", encoding="utf-8")
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.system.subprocess.Popen",
+        "insi.system.subprocess.Popen",
         lambda command, cwd=None, env=None, **_options: calls.append(
             (command, cwd, env)
         ),
     )
     monkeypatch.setattr(
-        "pykim.guide.runtime.selected_runtime",
+        "insi.runtime.selected_runtime",
         lambda course=None: RuntimeCandidate(
             __import__("sys").executable, "3.11.0", "Test", True, True, True
         ),
@@ -2267,11 +2283,11 @@ def test_execute_student_program_captures_output(tmp_path, monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        "pykim.guide.system.subprocess.run",
+        "insi.system.subprocess.run",
         lambda command, **kwargs: (calls.append((command, kwargs)) or Completed()),
     )
     monkeypatch.setattr(
-        "pykim.guide.runtime.selected_runtime",
+        "insi.runtime.selected_runtime",
         lambda course=None: RuntimeCandidate(
             __import__("sys").executable, "3.11.0", "Test", True, True, True
         ),
@@ -2415,7 +2431,7 @@ def test_pyxel_repair_uses_supported_version_range(monkeypatch):
         calls.append((command, kwargs))
         return object()
 
-    monkeypatch.setattr("pykim.guide.system.subprocess.run", run)
+    monkeypatch.setattr("insi.system.subprocess.run", run)
 
     install_or_repair_pyxel()
 

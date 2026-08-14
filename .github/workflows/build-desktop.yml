@@ -24,6 +24,7 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[test]"
+      - run: python -m pip install -e "./insi[test]"
       - run: python -m pytest
       - name: Release-Tag gegen Projektversion prüfen
         if: startsWith(github.ref, 'refs/tags/v')

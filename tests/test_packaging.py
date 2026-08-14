@@ -10,15 +10,19 @@ PROJECT = Path(__file__).parents[1]
 
 
 def test_test_extra_contains_collection_time_dependencies():
-    with (PROJECT / "pyproject.toml").open("rb") as source:
-        dependencies = tomllib.load(source)["project"]["optional-dependencies"]["test"]
+    with (PROJECT / "insi/pyproject.toml").open("rb") as source:
+        project = tomllib.load(source)["project"]
+    dependencies = [
+        *project["dependencies"],
+        *project["optional-dependencies"]["test"],
+    ]
 
     assert any(dependency.startswith("cryptography") for dependency in dependencies)
     assert any(dependency.startswith("Send2Trash") for dependency in dependencies)
 
 
 def test_windows_build_pins_compatible_pythonnet():
-    with (PROJECT / "pyproject.toml").open("rb") as source:
+    with (PROJECT / "insi/pyproject.toml").open("rb") as source:
         dependencies = tomllib.load(source)["project"]["optional-dependencies"]["build"]
 
     assert "pythonnet==3.0.5; sys_platform == 'win32'" in dependencies
@@ -47,20 +51,23 @@ def test_desktop_workflow_covers_all_release_targets():
 
 def test_pyinstaller_specs_are_valid_python_and_use_common_entrypoint():
     for relative in (
-        "packaging/desktop/PyKIM.spec",
-        "packaging/macos/PyKIM.spec",
+        "insi/packaging/desktop/PyKIM.spec",
+        "insi/packaging/macos/PyKIM.spec",
     ):
         path = PROJECT / relative
         source = path.read_text(encoding="utf-8")
         compile(source, str(path), "exec")
         assert 'packaging" / "app_entry.py' in source
 
+    entrypoint = (PROJECT / "insi/packaging/app_entry.py").read_text(encoding="utf-8")
+    assert "from insi.app import main" in entrypoint
+
 
 def test_desktop_brand_uses_safe_technical_names_and_visible_display_name():
-    desktop = (PROJECT / "packaging/desktop/PyKIM.spec").read_text(
+    desktop = (PROJECT / "insi/packaging/desktop/PyKIM.spec").read_text(
         encoding="utf-8"
     )
-    macos = (PROJECT / "packaging/macos/PyKIM.spec").read_text(
+    macos = (PROJECT / "insi/packaging/macos/PyKIM.spec").read_text(
         encoding="utf-8"
     )
 
