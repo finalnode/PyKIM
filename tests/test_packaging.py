@@ -26,6 +26,16 @@ def test_wheel_validator_accepts_only_pykim_and_metadata(tmp_path):
     )
 
 
+def test_wheel_validator_accepts_normalized_metadata_name(tmp_path):
+    wheel = _wheel(
+        tmp_path,
+        "pykim/__init__.py",
+        "pykim-0.6.0.dist-info/METADATA",
+    )
+
+    assert "pykim-0.6.0.dist-info/METADATA" in validate_wheel(wheel)
+
+
 @pytest.mark.parametrize("member", ["insi/app.py", "pykim/guide/app.py"])
 def test_wheel_validator_rejects_application_modules(tmp_path, member):
     wheel = _wheel(tmp_path, "pykim/__init__.py", member)
@@ -43,4 +53,3 @@ def test_wheel_validator_rejects_moved_trainer_modules(tmp_path):
 
     with pytest.raises(ValueError, match="Ausgelagerter Paketinhalt"):
         validate_wheel(wheel)
-

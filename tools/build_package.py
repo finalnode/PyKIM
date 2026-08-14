@@ -35,8 +35,9 @@ def validate_wheel(wheel: str | Path) -> tuple[str, ...]:
     for member in members:
         parts = PurePosixPath(member).parts
         top_level = parts[0] if parts else ""
+        normalized = top_level.lower()
         if top_level == "pykim" or (
-            top_level.startswith("PyKIM-") and top_level.endswith(".dist-info")
+            normalized.startswith("pykim-") and normalized.endswith(".dist-info")
         ):
             continue
         raise ValueError(f"Fremder Paketinhalt im PyKIM-Wheel: {member}")
@@ -74,13 +75,12 @@ def build_wheel(output_directory: str | Path) -> Path:
                 "wheel",
                 str(project),
                 "--no-deps",
-                "--no-build-isolation",
                 "--wheel-dir",
                 str(wheels),
             ],
             check=True,
         )
-        built = tuple(wheels.glob("PyKIM-*.whl"))
+        built = tuple(wheels.glob("*.whl"))
         if len(built) != 1:
             raise RuntimeError(
                 f"Erwartet wurde genau ein PyKIM-Wheel, gefunden: {len(built)}"
@@ -102,4 +102,3 @@ def main(arguments: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
