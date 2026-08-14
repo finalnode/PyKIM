@@ -33,6 +33,14 @@ python -m pip install -e '.[test]'
 python -m pytest
 ```
 
+Ein Release-Wheel wird immer aus einer frischen Quellkopie gebaut und danach
+auf fremde oder bereits ausgelagerte Module geprüft. Dadurch können lokale
+Altstände unter `build/` das Paket nicht verunreinigen:
+
+```bash
+python tools/build_package.py --output dist
+```
+
 Unter Windows wird die Umgebung mit `.venv\Scripts\activate` aktiviert.
 
 ## Erstes Programm
@@ -151,18 +159,84 @@ other_world = pykim.World(other)
 Damit können Anwendungen und Tests voneinander unabhängige Welten erzeugen,
 ohne die einsteigerfreundliche imperative API aufzugeben.
 
-## Trainer als externer Inhaltsvertrag
+## Fachliche Prüfregeln statt Kurszustand
 
-Der Trainerkern kann deklarative YAML-Prüfungen laden. PyKIM selbst enthält
-bewusst keinen fest eingebauten Kurs. Eine Lernanwendung oder ein Kurs setzt
-den bereits geprüften Inhaltsordner über `PYKIM_TRAINER_CONTENT_DIR`; darunter
-liegt üblicherweise `Trainer/`.
+PyKIM stellt fachliche Prüfbausteine für Weltzustand, Pixel, Farben, Bewegung,
+Audio und Pythonstrukturen bereit. Konkrete Trainerdefinitionen, aktive
+Aufgabenregistrys, interaktive Aufgabentypen und Lernfortschritt gehören jedoch
+zum Kurs beziehungsweise zur Host-Anwendung – beispielsweise in:si.
+
+| Bestandteil | Verantwortlich |
+|---|---|
+| Pixelwelt, Laufzeit und Anfänger-API | PyKIM |
+| PyKIM-spezifische Prüfregeln und Prüfmodelle | PyKIM |
+| konkrete `Trainer/*.yml` mit Sollwerten und Hinweisen | Kursrepository oder Kursarchiv |
+| aktiver Kurs, Aufgabenregistry, Feedback und Lernfortschritt | Host-Anwendung, zum Beispiel in:si |
+| Prozessisolation und Betriebssystem-Sandbox | Host-Anwendung |
+
+Ein normales PyKIM-Programm braucht deshalb keinen Trainer und keine
+Lernplattform:
+
+```python
+from pykim import *
+
+paint("orange")
+right(20)
+run()
+```
+
+Erst `prepare("...")` oder `run(check="...")` benötigt einen Provider. Das
+folgende kleine Beispiel zeigt die öffentliche Schnittstelle, wie sie auch von
+Tests oder einer anderen Lernanwendung verwendet werden kann:
+
+```python
+from pykim import configure_trainer_provider, prepare, run
+from pykim.trainer.models import WorldSetup
+
+
+class MyTrainer:
+    def get_world_setup(self, exercise_name):
+        return WorldSetup(
+            background="dark_blue",
+            start=(20, 20),
+            cells=((25, 20, "red"),),
+            obstacles=("gray",),
+        )
+
+    def check_exercise(self, name, source, namespace=None):
+        print(f"Prüfe {name}: {len(source.splitlines())} Codezeilen")
+
+
+configure_trainer_provider(MyTrainer())
+prepare("meine-aufgabe")
+# ... Schülerlösung ...
+run(check="meine-aufgabe")
+```
+
+Für `prepare(...)` und `run(check=...)` verwendet PyKIM deshalb eine optionale
+Provider-Schnittstelle. Eine installierte Lernanwendung kann sie über den
+Entry-Point `pykim.trainer_provider` oder die Umgebungsvariable
+`PYKIM_TRAINER_PROVIDER=modul:objekt` anbieten. Ohne Provider bleibt die
+Pixelwelt vollständig nutzbar; nur kursgebundene Prüfaufrufe melden verständlich
+die fehlende Traineranwendung.
+
+Installierbare Hosts registrieren ihren Provider ohne feste Abhängigkeit in
+`pyproject.toml`:
+
+```toml
+[project.entry-points."pykim.trainer_provider"]
+insi = "insi.training.provider:provider"
+```
+
+Damit darf in:si PyKIM verwenden, während PyKIM niemals in:si importiert. Ein
+Kursupdate aktualisiert seine Kursquelle und Trainerdefinitionen; bestehende
+Schülerprojekte und Fortschrittsdaten bleiben im getrennten Student Workspace.
 
 Diese Trennung sorgt dafür, dass:
 
 - PyKIM nicht von in:si oder einer Kursverwaltung abhängt,
 - verschiedene Kurse eigene Trainerstände verwenden können,
-- Trainer und Kursinhalte gemeinsam versioniert werden,
+- Trainerdaten und Kursinhalte gemeinsam versioniert werden,
 - die Bibliothek auch völlig ohne Lernplattform funktioniert.
 
 PyKIM führt beim Laden der YAML-Dateien keinen beliebigen Pythoncode aus.

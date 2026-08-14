@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -281,32 +280,12 @@ def load_exercises(path: str | Path) -> dict[str, Exercise]:
     result = {}
     seen_names: set[str] = set()
     for definition in definitions:
-        if isinstance(definition, dict) and definition.get("mode") in {"answer", "matching"}:
-            mode = definition.get("mode")
-            unknown = set(definition) - (
-                {"id", "title", "mode", "pairs"}
-                if mode == "matching" else {"id", "title", "mode"}
-            )
-            if unknown:
-                raise ValueError(
-                    "Unbekannte Felder für Antwortaufgabe: "
-                    + ", ".join(sorted(unknown))
-                )
-            name = definition.get("id")
-            title = definition.get("title")
-            if not isinstance(name, str) or not re.fullmatch(
-                r"[a-z0-9]+(?:-[a-z0-9]+)*", name
-            ):
-                raise ValueError("Die Kennung einer Antwortaufgabe muss kebab-case sein.")
-            if not isinstance(title, str) or not title.strip():
-                raise ValueError(f"Für die Antwortaufgabe {name!r} fehlt der Titel.")
-            if name in seen_names:
-                raise ValueError(f"Die Aufgabenkennung {name!r} ist doppelt.")
-            if mode == "matching":
-                from .activities import activity_from_data
-
-                activity_from_data(definition)
-            seen_names.add(name)
+        if isinstance(definition, dict) and definition.get("mode") in {
+            "answer",
+            "matching",
+        }:
+            # Diese Aufgabentypen besitzen keine PyKIM-Welt. Validierung,
+            # Darstellung und Zustand gehören der aufrufenden Lernanwendung.
             continue
         if isinstance(definition, dict) and definition.get("mode") == "parsons":
             definition = {

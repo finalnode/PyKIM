@@ -1,4 +1,4 @@
-"""Deutschsprachige Aufgabenprüfung für den Einsatz mit Thonny."""
+"""Fachliche Prüfbausteine für PyKIM-Aufgaben."""
 
 from .models import CheckReport, CheckResult, OptimizationResult, RuleDefinition
 from .builder import ExerciseBuilder

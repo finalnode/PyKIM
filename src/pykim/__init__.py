@@ -2,6 +2,7 @@
 
 import re
 
+from ._trainer_provider import configure_trainer_provider
 from .runtime import Runtime
 
 __version__ = "0.6.0"
@@ -116,9 +117,9 @@ def prepare(exercise_name: str) -> None:
     """Lade das in sicheren Trainerdaten definierte Aufgabenspielfeld."""
     if not isinstance(exercise_name, str) or not exercise_name:
         raise TypeError("prepare() benötigt eine Aufgabenkennung.")
-    from pykim.trainer.exercises import get_exercise
+    from pykim._trainer_provider import trainer_provider
 
-    setup = get_exercise(exercise_name).world_setup
+    setup = trainer_provider().get_world_setup(exercise_name)
     if setup is None:
         return
     _reset()
@@ -631,7 +632,7 @@ def run(
     if check is not None:
         import inspect
 
-        from pykim.trainer.runner import check_exercise
+        from pykim._trainer_provider import trainer_provider
 
         caller = inspect.currentframe()
         caller = caller.f_back if caller is not None else None
@@ -646,7 +647,7 @@ def run(
         if caller is not None:
             namespace.update(caller.f_globals)
             namespace.update(caller.f_locals)
-        check_exercise(check, source, namespace)
+        trainer_provider().check_exercise(check, source, namespace)
 
     # Dokumentations- und CI-Prüfungen führen vollständige Schülerprogramme
     # absichtlich ohne Fenster aus. Die gesamte Weltlogik ist zu diesem
@@ -752,6 +753,7 @@ runtime.bind(world, kim)
 __all__ = [
     "animate",
     "collect",
+    "configure_trainer_provider",
     "count_color",
     "down",
     "get_color",
