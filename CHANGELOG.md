@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht
 
+## 0.6.0 – 2026-08-14
+
 - die Desktop-Lernumgebung, Kursverwaltung, Autorenwerkstatt, Abgabe und
   Desktop-Builds in das eigenständige Repository
   [finalnode/insi](https://github.com/finalnode/insi) ausgelagert;

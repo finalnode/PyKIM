@@ -4,7 +4,7 @@ import re
 
 from .runtime import Runtime
 
-__version__ = "0.5.5"
+__version__ = "0.6.0"
 
 WIDTH = 160
 HEIGHT = 120

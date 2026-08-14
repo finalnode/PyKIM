@@ -1,5 +1,7 @@
 # PyKIM
 
+**Aktuelle Version: 0.6.0**
+
 PyKIM ist ein kleines Pythonmodul für einen visuellen, pixelbasierten Einstieg
 in die Programmierung. Eine Figur namens KIM bewegt sich auf einer
 [Pyxel](https://github.com/kitao/pyxel)-Welt, malt Pixel, erkennt Farben und
@@ -9,6 +11,10 @@ Die allgemeine Desktop-Lernumgebung, Kursverwaltung und Autorenwerkstatt werden
 im eigenständigen Projekt [in:si](https://github.com/finalnode/insi)
 weiterentwickelt. PyKIM bleibt eine unabhängige Bibliothek und kann ebenso in
 Thonny, VS Code, PyCharm oder eigenen Pythonprojekten verwendet werden.
+
+Seit Version 0.6.0 werden PyKIM und in:si unabhängig veröffentlicht. PyKIM
+enthält ausschließlich Pixelwelt, Laufzeit und Trainerkern; Desktop-App,
+Kursverwaltung und Autorenwerkzeuge gehören zu in:si.
 
 ## Installation
 
@@ -186,11 +192,18 @@ Die Pixelwelt soll Labyrinthe und typische Suchalgorithmen anschaulich machen:
 Breiten- und Tiefensuche, kürzeste Wege, Dijkstra und A*. Einzelne Suchschritte
 sollen animierbar und durch externe Trainer prüfbar werden.
 
-Ebenfalls vorgesehen ist eine validierte Sprachmap für API-Aliase. Kurse können
-dann beispielsweise `right` als `rechts` oder `paint` als `male` anbieten,
-ohne Python-Schlüsselwörter zu verändern. Intern bleibt der kanonische
-PyKIM-Befehl erhalten, damit Projekte und Trainer sprachübergreifend kompatibel
-bleiben.
+### Sprachmaps – geplant, noch nicht implementiert
+
+Vorgesehen ist eine validierte Sprachmap für API-Aliase. Kurse oder
+Sprachpakete sollen dann beispielsweise `right` als `rechts`, `paint` als
+`male` oder `get_position` als `position_lesen` anbieten können, ohne
+Python-Schlüsselwörter zu verändern.
+
+Intern bleibt immer der kanonische PyKIM-Befehl erhalten, damit Projekte und
+Trainer sprachübergreifend kompatibel bleiben. Vor der Veröffentlichung dieser
+Funktion fehlen noch der Sprachpaket-Loader, Kollisionsprüfungen, eine
+eindeutige Rückübersetzung und Tests für gemischte Sprachmaps. Diese Aliase
+sind deshalb **nicht Bestandteil von PyKIM 0.6.0**.
 
 ## Tests
 
